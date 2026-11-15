@@ -1,5 +1,6 @@
 package news.openwire.data.repository
 
+import android.util.Log
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import news.openwire.data.local.ArticleDao
@@ -38,6 +39,7 @@ class FeedRepositoryImpl(
             dao.upsertAll(fresh.map { it.toEntity(topic.id) })
             emit(FeedResult.Success(fresh, fromCache = false))
         } catch (e: Exception) {
+            Log.w("OpenWire", "Observe topic ${topic.id} failed", e)
             if (cached.isEmpty()) {
                 emit(FeedResult.Error(e.message ?: "Network error"))
             }

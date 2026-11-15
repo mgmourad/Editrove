@@ -2,6 +2,8 @@ package news.openwire.di
 
 import android.content.Context
 import news.openwire.data.local.OpenWireDatabase
+import news.openwire.data.remote.AssetNewsDataSource
+import news.openwire.data.remote.FallbackNewsRemote
 import news.openwire.data.remote.NewsRemoteDataSource
 import news.openwire.data.repository.FeedRepository
 import news.openwire.data.repository.FeedRepositoryImpl
@@ -17,6 +19,10 @@ class AppContainer(context: Context) {
     }
 
     val feedRepository: FeedRepository by lazy {
-        FeedRepositoryImpl(NewsRemoteDataSource(), database.articleDao())
+        val remote = FallbackNewsRemote(
+            primary = NewsRemoteDataSource(),
+            fallback = AssetNewsDataSource(context),
+        )
+        FeedRepositoryImpl(remote, database.articleDao())
     }
 }

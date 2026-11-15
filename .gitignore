@@ -56,3 +56,23 @@ test_openwire*.svg
 test_wrapper.html
 *.tmp
 *.bak
+
+# Android / Gradle
+.gradle/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.iml
+*.hprof
+release/
+signing/
+*.jks
+*.keystore
+!gradle/wrapper/gradle-wrapper.jar
+.kotlin/

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -15,10 +17,30 @@ android {
         versionName = "0.1.0"
     }
 
+    // Release signing: never committed. Looked up in <repo>/signing/keystore.properties,
+    // then ~/.openwire/keystore.properties (storeFile, storePassword, keyAlias, keyPassword).
+    val keystoreProps = listOf(
+        rootProject.file("signing/keystore.properties"),
+        file("${System.getProperty("user.home")}/.openwire/keystore.properties"),
+    ).firstOrNull { it.exists() }?.let { f -> Properties().apply { f.inputStream().use(::load) } }
+
+    signingConfigs {
+        if (keystoreProps != null) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
@@ -49,6 +71,7 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     implementation(libs.coil.compose)
+    implementation(libs.haze)
     implementation(libs.androidx.browser)
 
     testImplementation(libs.junit)

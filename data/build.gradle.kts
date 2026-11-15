@@ -28,6 +28,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.jsoup)
     api(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)

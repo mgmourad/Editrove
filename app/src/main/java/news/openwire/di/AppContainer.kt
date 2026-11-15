@@ -3,6 +3,7 @@ package news.openwire.di
 import android.content.Context
 import news.openwire.data.local.OpenWireDatabase
 import news.openwire.data.remote.ArchiveChecker
+import news.openwire.data.remote.ArticleTextExtractor
 import news.openwire.data.remote.AssetNewsDataSource
 import news.openwire.data.remote.FallbackNewsRemote
 import news.openwire.data.remote.GoogleNewsRssSource
@@ -26,6 +27,10 @@ class AppContainer(context: Context) {
 
     val archiveChecker: ArchiveChecker by lazy {
         ArchiveChecker()
+    }
+
+    val articleTextExtractor: ArticleTextExtractor by lazy {
+        ArticleTextExtractor()
     }
 
     val feedRepository: FeedRepository by lazy {

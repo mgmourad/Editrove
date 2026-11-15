@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import news.openwire.OpenWireApp
+import news.openwire.data.remote.ArticleTextExtractor
 import news.openwire.data.repository.FeedRepository
 import news.openwire.data.repository.FeedResult
 import news.openwire.domain.engine.TopicRegistry
@@ -70,6 +71,7 @@ fun HomeScreen() {
     val context = LocalContext.current
     val repository = app.container.feedRepository
     val router = remember { ArticleRouter(app.container.domainRegistry, app.container.archiveChecker) }
+    val extractor = app.container.articleTextExtractor
     val scope = rememberCoroutineScope()
     val topics = remember { TopicRegistry.defaultTopics() }
     val pagerState = rememberPagerState(pageCount = { topics.size })
@@ -84,6 +86,7 @@ fun HomeScreen() {
                 pagerState = pagerState,
                 repository = repository,
                 router = router,
+                extractor = extractor,
                 scope = scope,
                 context = context,
                 selectedArticle = selectedArticle.value,
@@ -97,6 +100,7 @@ fun HomeScreen() {
                 pagerState = pagerState,
                 repository = repository,
                 router = router,
+                extractor = extractor,
                 scope = scope,
                 context = context,
                 selectedArticle = selectedArticle.value,
@@ -114,6 +118,7 @@ private fun CompactLayout(
     pagerState: androidx.compose.foundation.pager.PagerState,
     repository: FeedRepository,
     router: ArticleRouter,
+    extractor: ArticleTextExtractor,
     scope: CoroutineScope,
     context: Context,
     selectedArticle: Article?,
@@ -142,6 +147,7 @@ private fun CompactLayout(
             ReaderOverlay(
                 article = article,
                 router = router,
+                extractor = extractor,
                 scope = scope,
                 context = context,
                 onClose = onCloseArticle,
@@ -156,6 +162,7 @@ private fun ExpandedLayout(
     pagerState: androidx.compose.foundation.pager.PagerState,
     repository: FeedRepository,
     router: ArticleRouter,
+    extractor: ArticleTextExtractor,
     scope: CoroutineScope,
     context: Context,
     selectedArticle: Article?,
@@ -177,7 +184,7 @@ private fun ExpandedLayout(
         }
         Box(modifier = Modifier.fillMaxHeight().weight(0.62f).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.3f))) {
             if (selectedArticle != null) {
-                ReaderContent(article = selectedArticle, router = router, scope = scope, context = context, modifier = Modifier.fillMaxSize())
+                ReaderContent(article = selectedArticle, router = router, extractor = extractor, scope = scope, context = context, modifier = Modifier.fillMaxSize())
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Select a story", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

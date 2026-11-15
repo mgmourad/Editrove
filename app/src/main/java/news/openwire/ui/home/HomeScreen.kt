@@ -1,12 +1,13 @@
 package news.openwire.ui.home
 
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -14,48 +15,80 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import news.openwire.OpenWireApp
+import news.openwire.data.repository.FeedRepository
 import news.openwire.data.repository.FeedResult
-import news.openwire.domain.model.Article
+import news.openwire.domain.engine.TopicRegistry
+import news.openwire.domain.model.Topic
 
 @Composable
 fun HomeScreen() {
     val app = LocalContext.current.applicationContext as OpenWireApp
     val context = LocalContext.current
-    val viewModel: FeedViewModel = viewModel(factory = FeedViewModel.factory(app.container.feedRepository))
+    val repository = app.container.feedRepository
     val router = remember { ArticleRouter(app.container.domainRegistry, app.container.archiveChecker) }
     val scope = rememberCoroutineScope()
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val topics = remember { TopicRegistry.defaultTopics() }
+    val pagerState = rememberPagerState(pageCount = { topics.size })
 
     Scaffold { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             TopicBar(
-                topics = state.topics,
-                selected = state.selected,
-                onSelect = viewModel::selectTopic,
+                topics = topics,
+                selectedIndex = pagerState.currentPage,
+                onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
             )
-            when (val result = state.result) {
-                is FeedResult.Loading -> LoadingState()
-                is FeedResult.Success -> FeedList(
-                    articles = result.articles,
-                    onArticleClick = { article ->
-                        router.open(scope, context, article) {
-                            Toast.makeText(context, "No readable copy available", Toast.LENGTH_SHORT).show()
-                        }
-                    },
+            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+                TopicFeed(
+                    topic = topics[page],
+                    repository = repository,
+                    router = router,
+                    scope = scope,
+                    context = context,
                 )
-                is FeedResult.Error -> ErrorState(result.message, onRetry = viewModel::retry)
-                is FeedResult.Empty -> EmptyState(result.topicId)
             }
         }
+    }
+}
+
+@Composable
+private fun TopicFeed(
+    topic: Topic,
+    repository: FeedRepository,
+    router: ArticleRouter,
+    scope: CoroutineScope,
+    context: Context,
+) {
+    var retry by remember(topic.id) { mutableIntStateOf(0) }
+    val result by produceState<FeedResult>(initialValue = FeedResult.Loading, topic.id, retry) {
+        value = FeedResult.Loading
+        repository.observeTopic(topic).collect { value = it }
+    }
+
+    when (val r = result) {
+        is FeedResult.Loading -> LoadingState()
+        is FeedResult.Success -> DynamicFeedLayout(
+            articles = r.articles,
+            onArticleClick = { article ->
+                router.open(scope, context, article) {
+                    Toast.makeText(context, "No readable copy available", Toast.LENGTH_SHORT).show()
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+        is FeedResult.Error -> ErrorState(r.message, onRetry = { retry++ })
+        is FeedResult.Empty -> EmptyState(r.topicId)
     }
 }
 
@@ -83,22 +116,9 @@ private fun EmptyState(topicId: String) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("No headlines yet", style = MaterialTheme.typography.titleMedium)
             Text(
-                "This edition is fetched live and is coming soon.",
+                "This edition is being fetched live.",
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun FeedList(articles: List<Article>, onArticleClick: (Article) -> Unit) {
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
-        items(articles, key = { it.id }) { article ->
-            ArticleCard(
-                article = article,
-                onArticleClick = { onArticleClick(article) },
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             )
         }
     }

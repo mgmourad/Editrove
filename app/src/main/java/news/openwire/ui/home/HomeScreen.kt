@@ -49,6 +49,9 @@ import news.openwire.R
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import news.openwire.OpenWireApp
 import news.openwire.data.remote.ArticleTextExtractor
 import news.openwire.data.repository.FeedRepository
@@ -129,6 +132,7 @@ private fun CompactLayout(
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
+            Masthead()
             TopicBar(
                 topics = topics,
                 selectedIndex = pagerState.currentPage,
@@ -173,6 +177,7 @@ private fun ExpandedLayout(
     Row(modifier = Modifier.fillMaxSize()) {
         SideRail(selectedTab = selectedTab, onSelectTab = onSelectTab)
         Column(modifier = Modifier.fillMaxHeight().weight(0.5f)) {
+            Masthead()
             TopicBar(
                 topics = topics,
                 selectedIndex = pagerState.currentPage,
@@ -213,6 +218,25 @@ private fun TopicFeed(
         }
         is FeedResult.Empty -> Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Text("Fetching this edition…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun Masthead() {
+    val dateText = remember {
+        LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE • MMM d", Locale.ENGLISH)).uppercase()
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Column {
+            Text(dateText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Row(verticalAlignment = Alignment.Top) {
+                Text("OpenWire", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onBackground)
+                Text("+", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
+            }
         }
     }
 }

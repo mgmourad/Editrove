@@ -62,11 +62,11 @@ fun DynamicFeedLayout(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item(span = { GridItemSpan(2) }, key = "hero") {
-            HeroCard(articles.first(), onArticleClick)
-        }
         item(span = { GridItemSpan(2) }, key = "ticker") {
             TickerStrip(articles, onArticleClick)
+        }
+        item(span = { GridItemSpan(2) }, key = "hero") {
+            HeroCard(articles.first(), onArticleClick)
         }
         item(span = { GridItemSpan(2) }, key = "bento-header") {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -326,7 +326,15 @@ private fun ArticleBody(
 
         Spacer(Modifier.height(8.dp))
         val context = LocalContext.current
-        GlassCard(onClick = { actions.router.open(actions.scope, context, article) }, contentPadding = PaddingValues(16.dp)) {
+        GlassCard(onClick = {
+            actions.router.open(actions.scope, context, article) {
+                android.widget.Toast.makeText(
+                    context,
+                    "No archived copy of this story yet — it stays locked behind the paywall.",
+                    android.widget.Toast.LENGTH_LONG,
+                ).show()
+            }
+        }, contentPadding = PaddingValues(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "Continue on ${article.source ?: "publisher site"}",

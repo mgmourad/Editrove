@@ -1,0 +1,6 @@
+Editrove 0.4.0 — Full view and automatic updates
+• Full view for unfolded and tablet screens: each page fills the screen, the lead story sits beside its photo, and stories open as full pages. Switch from the side rail or Settings › Appearance.
+• Updates: Editrove checks for new versions whenever you open it, shows a banner when one is out, and can install updates automatically (Settings › Updates & changelog).
+• This "What's new" note appears once after each update; the full changelog lives in Settings.
+• Softer glass: the top of the screen now fades like the bottom, with no hard lines.
+• The audio waveform now spans its whole player.

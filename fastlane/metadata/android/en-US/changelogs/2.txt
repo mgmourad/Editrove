@@ -1,0 +1,7 @@
+0.2.0 — Feature-complete v1 preview
+• Settings: editions (any city/country), topics (reorder, hide, custom keyword/source topics), source library with feed checks and custom RSS/Atom, paywall rule editor, backup & restore (incl. web app import).
+• Pull-to-refresh, refresh action and curated/newest/oldest ordering.
+• Hard-paywall stories without an archive copy are greyed out and locked.
+• Open any link via the share sheet, text selection or the "Open a link" dialog.
+• Background refresh and opt-in local notifications per topic.
+• Live feeds weave Google News with direct publisher feeds; photos are found for stories that lack one.

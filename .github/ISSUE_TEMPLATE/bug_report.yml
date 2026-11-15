@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a bug or unexpected behaviour
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please fill in as much detail as you can.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Ordered steps to reproduce the issue.
+      placeholder: |
+        1. Open the app
+        2. Navigate to ...
+        3. Tap ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      placeholder: e.g. 0.1.0
+  - type: input
+    id: device
+    attributes:
+      label: Device / Android version
+      placeholder: e.g. Pixel 8, Android 15
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Any relevant logcat output or screenshots.

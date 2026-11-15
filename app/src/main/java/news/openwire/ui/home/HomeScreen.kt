@@ -172,7 +172,7 @@ private fun ExpandedLayout(
 ) {
     Row(modifier = Modifier.fillMaxSize()) {
         SideRail(selectedTab = selectedTab, onSelectTab = onSelectTab)
-        Column(modifier = Modifier.fillMaxHeight().weight(0.38f)) {
+        Column(modifier = Modifier.fillMaxHeight().weight(0.5f)) {
             TopicBar(
                 topics = topics,
                 selectedIndex = pagerState.currentPage,
@@ -182,7 +182,7 @@ private fun ExpandedLayout(
                 TopicFeed(topics[page], repository, onSelectArticle)
             }
         }
-        Box(modifier = Modifier.fillMaxHeight().weight(0.62f).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.3f))) {
+        Box(modifier = Modifier.fillMaxHeight().weight(0.5f).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.3f))) {
             if (selectedArticle != null) {
                 ReaderContent(article = selectedArticle, router = router, extractor = extractor, scope = scope, context = context, modifier = Modifier.fillMaxSize())
             } else {

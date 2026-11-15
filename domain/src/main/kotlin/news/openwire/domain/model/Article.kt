@@ -17,4 +17,11 @@ data class Article(
     val targetUrl: String? = null,
     val archiveUrl: String? = null,
     val imageUrl: String? = null,
-)
+    /** Public excerpt (RSS description or preview index), plain text. */
+    val summary: String? = null,
+    /** The direct feed this story came from, when woven from a publisher feed. */
+    val feedUrl: String? = null,
+) {
+    /** True when the routing engine needs an archive snapshot to open this story. */
+    val needsArchive: Boolean get() = badge == "Archive.is" || badge == "Wayback"
+}

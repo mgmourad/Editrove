@@ -237,7 +237,7 @@ private fun ArticleBody(
         }
 
         // Editorial serif headline
-        Text(article.title, style = serif(28.sp, FontWeight.Bold, lineHeight = 32.sp, tracking = (-0.01).em), color = g.textPrimary)
+        Text(article.title.ifBlank { content?.title?.takeIf { it.isNotBlank() } ?: article.source ?: article.domain ?: "Article" }, style = serif(28.sp, FontWeight.Bold, lineHeight = 32.sp, tracking = (-0.01).em), color = g.textPrimary)
         Spacer(Modifier.height(12.dp))
 
         // Deck / standfirst — the publisher's own description, when we have it

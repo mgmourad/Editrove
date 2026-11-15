@@ -62,6 +62,9 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.filled.Refresh
 import coil.compose.AsyncImage
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -103,9 +106,9 @@ fun Article.badgeLabel(): String? = badge?.takeIf { it.isNotBlank() } ?: status?
 
 // ---- Masthead + category pills ----------------------------------------------
 
-/** "SUNDAY • NOV 15" / OpenWire masthead with the edition pill on the right. */
+/** "SUNDAY • NOV 15" / OpenWire masthead with the edition pill and settings on the right. */
 @Composable
-fun Masthead(edition: String, modifier: Modifier = Modifier) {
+fun Masthead(edition: String, onEdition: () -> Unit, onSettings: () -> Unit, modifier: Modifier = Modifier) {
     val g = Glass
     val date = remember {
         LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE • MMM d", Locale.ENGLISH)).uppercase()
@@ -128,12 +131,70 @@ fun Masthead(edition: String, modifier: Modifier = Modifier) {
         Spacer(Modifier.weight(1f))
         Box(
             modifier = Modifier
+                .widthIn(max = 150.dp)
                 .clip(CircleShape)
                 .background(g.chipFill)
                 .border(1.dp, g.hairline, CircleShape)
+                .clickable(onClick = onEdition)
                 .padding(horizontal = 10.dp, vertical = 4.dp),
         ) {
             Text(edition, style = sans(11.sp, FontWeight.Medium), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.width(6.dp))
+        Box(
+            Modifier.size(28.dp).clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape).clickable(onClick = onSettings),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.material3.Icon(
+                androidx.compose.material.icons.Icons.Outlined.Settings, contentDescription = "Settings",
+                tint = g.textPrimary, modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+/** Sort mode selector + freshness / refresh action under the category pills (SPEC §6.1). */
+@Composable
+fun FeedControls(
+    sortMode: news.openwire.domain.model.SortMode,
+    updatedAt: Long,
+    refreshing: Boolean,
+    failed: List<String>,
+    onSort: (news.openwire.domain.model.SortMode) -> Unit,
+    onRefresh: () -> Unit,
+) {
+    val g = Glass
+    Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape).padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            news.openwire.domain.model.SortMode.entries.forEach { m ->
+                val active = m == sortMode
+                val bg by animateColorAsState(if (active) g.glassElevated else Color.Transparent, tween(240, easing = SpringEasing), label = "sortBg")
+                Box(
+                    Modifier.clip(CircleShape).background(bg).clickable { onSort(m) }.padding(horizontal = 10.dp, vertical = 5.dp),
+                ) { Text(m.label, style = sans(11.sp, if (active) FontWeight.SemiBold else FontWeight.Medium), color = if (active) g.textPrimary else g.textSecondary) }
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        val label = when {
+            refreshing -> "Refreshing…"
+            updatedAt > 0 -> "Updated " + NewsProcessor.formatRelativeTime(updatedAt)
+            else -> "Saved copy"
+        } + if (failed.isNotEmpty() && !refreshing) " · ${failed.size} source${if (failed.size > 1) "s" else ""} offline" else ""
+        Row(
+            Modifier.clip(CircleShape).clickable(enabled = !refreshing, onClick = onRefresh).padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, style = mono(10.sp, tracking = 0.sp), color = g.textSecondary, maxLines = 1)
+            Spacer(Modifier.width(6.dp))
+            val spin = rememberInfiniteTransition(label = "spin")
+            val angle by spin.animateFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "a")
+            androidx.compose.material3.Icon(
+                androidx.compose.material.icons.Icons.Filled.Refresh, contentDescription = "Refresh",
+                tint = g.accentSoft, modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = if (refreshing) angle else 0f },
+            )
         }
     }
 }
@@ -227,13 +288,16 @@ fun LazyGridScope.feedItems(
     onToggleLiked: (Article) -> Unit,
     showTicker: Boolean = true,
     sectionTitle: String = "Bento Dispatch",
+    archive: Map<String, ArchiveState> = emptyMap(),
 ) {
     if (articles.isEmpty()) return
+    fun state(a: Article) = a.originalUrl?.let { archive[it] }
     if (showTicker) fullRow("ticker") { LiveTicker(articles, onOpen) }
     val hero = articles.first()
     fullRow("hero-${hero.id}") {
         HeroCard(
-            article = hero,
+            article = hero.withArchive(state(hero)),
+            locked = state(hero) == ArchiveState.Locked,
             category = category,
             selected = !compact && selectedId == hero.id,
             saved = hero.id in savedIds,
@@ -266,7 +330,8 @@ fun LazyGridScope.feedItems(
     ) { index, article ->
         Box(feedItemMotion()) {
             BentoCard(
-                article = article,
+                article = article.withArchive(state(article)),
+                locked = state(article) == ArchiveState.Locked,
                 category = category,
                 wide = compact && index % 7 == 2,
                 selected = !compact && selectedId == article.id,
@@ -368,6 +433,7 @@ private fun LivePill() {
 @Composable
 fun HeroCard(
     article: Article,
+    locked: Boolean = false,
     category: String,
     selected: Boolean,
     saved: Boolean,
@@ -376,7 +442,7 @@ fun HeroCard(
 ) {
     GlassCard(
         onClick = { onOpen(article) },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().lockedLook(locked),
         contentPadding = PaddingValues(0.dp),
         selected = selected,
     ) {
@@ -385,6 +451,7 @@ fun HeroCard(
                 article,
                 Modifier.fillMaxSize().sharedArticleImage(article.id, article.imageUrl != null, BentoRadius),
                 logoSize = 72.dp,
+                grayscale = locked,
             )
             // Multi-stop mask for editorial legibility: from-obsidian via-obsidian/65 to-transparent (bottom → top)
             Box(
@@ -447,6 +514,7 @@ fun HeroCard(
 @Composable
 fun BentoCard(
     article: Article,
+    locked: Boolean = false,
     category: String,
     wide: Boolean,
     selected: Boolean,
@@ -459,7 +527,7 @@ fun BentoCard(
     val g = Glass
     GlassCard(
         onClick = { onOpen(article) },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().lockedLook(locked),
         contentPadding = PaddingValues(10.dp),
         selected = selected,
     ) {
@@ -469,6 +537,7 @@ fun BentoCard(
                 article,
                 Modifier.fillMaxSize().sharedArticleImage(article.id, article.imageUrl != null, InnerRadius),
                 logoSize = 36.dp,
+                grayscale = locked,
             )
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.6f))))
             Box(
@@ -520,12 +589,25 @@ fun BentoCard(
     }
 }
 
-/** Article photo, or the publisher logo on a soft canvas when there is none. */
+/** Resolves missing lead photos from the article page (js/imageService.js). */
+val LocalImageResolver = androidx.compose.runtime.staticCompositionLocalOf<news.openwire.data.remote.ImageResolver?> { null }
+
+private val GrayscaleFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) })
+
+/** Article photo; when the feed had none, the page's editorial image; else the publisher logo. */
 @Composable
-fun ArticleImage(article: Article, modifier: Modifier, logoSize: Dp) {
+fun ArticleImage(article: Article, modifier: Modifier, logoSize: Dp, grayscale: Boolean = false) {
     val g = Glass
-    if (article.imageUrl != null) {
-        AsyncImage(model = article.imageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
+    val resolver = LocalImageResolver.current
+    val found by androidx.compose.runtime.produceState<String?>(null, article.imageUrl, article.originalUrl) {
+        value = if (article.imageUrl == null && resolver != null) resolver.resolve(article.originalUrl) else null
+    }
+    val url = article.imageUrl ?: found
+    if (url != null) {
+        AsyncImage(
+            model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier,
+            colorFilter = if (grayscale) GrayscaleFilter else null,
+        )
     } else {
         Box(
             modifier = modifier.background(
@@ -536,6 +618,16 @@ fun ArticleImage(article: Article, modifier: Modifier, logoSize: Dp) {
             SourceLogo(article.domain, article.source, size = logoSize)
         }
     }
+}
+
+/** Hard paywall with no archive snapshot: greyed out and marked locked (SPEC §6.2). */
+fun Modifier.lockedLook(locked: Boolean): Modifier = if (locked) this.graphicsLayer { alpha = 0.55f } else this
+
+/** Applies an archive check result: archived stories open the snapshot; missing ones are locked. */
+fun Article.withArchive(state: ArchiveState?): Article = when (state) {
+    is ArchiveState.Available -> copy(targetUrl = state.url, archiveUrl = state.url, badge = "Archive")
+    ArchiveState.Locked -> copy(status = "locked", badge = "Locked")
+    else -> this
 }
 
 // ---- States ------------------------------------------------------------------------

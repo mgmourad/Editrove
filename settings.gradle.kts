@@ -24,3 +24,4 @@ rootProject.name = "OpenWire"
 include(":app")
 include(":data")
 include(":domain")
+include(":notifications")

@@ -20,7 +20,7 @@ fun ArticleDto.toArticle(): Article = Article(
     imageUrl = imageUrl,
 )
 
-fun Article.toEntity(topicId: String): ArticleEntity = ArticleEntity(
+fun Article.toEntity(topicId: String, position: Int = 0): ArticleEntity = ArticleEntity(
     id = id,
     topicId = topicId,
     title = title,
@@ -33,6 +33,9 @@ fun Article.toEntity(topicId: String): ArticleEntity = ArticleEntity(
     targetUrl = targetUrl,
     archiveUrl = archiveUrl,
     imageUrl = imageUrl,
+    summary = summary,
+    feedUrl = feedUrl,
+    position = position,
 )
 
 fun ArticleEntity.toArticle(): Article = Article(
@@ -47,4 +50,6 @@ fun ArticleEntity.toArticle(): Article = Article(
     targetUrl = targetUrl,
     archiveUrl = archiveUrl,
     imageUrl = imageUrl,
+    summary = summary,
+    feedUrl = feedUrl,
 )

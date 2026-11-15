@@ -17,4 +17,8 @@ data class ArticleEntity(
     val targetUrl: String? = null,
     val archiveUrl: String? = null,
     val imageUrl: String? = null,
+    val summary: String? = null,
+    val feedUrl: String? = null,
+    /** Position in the woven/curated order. */
+    val position: Int = 0,
 )

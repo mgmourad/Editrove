@@ -2,9 +2,10 @@
 package news.openwire.domain.model
 
 /**
- * A news topic. Snapshot-backed topics carry [snapshotFile] (a JSON filename
- * under the data/ directory); live-only topics (US / Washington D.C. in v1)
- * carry [liveUrl] and [liveOnly] = true until their live fetch is implemented.
+ * A news topic. Snapshot-backed topics carry [snapshotFile] (a JSON filename under
+ * the data/ directory); live topics carry [liveUrl] (Google News RSS) and
+ * [liveOnly] = true. Custom topics are built from [keywords] and/or assigned
+ * [sources] (feed source ids).
  */
 data class Topic(
     val id: String,
@@ -12,4 +13,8 @@ data class Topic(
     val snapshotFile: String? = null,
     val liveUrl: String? = null,
     val liveOnly: Boolean = false,
+    val keywords: List<String> = emptyList(),
+    val sources: List<String> = emptyList(),
+    val isCustom: Boolean = false,
+    val isVisible: Boolean = true,
 )

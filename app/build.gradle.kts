@@ -13,8 +13,13 @@ android {
         applicationId = "news.openwire"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+
+        // Static host of the published topic snapshots (SPEC §8). Override with
+        // -Popenwire.dataUrl=https://example.org/ (e.g. your own GitHub Pages copy).
+        val dataUrl = (project.findProperty("openwire.dataUrl") as String?) ?: "https://ansonlai.github.io/OpenWire/"
+        buildConfigField("String", "DATA_BASE_URL", "\"$dataUrl\"")
     }
 
     // Release signing: never committed. Looked up in <repo>/signing/keystore.properties,
@@ -51,12 +56,14 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
 dependencies {
     implementation(project(":domain"))
     implementation(project(":data"))
+    implementation(project(":notifications"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

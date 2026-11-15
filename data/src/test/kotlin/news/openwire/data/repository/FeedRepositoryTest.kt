@@ -35,6 +35,7 @@ class FeedRepositoryTest {
         override suspend fun upsertAll(articles: List<ArticleEntity>) {
             if (articles.isNotEmpty()) store[articles.first().topicId] = articles
         }
+        override suspend fun deleteTopic(topicId: String) { store.remove(topicId) }
     }
 
     private fun repo(remote: NewsRemote, dao: ArticleDao = FakeArticleDao()) =
@@ -76,6 +77,16 @@ class FeedRepositoryTest {
     fun networkErrorWithEmptyCacheSurfacesError() = runTest {
         val results = repo(FakeNewsRemote(error = true)).observeTopic(topic()).toList()
         assertTrue(results.last() is FeedResult.Error)
+    }
+
+    @Test
+    fun cachedCopyIsServedWhenRefreshFails() = runTest {
+        val dao = FakeArticleDao()
+        repo(FakeNewsRemote(listOf(ArticleDto(id = "a", title = "Cached story"))), dao).observeTopic(topic()).toList()
+        val results = repo(FakeNewsRemote(error = true), dao).observeTopic(topic()).toList()
+        val last = results.last() as FeedResult.Success
+        assertTrue(last.fromCache)
+        assertEquals("Cached story", last.articles.single().title)
     }
 
     @Test

@@ -11,24 +11,50 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import news.openwire.domain.model.Article
 
+/** Saved (bookmarked) stories and liked ids. */
+interface Library {
+    val saved: StateFlow<List<Article>>
+    val liked: StateFlow<Set<String>>
+    fun toggleSaved(article: Article): Boolean
+    fun toggleLiked(articleId: String): Boolean
+}
+
+/** In-memory library for tests. */
+class InMemoryLibrary : Library {
+    private val _saved = MutableStateFlow<List<Article>>(emptyList())
+    override val saved: StateFlow<List<Article>> = _saved.asStateFlow()
+    private val _liked = MutableStateFlow<Set<String>>(emptySet())
+    override val liked: StateFlow<Set<String>> = _liked.asStateFlow()
+    override fun toggleSaved(article: Article): Boolean {
+        val now = _saved.value.none { it.id == article.id }
+        _saved.value = if (now) listOf(article) + _saved.value else _saved.value.filterNot { it.id == article.id }
+        return now
+    }
+    override fun toggleLiked(articleId: String): Boolean {
+        val now = articleId !in _liked.value
+        _liked.value = if (now) _liked.value + articleId else _liked.value - articleId
+        return now
+    }
+}
+
 /**
  * On-device reading library: bookmarked (saved) stories and liked story ids.
  * Purely local — nothing ever leaves the device. Saved stories keep a full copy
  * of the article so the Saved tab works offline and after the feed rotates.
  */
-class LibraryStore(context: Context) {
+class LibraryStore(context: Context) : Library {
 
     private val prefs = context.getSharedPreferences("openwire_library", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _saved = MutableStateFlow(loadSaved())
     /** Saved stories, most recently saved first. */
-    val saved: StateFlow<List<Article>> = _saved.asStateFlow()
+    override val saved: StateFlow<List<Article>> = _saved.asStateFlow()
 
     private val _liked = MutableStateFlow(prefs.getStringSet(KEY_LIKED, emptySet()).orEmpty().toSet())
-    val liked: StateFlow<Set<String>> = _liked.asStateFlow()
+    override val liked: StateFlow<Set<String>> = _liked.asStateFlow()
 
-    fun toggleSaved(article: Article): Boolean {
+    override fun toggleSaved(article: Article): Boolean {
         var nowSaved = false
         _saved.update { current ->
             if (current.any { it.id == article.id }) {
@@ -42,7 +68,7 @@ class LibraryStore(context: Context) {
         return nowSaved
     }
 
-    fun toggleLiked(articleId: String): Boolean {
+    override fun toggleLiked(articleId: String): Boolean {
         var nowLiked = false
         _liked.update { current ->
             if (articleId in current) current - articleId else { nowLiked = true; current + articleId }

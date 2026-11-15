@@ -8,4 +8,11 @@ data class RssItem(
     val pubDate: String?,
     val description: String?,
     val source: String?,
+    /** Publisher name from Google News `<source>` text, when present. */
+    val sourceName: String? = null,
+    /** media:content / media:thumbnail / image enclosure, when present. */
+    val imageUrl: String? = null,
 )
+
+/** A parsed feed: its channel title and items. */
+data class ParsedFeed(val title: String?, val items: List<RssItem>)

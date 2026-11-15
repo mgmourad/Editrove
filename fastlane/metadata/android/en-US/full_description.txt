@@ -1,0 +1,22 @@
+<p><b>OpenWire</b> is a fast, ad-free and tracking-free news reader for Android with a smart paywall-routing engine. No accounts, no analytics and no server of its own — your settings and saved stories never leave your device.</p>
+
+<p><b>Read without barriers</b></p>
+<ul>
+<li>Every publisher is classified by its paywall: open articles open directly, metered ones go through reader/bypass tools, and hard paywalls fall back to archive snapshots. Headlines with no readable copy are greyed out and locked.</li>
+<li>Share any article link from another app (or select a URL) to route it through the engine.</li>
+<li>An in-app reader with narrated audio briefings generated on-device.</li>
+</ul>
+
+<p><b>Your news, your way</b></p>
+<ul>
+<li>Topics: Top, Latest, AI, your country, your city, Business, Tech, International, Science, Entertainment, Sports, Politics, Finance, Lifestyle — reorder or hide them, or create your own from keywords and sources.</li>
+<li>Editions for any city and country, read live from Google News in the right language.</li>
+<li>A library of 70+ direct publisher feeds woven in fairly, plus any RSS or Atom feed you add.</li>
+<li>Curated, newest or oldest ordering; pull to refresh; offline cache; optional background refresh.</li>
+<li>Local, opt-in notifications per topic — no push service.</li>
+<li>Export/import your settings (including from the OpenWire web app).</li>
+</ul>
+
+<p><b>Designed for foldables</b>: a Liquid Glass interface with a floating navigation pill on the cover screen and a side-by-side reader when unfolded, in Black Glass or Editorial Paper themes.</p>
+
+<p>OpenWire for Android is a fork of the original OpenWire web app by Anson Lai and is free software under the AGPL-3.0.</p>

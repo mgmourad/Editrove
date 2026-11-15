@@ -8,9 +8,9 @@ directly, routes metered ones through reader/bypass tools, and falls back to
 archive snapshots for hard paywalls — greying out headlines that have no
 readable copy.
 
-> **Status:** 🚧 Documentation complete; Android implementation in progress.
-> This repository is the canonical source for the native Android app (a rebuild
-> of the original OpenWire PWA).
+> **Status:** v0.2.0 — the v1 feature set (SPEC §6) is implemented and in
+> preview. This repository is the canonical source for the native Android app,
+> a fork and rebuild of the original OpenWire PWA by Anson Lai.
 
 ---
 

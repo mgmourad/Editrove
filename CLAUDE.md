@@ -19,11 +19,19 @@ Read these before making changes:
 
 ## Status
 
-The multi-module Gradle project is scaffolded and runs. The UI follows the
-reference prototype (`pulse_news_2026_adaptive_liquid_glass_prototype.html`,
-branded **OpenWire** — never "Pulse" or "OpenWire+"): Liquid Glass / Black Glass + Editorial Paper themes,
+v0.2.0: the SPEC §6 v1 feature set is implemented across `app/`, `data/`,
+`domain/` and `notifications/`. The UI follows the reference prototype
+(`pulse_news_2026_adaptive_liquid_glass_prototype.html`, branded **OpenWire** —
+never "Pulse" or "OpenWire+"): Liquid Glass / Black Glass + Editorial Paper,
 cover-screen Bento feed with floating pill nav and slide-up reader, and an
-unfolded rail + 50/50 feed/reader layout (owner preference over the mock's 38/62) at >= 600dp.
+unfolded rail + 50/50 feed/reader layout (owner preference over the mock's 38/62).
+
+Snapshot host: `BuildConfig.DATA_BASE_URL` (Gradle property `openwire.dataUrl`).
+`openwire.news` is currently a parked page; the default points at the original
+project's GitHub Pages feed until this fork publishes its own.
+
+Release signing reads `signing/keystore.properties` or
+`~/.openwire/keystore.properties` (never committed).
 
 ## Commands
 
@@ -54,7 +62,7 @@ full picture.
 app/            Compose UI, navigation, theme, DI wiring
 data/           Repositories, Room, DataStore, Retrofit/OkHttp
 domain/         Pure Kotlin — models + ported engine logic (no Android deps)
-notifications/  WorkManager + NotificationManager
+notifications/  WorkManager refresh worker + local NotificationManager alerts
 ```
 
 - **`domain/` must stay free of Android framework imports.** All ported PWA

@@ -46,6 +46,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -125,7 +127,7 @@ private class FeedUi(
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun HomeScreen(vm: HomeViewModel) {
+fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.SettingsViewModel) {
     val app = LocalContext.current.applicationContext as OpenWireApp
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
@@ -156,6 +158,11 @@ fun HomeScreen(vm: HomeViewModel) {
         if (it == tab) scope.launch { stateFor(it).animateScrollToItem(0) } else vm.selectTab(it)
     }
 
+    val settingsOpen by vm.settingsOpen.collectAsState()
+    val linkDialog by vm.linkDialog.collectAsState()
+    val themeMode by vm.themeMode.collectAsState()
+
+    CompositionLocalProvider(LocalImageResolver provides app.container.imageResolver) {
     SharedTransitionLayout {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= ExpandedBreakpoint
@@ -166,7 +173,7 @@ fun HomeScreen(vm: HomeViewModel) {
             if (expanded) {
                 AmbientBackdrop()
                 Row(Modifier.fillMaxSize()) {
-                    SideRail(tab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) })
+                    SideRail(tab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) }, onSettings = { vm.openSettings() })
                     Box(Modifier.fillMaxHeight().width(feedWidth)) {
                         TabFeed(
                             vm = vm, tab = tab, compact = false, stateFor = stateFor,
@@ -201,7 +208,26 @@ fun HomeScreen(vm: HomeViewModel) {
                     onClose = { vm.closeSheet() },
                 )
             }
+
+            // Settings slide up over either posture.
+            AnimatedVisibility(
+                visible = settingsOpen,
+                enter = slideInVertically(springTween(480)) { it / 3 } + fadeIn(springTween(300)),
+                exit = slideOutVertically(springTween(380)) { it / 3 } + fadeOut(tween(220)),
+            ) {
+                news.openwire.ui.settings.SettingsScreen(
+                    vm = settingsVm,
+                    themeMode = themeMode,
+                    onTheme = { vm.setTheme(it) },
+                    onOpenLink = { vm.showLinkDialog() },
+                    onClose = { vm.openSettings(false) },
+                )
+            }
+            AnimatedVisibility(linkDialog, enter = fadeIn(tween(180)), exit = fadeOut(tween(160))) {
+                LinkDialog(onOpen = { vm.openLink(it) }, onDismiss = { vm.showLinkDialog(false) })
+            }
         }
+    }
     }
 }
 
@@ -262,7 +288,7 @@ private fun SharedTransitionScope.ReaderSheetHost(
 }
 
 private fun categoryLabel(vm: HomeViewModel, tab: NavTab, topicIndex: Int): String = when (tab) {
-    NavTab.TODAY, NavTab.AUDIO -> vm.topics[topicIndex].label
+    NavTab.TODAY, NavTab.AUDIO -> vm.topics.getOrNull(topicIndex)?.label ?: vm.topics.first().label
     NavTab.DISCOVER -> "Discover"
     NavTab.SAVED -> "Saved"
 }
@@ -323,7 +349,11 @@ private fun TabFeed(
     val feeds by vm.feeds.collectAsState()
     val saved by vm.saved.collectAsState()
     val query by vm.query.collectAsState()
-    val topic = vm.topics[topicIndex]
+    val topicsList by vm.topicsState.collectAsState()
+    val topic = topicsList.getOrElse(topicIndex) { topicsList.first() }
+    val userSettings by vm.settings.collectAsState()
+    val archive by vm.archive.collectAsState()
+    val refreshingIds by vm.refreshing.collectAsState()
 
     val padding = PaddingValues(
         start = 16.dp, end = 16.dp,
@@ -358,9 +388,22 @@ private fun TabFeed(
         }
         LaunchedEffect(t, visible.firstOrNull()?.id) { visible.firstOrNull()?.let(onFirstArticle) }
 
+        val isRefreshing = when (t) {
+            NavTab.DISCOVER -> refreshingIds.isNotEmpty()
+            NavTab.SAVED -> false
+            else -> topic.id in refreshingIds
+        }
+        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { vm.refresh() },
+            modifier = Modifier.fillMaxSize(),
+        ) {
         EditorialGrid(stateFor(t), padding, Modifier.fillMaxSize()) {
-            fullRow("masthead") { Masthead(EDITION) }
+            fullRow("masthead") {
+                Masthead(userSettings.edition.city, onEdition = { vm.openSettings() }, onSettings = { vm.openSettings() })
+            }
             fun feed(articles: List<Article>, category: String, ticker: Boolean, title: String) = feedItems(
+                archive = archive,
                 articles = articles, category = category, compact = compact,
                 selectedId = ui.selectedId, savedIds = ui.savedIds, likedIds = ui.likedIds,
                 onOpen = onOpen, onToggleSaved = { vm.toggleSaved(it) }, onToggleLiked = { vm.toggleLiked(it) },
@@ -368,11 +411,22 @@ private fun TabFeed(
             )
             when (t) {
                 NavTab.TODAY, NavTab.AUDIO -> {
-                    fullRow("pills") { CategoryPills(vm.topics, topicIndex, onSelect = { vm.selectTopic(it) }) }
+                    fullRow("pills") { CategoryPills(topicsList, topicIndex, onSelect = { vm.selectTopic(it) }) }
                     when (val r = feeds[topic.id]) {
                         is FeedResult.Success -> {
-                            if (t == NavTab.AUDIO) fullRow("briefing-${topic.id}") { HeadlineBriefingCard(topic.label, r.articles) }
-                            feed(r.articles, topic.label, ticker = t == NavTab.TODAY, title = if (t == NavTab.AUDIO) "Listen Next" else "Bento Dispatch")
+                            fullRow("controls") {
+                                FeedControls(
+                                    sortMode = userSettings.sortMode,
+                                    updatedAt = r.updatedAt,
+                                    refreshing = r.refreshing || topic.id in refreshingIds,
+                                    failed = r.failedSources,
+                                    onSort = { vm.setSortMode(it) },
+                                    onRefresh = { vm.refresh() },
+                                )
+                            }
+                            val ordered = news.openwire.domain.engine.FeedOrdering.apply(r.articles, userSettings.sortMode)
+                            if (t == NavTab.AUDIO) fullRow("briefing-${topic.id}") { HeadlineBriefingCard(topic.label, ordered) }
+                            feed(ordered, topic.label, ticker = t == NavTab.TODAY, title = if (t == NavTab.AUDIO) "Listen Next" else "Bento Dispatch")
                         }
                         is FeedResult.Error -> fullRow("err-${topic.id}") {
                             MessageCard("Unable to load ${topic.label}", r.message, "Try again") { vm.retry(topic) }
@@ -385,6 +439,10 @@ private fun TabFeed(
                 }
                 NavTab.DISCOVER -> {
                     fullRow("search") { SearchPill(query, vm::setQuery) }
+                    val pastedUrl = news.openwire.domain.engine.SharedUrl.extract(query).takeIf { query.contains('.') && !query.trim().contains(' ') }
+                    if (!pastedUrl.isNullOrEmpty()) fullRow("open-link") {
+                        MessageCard("Open this link", pastedUrl + "\nOpenWire will route it around its paywall.", "Open") { vm.openLink(pastedUrl) }
+                    }
                     if (visible.isEmpty()) {
                         fullRow("discover-empty") {
                             if (query.isBlank()) MessageCard("Gathering every edition…", "Discover searches across all topics once they load.")
@@ -404,6 +462,7 @@ private fun TabFeed(
                     }
                 }
             }
+        }
         }
     }
 }
@@ -524,7 +583,7 @@ private fun BottomNavPill(
 }
 
 @Composable
-private fun SideRail(selectedTab: NavTab, onSelectTab: (NavTab) -> Unit, onToggleTheme: (Boolean) -> Unit) {
+private fun SideRail(selectedTab: NavTab, onSelectTab: (NavTab) -> Unit, onToggleTheme: (Boolean) -> Unit, onSettings: () -> Unit) {
     val g = Glass
     val systemDark = isSystemInDarkTheme()
     Box(Modifier.width(64.dp).fillMaxHeight()) {
@@ -558,6 +617,13 @@ private fun SideRail(selectedTab: NavTab, onSelectTab: (NavTab) -> Unit, onToggl
                 }
             }
             Spacer(Modifier.weight(1f))
+            Box(
+                Modifier.size(40.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onSettings),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(androidx.compose.material.icons.Icons.Outlined.Settings, contentDescription = "Settings", tint = g.textPrimary.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.height(16.dp))
             // Where the prototype shows a profile photo: OpenWire has no accounts, so this
             // slot toggles Black Glass ↔ Editorial Paper instead.
             Box(
@@ -580,5 +646,57 @@ private fun SideRail(selectedTab: NavTab, onSelectTab: (NavTab) -> Unit, onToggl
             }
         }
         Box(Modifier.align(Alignment.CenterEnd).width(1.dp).fillMaxHeight().background(g.hairline))
+    }
+}
+
+
+/** Quick-URL opener (SPEC §6.5): paste any article link; the paywall engine routes it. */
+@Composable
+private fun LinkDialog(onOpen: (String) -> Unit, onDismiss: () -> Unit) {
+    val g = Glass
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var text by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        clipboard.getText()?.text?.let { clip -> if (news.openwire.domain.engine.SharedUrl.extract(clip).isNotEmpty()) text = clip }
+    }
+    androidx.activity.compose.BackHandler(onBack = onDismiss)
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)).clickable(
+            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, onClick = onDismiss,
+        ),
+        contentAlignment = Alignment.Center,
+    ) {
+        GlassCard(
+            modifier = Modifier.padding(24.dp).fillMaxWidth().widthIn(max = 520.dp)
+                .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {},
+            contentPadding = PaddingValues(22.dp),
+        ) {
+            Text("OPEN A LINK", style = mono(10.sp, FontWeight.SemiBold, 0.16.sp), color = g.accentSoft)
+            Spacer(Modifier.height(4.dp))
+            Text("Read any article", style = serif(22.sp, FontWeight.Bold), color = g.textPrimary)
+            Spacer(Modifier.height(4.dp))
+            Text("Paste a link — OpenWire picks the right way around its paywall and opens it in the reader.", style = sans(12.sp, lineHeight = 18.sp), color = g.textSecondary)
+            Spacer(Modifier.height(14.dp))
+            Box(Modifier.fillMaxWidth().glassSurface(RoundedCornerShape(16.dp), fill = g.glassPill, elevation = 0.dp).padding(14.dp)) {
+                if (text.isEmpty()) Text("https://…", style = sans(14.sp), color = g.textMuted)
+                BasicTextField(
+                    value = text, onValueChange = { text = it }, singleLine = true,
+                    textStyle = sans(14.sp).copy(color = g.textPrimary), cursorBrush = SolidColor(g.accent),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    Modifier.weight(1f).clip(CircleShape).background(g.chipFill).clickable(onClick = onDismiss).padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) { Text("Cancel", style = sans(13.sp, FontWeight.SemiBold), color = g.textPrimary) }
+                Box(
+                    Modifier.weight(1f).clip(CircleShape).background(g.accent).clickable { onOpen(text) }.padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) { Text("Open", style = sans(13.sp, FontWeight.SemiBold), color = Color.White) }
+            }
+        }
     }
 }

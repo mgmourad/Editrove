@@ -1,9 +1,9 @@
 package news.openwire.ui.home
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,6 +14,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -27,7 +29,10 @@ import news.openwire.domain.model.Article
 @Composable
 fun HomeScreen() {
     val app = LocalContext.current.applicationContext as OpenWireApp
+    val context = LocalContext.current
     val viewModel: FeedViewModel = viewModel(factory = FeedViewModel.factory(app.container.feedRepository))
+    val router = remember { ArticleRouter(app.container.domainRegistry, app.container.archiveChecker) }
+    val scope = rememberCoroutineScope()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold { innerPadding ->
@@ -39,7 +44,14 @@ fun HomeScreen() {
             )
             when (val result = state.result) {
                 is FeedResult.Loading -> LoadingState()
-                is FeedResult.Success -> FeedList(result.articles)
+                is FeedResult.Success -> FeedList(
+                    articles = result.articles,
+                    onArticleClick = { article ->
+                        router.open(scope, context, article) {
+                            Toast.makeText(context, "No readable copy available", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                )
                 is FeedResult.Error -> ErrorState(result.message, onRetry = viewModel::retry)
                 is FeedResult.Empty -> EmptyState(result.topicId)
             }
@@ -80,10 +92,14 @@ private fun EmptyState(topicId: String) {
 }
 
 @Composable
-private fun FeedList(articles: List<Article>) {
+private fun FeedList(articles: List<Article>, onArticleClick: (Article) -> Unit) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(articles, key = { it.id }) { article ->
-            ArticleCard(article = article, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+            ArticleCard(
+                article = article,
+                onArticleClick = { onArticleClick(article) },
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            )
         }
     }
 }

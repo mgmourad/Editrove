@@ -1,8 +1,5 @@
 package news.openwire.ui.home
 
-import android.content.Context
-import android.net.Uri
-import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,8 +13,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import news.openwire.domain.engine.NewsProcessor
@@ -26,11 +23,12 @@ import news.openwire.domain.model.Article
 @Composable
 fun ArticleCard(
     article: Article,
+    onArticleClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    Card(onClick = { openInCustomTabs(context, article) }, modifier = modifier) {
-        Column {
+    val locked = article.status == "locked"
+    Card(onClick = onArticleClick, modifier = modifier) {
+        Column(modifier = Modifier.alpha(if (locked) 0.45f else 1f)) {
             val imageUrl = article.imageUrl
             if (imageUrl != null) {
                 AsyncImage(
@@ -68,9 +66,4 @@ fun ArticleCard(
             }
         }
     }
-}
-
-fun openInCustomTabs(context: Context, article: Article) {
-    val url = article.targetUrl ?: article.originalUrl ?: return
-    CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
 }

@@ -2,20 +2,28 @@ package news.openwire.di
 
 import android.content.Context
 import news.openwire.data.local.OpenWireDatabase
+import news.openwire.data.remote.ArchiveChecker
 import news.openwire.data.remote.AssetNewsDataSource
 import news.openwire.data.remote.FallbackNewsRemote
 import news.openwire.data.remote.NewsRemoteDataSource
 import news.openwire.data.repository.FeedRepository
 import news.openwire.data.repository.FeedRepositoryImpl
+import news.openwire.domain.engine.DomainRegistry
 
 /**
  * Manual dependency container (no Hilt in v1 to keep the AGP 9 scaffold lean).
- * Builds the Room database and the feed repository.
+ * Builds the Room database, the feed repository, and the paywall router deps.
  */
 class AppContainer(context: Context) {
 
     private val database: OpenWireDatabase by lazy {
         OpenWireDatabase.create(context)
+    }
+
+    val domainRegistry = DomainRegistry()
+
+    val archiveChecker: ArchiveChecker by lazy {
+        ArchiveChecker()
     }
 
     val feedRepository: FeedRepository by lazy {

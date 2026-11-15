@@ -72,6 +72,9 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         val notifyTopics: Set<String> = emptySet(),
         val backgroundRefresh: Boolean = true,
         val disabledServices: Set<String> = emptySet(),
+        val unfoldedLayout: String = "SPLIT",
+        val autoCheckUpdates: Boolean = true,
+        val autoInstallUpdates: Boolean = false,
     ) {
         fun toSettings() = UserSettings(
             edition = LocalEdition(city, region, country),
@@ -85,6 +88,9 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
             notifyTopics = notifyTopics,
             backgroundRefresh = backgroundRefresh,
             disabledServices = disabledServices.mapNotNull { Strategy.fromWire(it) }.toSet(),
+            unfoldedLayout = news.openwire.domain.model.UnfoldedLayout.entries.firstOrNull { it.name == unfoldedLayout } ?: news.openwire.domain.model.UnfoldedLayout.SPLIT,
+            autoCheckUpdates = autoCheckUpdates,
+            autoInstallUpdates = autoInstallUpdates,
         )
 
         companion object {
@@ -95,6 +101,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 s.customFeeds.map { StoredFeed(it.id, it.name, it.url, it.domain, it.topics, it.maxArticles, it.enabled) },
                 s.disabledSources, s.sortMode.name, s.notificationsEnabled, s.notifyTopics, s.backgroundRefresh,
                 s.disabledServices.map { it.wireValue }.toSet(),
+                s.unfoldedLayout.name, s.autoCheckUpdates, s.autoInstallUpdates,
             )
         }
     }

@@ -13,13 +13,17 @@ android {
         applicationId = "news.editrove"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
 
         // Static host of the published topic snapshots (SPEC §8). Override with
         // -Popenwire.dataUrl=https://example.org/ (e.g. your own GitHub Pages copy).
         val dataUrl = (project.findProperty("openwire.dataUrl") as String?) ?: "https://ansonlai.github.io/OpenWire/"
         buildConfigField("String", "DATA_BASE_URL", "\"$dataUrl\"")
+        // Self-update from GitHub Releases. Store builds (e.g. F-Droid) pass -Popenwire.selfUpdate=false.
+        val selfUpdate = (project.findProperty("openwire.selfUpdate") as String?)?.toBoolean() ?: true
+        buildConfigField("boolean", "SELF_UPDATE", selfUpdate.toString())
+        buildConfigField("String", "UPDATE_REPO", "\"mgmourad/Editrove\"")
     }
 
     // Release signing: never committed. Looked up in <repo>/signing/keystore.properties,
@@ -53,6 +57,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    // The in-app changelog reads the same per-version notes the store listing uses.
+    sourceSets["main"].assets.srcDir("../fastlane/metadata/android/en-US/changelogs")
 
     buildFeatures {
         compose = true

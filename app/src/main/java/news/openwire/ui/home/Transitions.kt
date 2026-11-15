@@ -109,26 +109,30 @@ fun Modifier.frostedGlass(state: HazeState?, blur: Dp = 28.dp): Modifier {
 }
 
 /**
- * Frosted glass behind the status bar: the feed blurs as it scrolls under it,
- * tinted with the app's glass colour and finished with a hairline rim.
+ * Top of the screen: the mirror of [BottomFadeGlass] — a blur that is strongest at
+ * the very top and fades out below the status bar, with no hard edge or rule.
+ * [extra] is how far below the status bar the fade reaches.
  */
 @Composable
-fun StatusBarGlass(state: HazeState?, modifier: Modifier = Modifier) {
+fun StatusBarGlass(state: HazeState?, modifier: Modifier = Modifier, extra: Dp = 28.dp) {
     val g = Glass
     val top = androidx.compose.foundation.layout.WindowInsets.statusBars
         .asPaddingValues().calculateTopPadding()
     androidx.compose.foundation.layout.Box(
-        modifier.fillMaxWidth().height(top + 6.dp)
+        modifier.fillMaxWidth().height(top + extra)
             .then(
                 if (state != null) Modifier.hazeEffect(
                     state,
-                    HazeStyle(backgroundColor = g.deviceBg, tint = HazeTint(g.deviceBg.copy(alpha = 0.55f)), blurRadius = 24.dp, noiseFactor = 0.04f),
-                ) { progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0.75f) }
-                else Modifier.background(g.deviceBg.copy(alpha = 0.85f)),
+                    HazeStyle(backgroundColor = g.deviceBg, tint = HazeTint(g.deviceBg.copy(alpha = 0.35f)), blurRadius = 22.dp, noiseFactor = 0.03f),
+                ) { progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0f) }
+                else Modifier,
             )
-            .drawBehind {
-                drawLine(g.hairline, androidx.compose.ui.geometry.Offset(0f, size.height - 1), androidx.compose.ui.geometry.Offset(size.width, size.height - 1), 1.dp.toPx())
-            },
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    0f to g.deviceBg.copy(alpha = 0.7f),
+                    1f to androidx.compose.ui.graphics.Color.Transparent,
+                ),
+            ),
     )
 }
 

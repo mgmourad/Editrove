@@ -209,6 +209,9 @@ class SettingsViewModel(
     fun setNotificationsEnabled(on: Boolean) = settingsRepo.update { it.copy(notificationsEnabled = on) }
     fun setNotifyTopic(id: String, on: Boolean) = settingsRepo.update { s -> s.copy(notifyTopics = if (on) s.notifyTopics + id else s.notifyTopics - id) }
     fun setSortMode(mode: news.openwire.domain.model.SortMode) = settingsRepo.update { it.copy(sortMode = mode) }
+    fun setUnfoldedLayout(layout: news.openwire.domain.model.UnfoldedLayout) = settingsRepo.update { it.copy(unfoldedLayout = layout) }
+    fun setAutoCheckUpdates(on: Boolean) = settingsRepo.update { it.copy(autoCheckUpdates = on) }
+    fun setAutoInstallUpdates(on: Boolean) = settingsRepo.update { it.copy(autoInstallUpdates = on) }
     fun setBackgroundRefresh(on: Boolean) = settingsRepo.update { it.copy(backgroundRefresh = on) }
 
     // ---- Backup ----

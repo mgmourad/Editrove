@@ -83,6 +83,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Check for a newer release every time the app is opened or returned to (throttled).
+        container.updateManager.onForeground()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)

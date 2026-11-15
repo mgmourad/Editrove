@@ -192,7 +192,12 @@ class HomeViewModel(
 
     fun setQuery(q: String) { _query.value = q }
 
-    fun openSettings(open: Boolean = true) { _settingsOpen.value = open }
+    private val _settingsTarget = MutableStateFlow<String?>(null)
+    /** Settings page to open on (e.g. "updates" from the update banner). */
+    val settingsTarget: StateFlow<String?> = _settingsTarget.asStateFlow()
+
+    fun openSettings(open: Boolean = true) { _settingsTarget.value = null; _settingsOpen.value = open }
+    fun openUpdates() { _settingsTarget.value = "updates"; _settingsOpen.value = true }
     fun showLinkDialog(show: Boolean = true) { _linkDialog.value = show }
 
     /**
@@ -230,6 +235,10 @@ class HomeViewModel(
     }
 
     fun setTheme(mode: ThemeMode) = appearance.set(mode)
+
+    fun toggleUnfoldedLayout() = settingsRepo.update { s ->
+        s.copy(unfoldedLayout = if (s.unfoldedLayout == news.openwire.domain.model.UnfoldedLayout.FULL) news.openwire.domain.model.UnfoldedLayout.SPLIT else news.openwire.domain.model.UnfoldedLayout.FULL)
+    }
 
     private fun load(topic: Topic, force: Boolean = false) {
         if (!force && loadJobs[topic.id]?.isActive == true) return

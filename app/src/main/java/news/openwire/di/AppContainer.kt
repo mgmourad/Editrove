@@ -43,6 +43,11 @@ class AppContainer(context: Context) {
     val imageResolver: ImageResolver by lazy { ImageResolver() }
     val serviceHealth: ServiceHealth by lazy { ServiceHealth() }
 
+    val updateManager: news.openwire.update.UpdateManager by lazy {
+        news.openwire.update.UpdateManager(context, settingsRepository, news.openwire.data.remote.ReleaseSource(news.openwire.BuildConfig.UPDATE_REPO))
+    }
+    val changelog: news.openwire.update.Changelog by lazy { news.openwire.update.Changelog(context) }
+
     /** Paywall routing with service health checks and fallbacks. */
     val articleRouter: news.openwire.ui.home.ArticleRouter by lazy {
         news.openwire.ui.home.ArticleRouter(domainRegistry, archiveChecker, serviceHealth) { settingsRepository.settings.value.disabledServices }

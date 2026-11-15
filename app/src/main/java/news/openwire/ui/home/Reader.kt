@@ -166,7 +166,9 @@ fun ReaderSheet(
         ) {
             ArticleBody(article, category, showMetaBar = false, saved = saved, liked = liked, actions = actions)
         }
-        Column(Modifier.fillMaxWidth().frostedGlass(haze, blur = 24.dp)) {
+        // Faded glass behind the header (no rule), matching the feed's top and bottom fades.
+        StatusBarGlass(haze, extra = headerHeight + 18.dp)
+        Column(Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth().statusBarsPadding().height(headerHeight - 1.dp).padding(horizontal = 20.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -188,20 +190,21 @@ fun ReaderSheet(
                 Spacer(Modifier.width(8.dp))
                 SpringToggle(saved, ToggleKind.BOOKMARK, { actions.onToggleSaved(article) }, background = g.chipFill, padding = 8.dp)
             }
-            Box(Modifier.fillMaxWidth().height(1.dp).background(g.hairline))
         }
     }
 }
 
 /** Shared editorial article layout (prototype `buildArticleHTML`). */
 @Composable
-private fun ArticleBody(
+internal fun ArticleBody(
     article: Article,
     category: String,
     showMetaBar: Boolean,
     saved: Boolean,
     liked: Boolean,
     actions: ReaderActions,
+    /** False when the page already shows the photo as a large header (Full view). */
+    showFeatureImage: Boolean = true,
 ) {
     val g = Glass
     val url = article.originalUrl ?: article.targetUrl ?: ""
@@ -317,7 +320,7 @@ private fun ArticleBody(
         Spacer(Modifier.height(16.dp))
 
         // Feature image (16:9, 24dp radius) with caption
-        article.imageUrl?.let { img ->
+        article.imageUrl?.takeIf { showFeatureImage }?.let { img ->
             Box(
                 Modifier.fillMaxWidth().aspectRatio(16f / 9f)
                     .sharedArticleImage(article.id, hasImage = true, cornerRadius = 24.dp)
@@ -513,24 +516,29 @@ private fun buildNarration(article: Article, content: ArticleContent?): String =
 
 /** `wavePulse`: bars breathe between 35% and 100% height, staggered 70ms apart. */
 @Composable
-internal fun Waveform(playing: Boolean) {
+internal fun Waveform(playing: Boolean, modifier: Modifier = Modifier) {
     val g = Glass
     val t = rememberInfiniteTransition(label = "wave")
-    Row(Modifier.height(16.dp).fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        WaveHeights.forEachIndexed { i, h ->
-            val pulse by t.animateFloat(
-                0.35f, 1f,
-                infiniteRepeatable(tween(450), RepeatMode.Reverse, StartOffset(i * 70)),
-                label = "bar$i",
-            )
-            Box(
-                Modifier.width(4.dp).fillMaxHeight(h / 100f)
-                    .graphicsLayer {
-                        transformOrigin = TransformOrigin(0.5f, 1f)
-                        scaleY = if (playing) pulse else 1f
-                    }
-                    .clip(CircleShape).background(g.accent.copy(alpha = 0.85f)),
-            )
+    // As many 4dp bars (3dp gaps) as fit, spread edge to edge across the container.
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.height(16.dp).fillMaxWidth()) {
+        val count = ((maxWidth.value + 3f) / 7f).toInt().coerceAtLeast(8)
+        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
+            repeat(count) { i ->
+                val h = WaveHeights[(i * 7 + i / WaveHeights.size) % WaveHeights.size]
+                val pulse by t.animateFloat(
+                    0.35f, 1f,
+                    infiniteRepeatable(tween(450), RepeatMode.Reverse, StartOffset((i * 70) % 900)),
+                    label = "bar$i",
+                )
+                Box(
+                    Modifier.width(4.dp).fillMaxHeight(h / 100f)
+                        .graphicsLayer {
+                            transformOrigin = TransformOrigin(0.5f, 1f)
+                            scaleY = if (playing) pulse else 1f
+                        }
+                        .clip(CircleShape).background(g.accent.copy(alpha = 0.85f)),
+                )
+            }
         }
     }
 }

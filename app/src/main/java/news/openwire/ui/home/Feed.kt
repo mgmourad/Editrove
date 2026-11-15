@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -249,28 +250,30 @@ fun Modifier.glowShadow(color: Color, radius: Dp = 8.dp): Modifier =
 
 // ---- Feed grid -----------------------------------------------------------------
 
-/** The single lazy grid every tab renders into (two columns, 12dp gutters). */
+/** The single lazy grid every tab renders into (two columns; 3–4 in Full view, 12–16dp gutters). */
 @Composable
 fun EditorialGrid(
     state: LazyGridState,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
+    columns: Int = 2,
     content: LazyGridScope.() -> Unit,
 ) {
+    val gap = if (columns > 2) 16.dp else 12.dp
     LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
+        columns = GridCells.Fixed(columns),
         state = state,
         modifier = modifier,
         contentPadding = contentPadding,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(gap),
+        verticalArrangement = Arrangement.spacedBy(gap),
         content = content,
     )
 }
 
 /** A full-width grid row that animates in/out with the feed. */
 fun LazyGridScope.fullRow(key: Any, content: @Composable () -> Unit) =
-    item(span = { GridItemSpan(2) }, key = key) { Box(feedItemMotion()) { content() } }
+    item(span = { GridItemSpan(maxLineSpan) }, key = key) { Box(feedItemMotion()) { content() } }
 
 /**
  * The editorial feed (as in the prototype): live ticker, full-bleed hero cover,
@@ -289,13 +292,22 @@ fun LazyGridScope.feedItems(
     showTicker: Boolean = true,
     sectionTitle: String = "Bento Dispatch",
     archive: Map<String, ArchiveState> = emptyMap(),
+    /** Full view: magazine lead card and multi-column grid with feature cards. */
+    magazine: Boolean = false,
 ) {
     if (articles.isEmpty()) return
     fun state(a: Article) = a.originalUrl?.let { archive[it] }
     if (showTicker) fullRow("ticker") { LiveTicker(articles, onOpen) }
     val hero = articles.first()
     fullRow("hero-${hero.id}") {
-        HeroCard(
+        if (magazine) LeadStoryCard(
+            article = hero.withArchive(state(hero)),
+            locked = state(hero) == ArchiveState.Locked,
+            category = category,
+            saved = hero.id in savedIds,
+            onOpen = onOpen,
+            onToggleSaved = onToggleSaved,
+        ) else HeroCard(
             article = hero.withArchive(state(hero)),
             locked = state(hero) == ArchiveState.Locked,
             category = category,
@@ -326,14 +338,20 @@ fun LazyGridScope.feedItems(
         rest,
         key = { _, a -> a.id },
         // Every 7th bento item (starting with the 3rd) spans both columns on the cover screen.
-        span = { index, _ -> if (compact && index % 7 == 2) GridItemSpan(2) else GridItemSpan(1) },
+        span = { index, _ ->
+            when {
+                magazine && index % 5 == 0 && maxLineSpan > 2 -> GridItemSpan(2)
+                compact && index % 7 == 2 -> GridItemSpan(2)
+                else -> GridItemSpan(1)
+            }
+        },
     ) { index, article ->
         Box(feedItemMotion()) {
             BentoCard(
                 article = article.withArchive(state(article)),
                 locked = state(article) == ArchiveState.Locked,
                 category = category,
-                wide = compact && index % 7 == 2,
+                wide = (compact && index % 7 == 2) || (magazine && index % 5 == 0),
                 selected = !compact && selectedId == article.id,
                 saved = article.id in savedIds,
                 liked = article.id in likedIds,
@@ -504,6 +522,67 @@ fun HeroCard(
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+        }
+    }
+}
+
+// ---- Lead story (Full view) ---------------------------------------------------------
+
+/**
+ * Full-view lead story, Apple News–style: a large photo with the headline,
+ * standfirst and source set beside it on glass.
+ */
+@Composable
+fun LeadStoryCard(
+    article: Article,
+    locked: Boolean,
+    category: String,
+    saved: Boolean,
+    onOpen: (Article) -> Unit,
+    onToggleSaved: (Article) -> Unit,
+) {
+    val g = Glass
+    GlassCard(
+        onClick = { onOpen(article) },
+        modifier = Modifier.fillMaxWidth().lockedLook(locked),
+        contentPadding = PaddingValues(12.dp),
+    ) {
+        Row(Modifier.fillMaxWidth().height(360.dp)) {
+            Box(Modifier.weight(0.6f).fillMaxHeight().clip(RoundedCornerShape(InnerRadius + 4.dp))) {
+                ArticleImage(
+                    article,
+                    Modifier.fillMaxSize().sharedArticleImage(article.id, article.imageUrl != null, InnerRadius + 4.dp),
+                    logoSize = 84.dp,
+                    grayscale = locked,
+                )
+                ScrimPill(Modifier.padding(14.dp)) { Text(category.uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.1.em), color = Color.White) }
+            }
+            Column(Modifier.weight(0.4f).fillMaxHeight().padding(start = 22.dp, end = 10.dp, top = 10.dp, bottom = 6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SourceLogo(article.domain, article.source, size = 18.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(article.publication(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    article.title,
+                    style = serif(30.sp, FontWeight.Bold, lineHeight = 34.sp, tracking = (-0.01).em),
+                    color = g.textPrimary, maxLines = 5, overflow = TextOverflow.Ellipsis,
+                )
+                article.summary?.takeIf { it.isNotBlank() }?.let {
+                    Spacer(Modifier.height(10.dp))
+                    Text(it, style = sans(14.sp, lineHeight = 21.sp), color = g.textSecondary, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                }
+                Spacer(Modifier.weight(1f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(NewsProcessor.formatRelativeTime(article.publishedAt), style = mono(11.sp, tracking = 0.sp), color = g.textSecondary)
+                    article.badgeLabel()?.let {
+                        Text("  ·  $it", style = mono(11.sp, tracking = 0.sp), color = g.textSecondary)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    SpringToggle(saved, ToggleKind.BOOKMARK, { onToggleSaved(article) }, background = g.chipFill, padding = 8.dp)
+                }
             }
         }
     }

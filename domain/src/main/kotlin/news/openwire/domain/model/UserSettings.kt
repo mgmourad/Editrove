@@ -23,4 +23,12 @@ data class UserSettings(
     val backgroundRefresh: Boolean = true,
     /** Bypass services the user switched off (e.g. one that changed or shut down); routing skips them. */
     val disabledServices: Set<Strategy> = emptySet(),
+    /** Unfolded / tablet layout: list + reader side by side, or full-width pages. */
+    val unfoldedLayout: UnfoldedLayout = UnfoldedLayout.SPLIT,
+    /** Check GitHub releases for a newer build whenever the app opens. */
+    val autoCheckUpdates: Boolean = true,
+    /** Download and install updates without asking (where Android allows it). */
+    val autoInstallUpdates: Boolean = false,
 )
+
+enum class UnfoldedLayout(val label: String) { SPLIT("Split view"), FULL("Full view") }

@@ -67,6 +67,7 @@ import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.RssFeed
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -118,7 +119,7 @@ import news.openwire.ui.theme.Glass
 private enum class Page(val title: String) {
     HOME("Settings"), EDITION("Edition"), TOPICS("Topics"), ADD_TOPIC("New topic"), SOURCES("Sources"),
     ADD_SOURCE("Add a source"), RULES("Paywall rules"), NOTIFICATIONS("Notifications & refresh"),
-    APPEARANCE("Appearance"), BACKUP("Backup & restore"), ABOUT("About Editrove"),
+    APPEARANCE("Appearance"), BACKUP("Backup & restore"), UPDATES("Updates & changelog"), ABOUT("About Editrove"),
 }
 
 /**
@@ -132,10 +133,13 @@ fun SettingsScreen(
     onTheme: (ThemeMode) -> Unit,
     onOpenLink: () -> Unit,
     onClose: () -> Unit,
+    updateManager: news.openwire.update.UpdateManager? = null,
+    changelog: news.openwire.update.Changelog? = null,
+    startPage: String? = null,
 ) {
     val g = Glass
     val context = LocalContext.current
-    var page by rememberSaveable { mutableStateOf(Page.HOME) }
+    var page by rememberSaveable { mutableStateOf(if (startPage == "updates" && updateManager != null) Page.UPDATES else Page.HOME) }
     val back: () -> Unit = {
         page = when (page) {
             Page.HOME -> { onClose(); Page.HOME }
@@ -162,7 +166,6 @@ fun SettingsScreen(
                 Text(it, style = serif(24.sp, FontWeight.Bold), color = g.textPrimary)
             }
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(g.hairline))
         AnimatedContent(
             targetState = page,
             transitionSpec = {
@@ -192,6 +195,15 @@ fun SettingsScreen(
                         Page.APPEARANCE -> item { AppearancePage(vm, themeMode, onTheme) }
                         Page.BACKUP -> item { BackupPage(vm) }
                         Page.ABOUT -> item { AboutPage() }
+                        Page.UPDATES -> item {
+                            val s by vm.settings.collectAsState()
+                            if (updateManager != null && changelog != null) news.openwire.update.UpdatesSettings(
+                                manager = updateManager, changelog = changelog,
+                                autoCheck = s.autoCheckUpdates, autoInstall = s.autoInstallUpdates,
+                                onAutoCheck = vm::setAutoCheckUpdates, onAutoInstall = vm::setAutoInstallUpdates,
+                                switch = { c, f -> GlassSwitch(c, onChange = f) },
+                            )
+                        }
                     }
                 }
             }
@@ -230,6 +242,8 @@ private fun LazyListScope.homePage(vm: SettingsViewModel, themeMode: ThemeMode, 
             NavRow(Icons.Outlined.Link, "Open a link", "Paste any article URL — routed around its paywall") { onOpenLink() }
             Divider()
             NavRow(Icons.Outlined.Save, "Backup & restore", "Export, import (incl. the original OpenWire web app)") { go(Page.BACKUP) }
+            Divider()
+            NavRow(Icons.Outlined.SystemUpdate, "Updates & changelog", "Version ${news.openwire.BuildConfig.VERSION_NAME} · what's new") { go(Page.UPDATES) }
             Divider()
             NavRow(Icons.Outlined.Info, "About Editrove", "Open source · no ads · no tracking") { go(Page.ABOUT) }
         }
@@ -609,6 +623,17 @@ private fun AppearancePage(vm: SettingsViewModel, themeMode: ThemeMode, onTheme:
         Section {
             Label("Theme")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { ThemeMode.entries.forEach { m -> Chip(themeLabel(m), selected = m == themeMode) { onTheme(m) } } }
+        }
+        Section {
+            Label("Unfolded & tablet layout")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                news.openwire.domain.model.UnfoldedLayout.entries.forEach { m -> Chip(m.label, selected = m == s.unfoldedLayout) { vm.setUnfoldedLayout(m) } }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Split view keeps the feed and the story side by side. Full view uses the whole screen for each page, and stories open as full pages.",
+                style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary,
+            )
         }
         Section {
             Label("Feed order")

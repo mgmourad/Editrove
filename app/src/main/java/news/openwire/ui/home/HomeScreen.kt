@@ -48,6 +48,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.VerticalSplit
+import androidx.compose.material.icons.outlined.ViewDay
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -162,8 +164,11 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
     val settingsOpen by vm.settingsOpen.collectAsState()
     val linkDialog by vm.linkDialog.collectAsState()
     val themeMode by vm.themeMode.collectAsState()
+    val settingsTarget by vm.settingsTarget.collectAsState()
+    var whatsNew by remember { mutableStateOf(app.container.changelog.pendingWhatsNew()) }
 
     val briefing = rememberBriefingPlayer()
+    val userSettings by vm.settings.collectAsState()
 
     CompositionLocalProvider(LocalImageResolver provides app.container.imageResolver, LocalBriefingPlayer provides briefing) {
     SharedTransitionLayout {
@@ -173,12 +178,53 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
             val feedWidth = (maxWidth - 64.dp) / 2
             val category = categoryLabel(vm, tab, topicIndex)
 
-            if (expanded) {
+            if (expanded && userSettings.unfoldedLayout == news.openwire.domain.model.UnfoldedLayout.FULL) {
+                // Full view: rail + wide magazine canvas; stories open as full pages.
+                val haze = rememberHazeState()
+                val openId = if (sheetOpen) selected?.id else null
+                val columns = if (maxWidth >= 1000.dp) 4 else 3
+                Box(Modifier.fillMaxSize().hazeSource(haze)) {
+                    AmbientBackdrop()
+                    Row(Modifier.fillMaxSize()) {
+                        SideRail(
+                            tab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) }, onSettings = { vm.openSettings() },
+                            layout = userSettings.unfoldedLayout, onToggleLayout = { vm.toggleUnfoldedLayout() },
+                        )
+                        Box(Modifier.weight(1f).fillMaxHeight()) {
+                            CompositionLocalProvider(LocalImageTransition provides ImageTransition(this@SharedTransitionLayout, null, openId)) {
+                                TabFeed(
+                                    vm = vm, tab = tab, compact = false, stateFor = stateFor,
+                                    ui = FeedUi(savedIds, liked, null),
+                                    onOpen = { vm.openArticle(it) },
+                                    bottomPadding = 40.dp,
+                                    columns = columns, magazine = true, horizontalPadding = 28.dp,
+                                )
+                            }
+                            PaneMiniPlayer(briefing, Modifier.align(Alignment.BottomCenter))
+                        }
+                    }
+                }
+                StatusBarGlass(haze, Modifier.align(Alignment.TopCenter))
+                BottomFadeGlass(haze, 24.dp, Modifier.align(Alignment.BottomCenter))
+                FullReaderHost(
+                    visible = sheetOpen && selected != null,
+                    article = selected,
+                    category = category,
+                    backLabel = tab.label,
+                    savedIds = savedIds,
+                    likedIds = liked,
+                    actions = actions,
+                    onClose = { vm.closeSheet() },
+                )
+            } else if (expanded) {
                 val haze = rememberHazeState()
                 Box(Modifier.fillMaxSize().hazeSource(haze)) {
                 AmbientBackdrop()
                 Row(Modifier.fillMaxSize()) {
-                    SideRail(tab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) }, onSettings = { vm.openSettings() })
+                    SideRail(
+                        tab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) }, onSettings = { vm.openSettings() },
+                        layout = userSettings.unfoldedLayout, onToggleLayout = { vm.toggleUnfoldedLayout() },
+                    )
                     Box(Modifier.fillMaxHeight().width(feedWidth)) {
                         TabFeed(
                             vm = vm, tab = tab, compact = false, stateFor = stateFor,
@@ -218,6 +264,9 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                 )
             }
 
+            // In-app update notification.
+            news.openwire.update.UpdateBanner(app.container.updateManager, onOpen = { vm.openUpdates() }, Modifier.align(Alignment.TopCenter))
+
             // Settings slide up over either posture.
             AnimatedVisibility(
                 visible = settingsOpen,
@@ -230,10 +279,17 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                     onTheme = { vm.setTheme(it) },
                     onOpenLink = { vm.showLinkDialog() },
                     onClose = { vm.openSettings(false) },
+                    updateManager = app.container.updateManager,
+                    changelog = app.container.changelog,
+                    startPage = settingsTarget,
                 )
             }
             AnimatedVisibility(linkDialog, enter = fadeIn(tween(180)), exit = fadeOut(tween(160))) {
                 LinkDialog(onOpen = { vm.openLink(it) }, onDismiss = { vm.showLinkDialog(false) })
+            }
+            // Shown once after an update.
+            AnimatedVisibility(whatsNew != null, enter = fadeIn(tween(240)), exit = fadeOut(tween(200))) {
+                whatsNew?.let { e -> news.openwire.update.WhatsNewDialog(e) { app.container.changelog.markSeen(); whatsNew = null } }
             }
         }
     }
@@ -369,6 +425,9 @@ private fun TabFeed(
     onOpen: (Article) -> Unit,
     bottomPadding: Dp,
     onFirstArticle: (Article) -> Unit = {},
+    columns: Int = 2,
+    magazine: Boolean = false,
+    horizontalPadding: Dp = 16.dp,
 ) {
     val topicIndex by vm.topicIndex.collectAsState()
     val feeds by vm.feeds.collectAsState()
@@ -381,7 +440,7 @@ private fun TabFeed(
     val refreshingIds by vm.refreshing.collectAsState()
 
     val padding = PaddingValues(
-        start = 16.dp, end = 16.dp,
+        start = horizontalPadding, end = horizontalPadding,
         top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp,
         bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + bottomPadding,
     )
@@ -428,7 +487,7 @@ private fun TabFeed(
             onRefresh = { vm.refresh() },
             modifier = Modifier.fillMaxSize(),
         ) {
-        EditorialGrid(stateFor(t), padding, Modifier.fillMaxSize()) {
+        EditorialGrid(stateFor(t), padding, Modifier.fillMaxSize(), columns = columns) {
             fullRow("masthead") {
                 Masthead(userSettings.edition.city, onEdition = { vm.openSettings() }, onSettings = { vm.openSettings() })
             }
@@ -437,7 +496,7 @@ private fun TabFeed(
                 articles = articles, category = category, compact = compact,
                 selectedId = ui.selectedId, savedIds = ui.savedIds, likedIds = ui.likedIds,
                 onOpen = onOpen, onToggleSaved = { vm.toggleSaved(it) }, onToggleLiked = { vm.toggleLiked(it) },
-                showTicker = ticker, sectionTitle = title,
+                showTicker = ticker, sectionTitle = title, magazine = magazine,
             )
             when (t) {
                 NavTab.TODAY, NavTab.AUDIO -> {
@@ -618,7 +677,14 @@ private fun BottomNavPill(
 }
 
 @Composable
-private fun SideRail(selectedTab: NavTab, onSelectTab: (NavTab) -> Unit, onToggleTheme: (Boolean) -> Unit, onSettings: () -> Unit) {
+private fun SideRail(
+    selectedTab: NavTab,
+    onSelectTab: (NavTab) -> Unit,
+    onToggleTheme: (Boolean) -> Unit,
+    onSettings: () -> Unit,
+    layout: news.openwire.domain.model.UnfoldedLayout,
+    onToggleLayout: () -> Unit,
+) {
     val g = Glass
     val systemDark = isSystemInDarkTheme()
     Box(Modifier.width(64.dp).fillMaxHeight()) {
@@ -652,6 +718,23 @@ private fun SideRail(selectedTab: NavTab, onSelectTab: (NavTab) -> Unit, onToggl
                 }
             }
             Spacer(Modifier.weight(1f))
+            // Split view ↔ Full view.
+            val full = layout == news.openwire.domain.model.UnfoldedLayout.FULL
+            Box(
+                Modifier.size(40.dp).clip(RoundedCornerShape(16.dp))
+                    .background(if (full) g.accent.copy(alpha = 0.15f) else Color.Transparent)
+                    .clickable(onClick = onToggleLayout),
+                contentAlignment = Alignment.Center,
+            ) {
+                AnimatedContent(full, transitionSpec = { (fadeIn(tween(220)) + scaleIn(tween(220), 0.7f)) togetherWith fadeOut(tween(120)) }, label = "layoutIcon") { f ->
+                    Icon(
+                        if (f) androidx.compose.material.icons.Icons.Outlined.VerticalSplit else androidx.compose.material.icons.Icons.Outlined.ViewDay,
+                        contentDescription = if (f) "Switch to split view" else "Switch to full view",
+                        tint = if (f) g.accentSoft else g.textPrimary.copy(alpha = 0.6f), modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
             Box(
                 Modifier.size(40.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onSettings),
                 contentAlignment = Alignment.Center,
@@ -703,6 +786,7 @@ private fun LinkDialog(onOpen: (String) -> Unit, onDismiss: () -> Unit) {
     ) {
         GlassCard(
             modifier = Modifier.padding(24.dp).fillMaxWidth().widthIn(max = 520.dp)
+                .background(g.deviceBg.copy(alpha = 0.94f), RoundedCornerShape(BentoRadius))
                 .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {},
             contentPadding = PaddingValues(22.dp),
         ) {

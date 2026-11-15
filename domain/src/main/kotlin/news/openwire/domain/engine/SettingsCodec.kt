@@ -76,6 +76,9 @@ object SettingsCodec {
                 put("notifyTopics", JsonArray(settings.notifyTopics.map(::JsonPrimitive)))
                 put("backgroundRefresh", settings.backgroundRefresh)
                 put("disabledServices", JsonArray(settings.disabledServices.map { JsonPrimitive(it.wireValue) }))
+                put("unfoldedLayout", settings.unfoldedLayout.name)
+                put("autoCheckUpdates", settings.autoCheckUpdates)
+                put("autoInstallUpdates", settings.autoInstallUpdates)
             }
         }
         return json.encodeToString(JsonObject.serializer(), root)
@@ -164,6 +167,9 @@ object SettingsCodec {
             backgroundRefresh = prefs?.get("backgroundRefresh").bool() ?: defaults.backgroundRefresh,
             disabledServices = prefs?.get("disabledServices").strings().mapNotNull { Strategy.fromWire(it) }.toSet()
                 .takeIf { prefs?.get("disabledServices") != null } ?: defaults.disabledServices,
+            unfoldedLayout = prefs?.get("unfoldedLayout").str()?.let { v -> news.openwire.domain.model.UnfoldedLayout.entries.firstOrNull { it.name == v } } ?: defaults.unfoldedLayout,
+            autoCheckUpdates = prefs?.get("autoCheckUpdates").bool() ?: defaults.autoCheckUpdates,
+            autoInstallUpdates = prefs?.get("autoInstallUpdates").bool() ?: defaults.autoInstallUpdates,
         )
         return Imported(settings, rules, notes)
     }

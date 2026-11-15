@@ -5,7 +5,9 @@ import news.openwire.data.local.OpenWireDatabase
 import news.openwire.data.remote.ArchiveChecker
 import news.openwire.data.remote.AssetNewsDataSource
 import news.openwire.data.remote.FallbackNewsRemote
+import news.openwire.data.remote.GoogleNewsRssSource
 import news.openwire.data.remote.NewsRemoteDataSource
+import news.openwire.data.remote.RssNormalizer
 import news.openwire.data.repository.FeedRepository
 import news.openwire.data.repository.FeedRepositoryImpl
 import news.openwire.domain.engine.DomainRegistry
@@ -31,6 +33,11 @@ class AppContainer(context: Context) {
             primary = NewsRemoteDataSource(),
             fallback = AssetNewsDataSource(context),
         )
-        FeedRepositoryImpl(remote, database.articleDao())
+        FeedRepositoryImpl(
+            remote = remote,
+            rssSource = GoogleNewsRssSource(),
+            normalizer = RssNormalizer(domainRegistry),
+            dao = database.articleDao(),
+        )
     }
 }

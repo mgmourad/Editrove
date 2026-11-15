@@ -5,7 +5,10 @@ import kotlinx.coroutines.test.runTest
 import news.openwire.data.local.ArticleDao
 import news.openwire.data.local.ArticleEntity
 import news.openwire.data.remote.ArticleDto
+import news.openwire.data.remote.GoogleNewsRssSource
 import news.openwire.data.remote.NewsRemote
+import news.openwire.data.remote.RssNormalizer
+import news.openwire.domain.engine.DomainRegistry
 import news.openwire.domain.model.Topic
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -33,6 +36,9 @@ class FeedRepositoryTest {
         }
     }
 
+    private fun repo(remote: NewsRemote, dao: ArticleDao = FakeArticleDao()) =
+        FeedRepositoryImpl(remote, GoogleNewsRssSource(), RssNormalizer(DomainRegistry()), dao)
+
     private fun topic(snapshotFile: String? = "news_top.json", liveOnly: Boolean = false) =
         Topic(id = "TOP", label = "Top Stories", snapshotFile = snapshotFile, liveOnly = liveOnly)
 
@@ -59,8 +65,7 @@ class FeedRepositoryTest {
                 ArticleDto(id = "c", title = "Other story", pubDate = "2026-09-14T12:00:00Z"),
             ),
         )
-        val repo = FeedRepositoryImpl(remote, FakeArticleDao())
-        val results = repo.observeTopic(topic()).toList()
+        val results = repo(remote).observeTopic(topic()).toList()
         val last = results.last() as FeedResult.Success
         assertEquals(2, last.articles.size)
         assertEquals("c", last.articles[0].id)
@@ -68,15 +73,13 @@ class FeedRepositoryTest {
 
     @Test
     fun networkErrorWithEmptyCacheSurfacesError() = runTest {
-        val repo = FeedRepositoryImpl(FakeNewsRemote(error = true), FakeArticleDao())
-        val results = repo.observeTopic(topic()).toList()
+        val results = repo(FakeNewsRemote(error = true)).observeTopic(topic()).toList()
         assertTrue(results.last() is FeedResult.Error)
     }
 
     @Test
     fun liveOnlyTopicReturnsEmpty() = runTest {
-        val repo = FeedRepositoryImpl(FakeNewsRemote(), FakeArticleDao())
-        val results = repo.observeTopic(topic(snapshotFile = null, liveOnly = true)).toList()
+        val results = repo(FakeNewsRemote()).observeTopic(topic(snapshotFile = null, liveOnly = true)).toList()
         assertTrue(results.last() is FeedResult.Empty)
     }
 }

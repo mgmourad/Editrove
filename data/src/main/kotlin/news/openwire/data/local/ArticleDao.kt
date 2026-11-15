@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.data.local
 
 import androidx.room.Dao

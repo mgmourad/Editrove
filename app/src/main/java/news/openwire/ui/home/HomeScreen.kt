@@ -1,273 +1,406 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
-import android.content.Context
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.Newspaper
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.res.painterResource
-import news.openwire.R
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.CoroutineScope
+import androidx.compose.ui.unit.sp
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import news.openwire.OpenWireApp
-import news.openwire.data.remote.ArticleTextExtractor
-import news.openwire.data.repository.FeedRepository
+import news.openwire.R
 import news.openwire.data.repository.FeedResult
-import news.openwire.domain.engine.TopicRegistry
 import news.openwire.domain.model.Article
-import news.openwire.domain.model.Topic
-import news.openwire.ui.theme.Obsidian
+import news.openwire.ui.theme.Amber400
+import news.openwire.ui.theme.Glass
 
-private enum class NavTab(val label: String, val icon: ImageVector) {
-    TODAY("Today", Icons.Filled.Home),
-    DISCOVER("Discover", Icons.Filled.Search),
-    AUDIO("Audio", Icons.Filled.PlayArrow),
-    SAVED("Saved", Icons.Filled.Bookmark),
-}
+/** Width at which the app morphs from the cover (slab) layout to the unfolded list–detail layout. */
+private val ExpandedBreakpoint = 600.dp
 
+/** Default edition (SPEC §6.4). */
+private const val EDITION = "Washington, D.C."
+
+private val NavTab.icon: ImageVector
+    get() = when (this) {
+        NavTab.TODAY -> Icons.Outlined.Newspaper
+        NavTab.DISCOVER -> Icons.Outlined.Search
+        NavTab.AUDIO -> Icons.AutoMirrored.Outlined.VolumeUp
+        NavTab.SAVED -> Icons.Outlined.BookmarkBorder
+    }
+
+/** Feed-side state shared by both postures. */
+private class FeedUi(
+    val savedIds: Set<String>,
+    val likedIds: Set<String>,
+    val selectedId: String?,
+)
+
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(vm: HomeViewModel) {
     val app = LocalContext.current.applicationContext as OpenWireApp
-    val context = LocalContext.current
-    val repository = app.container.feedRepository
-    val router = remember { ArticleRouter(app.container.domainRegistry, app.container.archiveChecker) }
-    val extractor = app.container.articleTextExtractor
     val scope = rememberCoroutineScope()
-    val topics = remember { TopicRegistry.defaultTopics() }
-    val pagerState = rememberPagerState(pageCount = { topics.size })
-    val selectedArticle = remember { mutableStateOf<Article?>(null) }
-    val selectedTab = remember { mutableStateOf(NavTab.TODAY) }
     val haptics = LocalHapticFeedback.current
-
-    val expanded = LocalConfiguration.current.screenWidthDp >= 600
-    if (expanded) {
-            ExpandedLayout(
-                topics = topics,
-                pagerState = pagerState,
-                repository = repository,
-                router = router,
-                extractor = extractor,
-                scope = scope,
-                context = context,
-                selectedArticle = selectedArticle.value,
-                onSelectArticle = { selectedArticle.value = it },
-                selectedTab = selectedTab.value,
-                onSelectTab = { selectedTab.value = it; haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
-            )
-        } else {
-            CompactLayout(
-                topics = topics,
-                pagerState = pagerState,
-                repository = repository,
-                router = router,
-                extractor = extractor,
-                scope = scope,
-                context = context,
-                selectedArticle = selectedArticle.value,
-                onSelectArticle = { selectedArticle.value = it },
-                onCloseArticle = { selectedArticle.value = null },
-                selectedTab = selectedTab.value,
-                onSelectTab = { selectedTab.value = it; haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
-            )
-    }
-}
-
-@Composable
-private fun CompactLayout(
-    topics: List<Topic>,
-    pagerState: androidx.compose.foundation.pager.PagerState,
-    repository: FeedRepository,
-    router: ArticleRouter,
-    extractor: ArticleTextExtractor,
-    scope: CoroutineScope,
-    context: Context,
-    selectedArticle: Article?,
-    onSelectArticle: (Article) -> Unit,
-    onCloseArticle: () -> Unit,
-    selectedTab: NavTab,
-    onSelectTab: (NavTab) -> Unit,
-) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Masthead()
-            TopicBar(
-                topics = topics,
-                selectedIndex = pagerState.currentPage,
-                onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
-            )
-            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
-                TopicFeed(topics[page], repository, onSelectArticle)
-            }
-        }
-        BottomNavPill(
-            selectedTab = selectedTab,
-            onSelectTab = onSelectTab,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp),
+    val actions = remember {
+        ReaderActions(
+            router = ArticleRouter(app.container.domainRegistry, app.container.archiveChecker),
+            extractor = app.container.articleTextExtractor,
+            scope = scope,
+            onToggleSaved = { vm.toggleSaved(it) },
+            onToggleLiked = { vm.toggleLiked(it) },
         )
-        selectedArticle?.let { article ->
-            ReaderOverlay(
-                article = article,
-                router = router,
-                extractor = extractor,
-                scope = scope,
-                context = context,
-                onClose = onCloseArticle,
-            )
+    }
+
+    val tab by vm.tab.collectAsState()
+    val topicIndex by vm.topicIndex.collectAsState()
+    val selected by vm.selected.collectAsState()
+    val sheetOpen by vm.sheetOpen.collectAsState()
+    val saved by vm.saved.collectAsState()
+    val liked by vm.liked.collectAsState()
+    val savedIds = remember(saved) { saved.mapTo(HashSet()) { it.id } }
+
+    // One scroll position per tab/topic, shared by both postures so folding keeps your place.
+    val gridStates = remember { mutableMapOf<String, LazyGridState>() }
+    val stateFor: (NavTab) -> LazyGridState = { t -> gridStates.getOrPut("$t-$topicIndex") { LazyGridState() } }
+
+    val onSelectTab: (NavTab) -> Unit = {
+        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        if (it == tab) scope.launch { stateFor(it).animateScrollToItem(0) } else vm.selectTab(it)
+    }
+
+    SharedTransitionLayout {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val expanded = maxWidth >= ExpandedBreakpoint
+            // 50/50 feed/reader split beside the 64dp rail (owner preference over the mock's 38/62).
+            val feedWidth = (maxWidth - 64.dp) / 2
+            val category = categoryLabel(vm, tab, topicIndex)
+
+            if (expanded) {
+                AmbientBackdrop()
+                Row(Modifier.fillMaxSize()) {
+                    SideRail(tab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) })
+                    Box(Modifier.fillMaxHeight().width(feedWidth)) {
+                        TabFeed(
+                            vm = vm, tab = tab, compact = false, stateFor = stateFor,
+                            ui = FeedUi(savedIds, liked, selected?.id),
+                            onOpen = { vm.showInPane(it) },
+                            bottomPadding = 32.dp,
+                            onFirstArticle = { vm.ensureSelection(it) },
+                        )
+                        Box(Modifier.align(Alignment.CenterEnd).width(1.dp).fillMaxHeight().background(Glass.hairline))
+                    }
+                    ReaderPane(
+                        article = selected,
+                        category = category,
+                        saved = selected?.id in savedIds,
+                        liked = selected?.id in liked,
+                        actions = actions,
+                        modifier = Modifier.weight(1f).fillMaxHeight().statusBarsPadding().navigationBarsPadding(),
+                    )
+                }
+            } else {
+                val openId = if (sheetOpen) selected?.id else null
+                CompositionLocalProvider(LocalImageTransition provides ImageTransition(this@SharedTransitionLayout, null, openId)) {
+                    CompactLayout(vm, tab, stateFor, FeedUi(savedIds, liked, null), onSelectTab)
+                }
+                ReaderSheetHost(
+                    visible = sheetOpen && selected != null,
+                    article = selected,
+                    category = category,
+                    savedIds = savedIds,
+                    likedIds = liked,
+                    actions = actions,
+                    onClose = { vm.closeSheet() },
+                )
+            }
         }
     }
 }
 
+/** Slide-up reader with a shared photo transition and predictive back (drag to peek the feed). */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun ExpandedLayout(
-    topics: List<Topic>,
-    pagerState: androidx.compose.foundation.pager.PagerState,
-    repository: FeedRepository,
-    router: ArticleRouter,
-    extractor: ArticleTextExtractor,
-    scope: CoroutineScope,
-    context: Context,
-    selectedArticle: Article?,
-    onSelectArticle: (Article) -> Unit,
-    selectedTab: NavTab,
-    onSelectTab: (NavTab) -> Unit,
+private fun SharedTransitionScope.ReaderSheetHost(
+    visible: Boolean,
+    article: Article?,
+    category: String,
+    savedIds: Set<String>,
+    likedIds: Set<String>,
+    actions: ReaderActions,
+    onClose: () -> Unit,
 ) {
-    Row(modifier = Modifier.fillMaxSize()) {
-        SideRail(selectedTab = selectedTab, onSelectTab = onSelectTab)
-        Column(modifier = Modifier.fillMaxHeight().weight(0.5f)) {
-            Masthead()
-            TopicBar(
-                topics = topics,
-                selectedIndex = pagerState.currentPage,
-                onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
-            )
-            HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
-                TopicFeed(topics[page], repository, onSelectArticle)
-            }
+    val backProgress = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(visible) { if (visible) backProgress.snapTo(0f) }
+    PredictiveBackHandler(enabled = visible) { events ->
+        try {
+            events.collect { backProgress.snapTo(it.progress) }
+            onClose()
+        } catch (e: CancellationException) {
+            scope.launch { backProgress.animateTo(0f, springTween(300)) }
+            throw e
         }
-        Box(modifier = Modifier.fillMaxHeight().weight(0.5f).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.3f))) {
-            if (selectedArticle != null) {
-                ReaderContent(article = selectedArticle, router = router, extractor = extractor, scope = scope, context = context, modifier = Modifier.fillMaxSize())
-            } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Select a story", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(springTween(520)) { it } + fadeIn(tween(200)),
+        exit = slideOutVertically(springTween(420)) { it } + fadeOut(tween(300, delayMillis = 120)),
+    ) {
+        // Keep showing the last story while the sheet slides away.
+        var shown by remember { mutableStateOf(article) }
+        LaunchedEffect(article) { if (article != null) shown = article }
+        shown?.let { a ->
+            CompositionLocalProvider(LocalImageTransition provides ImageTransition(this@ReaderSheetHost, this, a.id)) {
+                Box(
+                    Modifier.fillMaxSize().graphicsLayer {
+                        val p = backProgress.value
+                        val s = 1f - 0.1f * p
+                        scaleX = s; scaleY = s
+                        translationY = 40.dp.toPx() * p
+                        shape = RoundedCornerShape((36 * p).dp)
+                        clip = p > 0f
+                    },
+                ) {
+                    ReaderSheet(
+                        article = a, category = category,
+                        saved = a.id in savedIds, liked = a.id in likedIds,
+                        actions = actions, onClose = onClose,
+                    )
                 }
             }
         }
     }
 }
 
-@Composable
-private fun TopicFeed(
-    topic: Topic,
-    repository: FeedRepository,
-    onArticleClick: (Article) -> Unit,
-) {
-    var retry by remember(topic.id) { mutableIntStateOf(0) }
-    val result by produceState<FeedResult>(initialValue = FeedResult.Loading, topic.id, retry) {
-        value = FeedResult.Loading
-        repository.observeTopic(topic).collect { value = it }
-    }
-    when (val r = result) {
-        is FeedResult.Loading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        is FeedResult.Success -> DynamicFeedLayout(articles = r.articles, onArticleClick = onArticleClick, modifier = Modifier.fillMaxSize())
-        is FeedResult.Error -> Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-            Text("Unable to load headlines\n\n${r.message}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        is FeedResult.Empty -> Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-            Text("Fetching this edition…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
+private fun categoryLabel(vm: HomeViewModel, tab: NavTab, topicIndex: Int): String = when (tab) {
+    NavTab.TODAY, NavTab.AUDIO -> vm.topics[topicIndex].label
+    NavTab.DISCOVER -> "Discover"
+    NavTab.SAVED -> "Saved"
 }
 
 @Composable
-private fun Masthead() {
-    val dateText = remember {
-        LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE • MMM d", Locale.ENGLISH)).uppercase()
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        Column {
-            Text(dateText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            Row(verticalAlignment = Alignment.Top) {
-                Text("OpenWire", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onBackground)
-                Text("+", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
+private fun CompactLayout(
+    vm: HomeViewModel,
+    tab: NavTab,
+    stateFor: (NavTab) -> LazyGridState,
+    ui: FeedUi,
+    onSelectTab: (NavTab) -> Unit,
+) {
+    val haze = rememberHazeState()
+    val state = stateFor(tab)
+    // Floating pill compacts while scrolling down and restores on scroll up.
+    var navCompact by remember { mutableStateOf(false) }
+    val connection = remember(state) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < -1f && (state.firstVisibleItemIndex > 0 || state.firstVisibleItemScrollOffset > 60)) navCompact = true
+                else if (available.y > 1f) navCompact = false
+                return Offset.Zero
             }
         }
     }
+    Box(Modifier.fillMaxSize().nestedScroll(connection)) {
+        Box(Modifier.fillMaxSize().hazeSource(haze)) {
+            AmbientBackdrop()
+            TabFeed(
+                vm = vm, tab = tab, compact = true, stateFor = stateFor, ui = ui,
+                onOpen = { vm.openArticle(it) },
+                bottomPadding = 112.dp,
+            )
+        }
+        BottomNavPill(
+            selectedTab = tab,
+            onSelectTab = onSelectTab,
+            compact = navCompact,
+            haze = haze,
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 20.dp),
+        )
+    }
 }
 
+/** The scrolling feed for the active tab, cross-fading between tabs. */
 @Composable
-private fun BottomNavPill(
-    selectedTab: NavTab,
-    onSelectTab: (NavTab) -> Unit,
-    modifier: Modifier = Modifier,
+private fun TabFeed(
+    vm: HomeViewModel,
+    tab: NavTab,
+    compact: Boolean,
+    stateFor: (NavTab) -> LazyGridState,
+    ui: FeedUi,
+    onOpen: (Article) -> Unit,
+    bottomPadding: Dp,
+    onFirstArticle: (Article) -> Unit = {},
 ) {
-    GlassCard(modifier = modifier, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 6.dp)) {
-        Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)) {
-            NavTab.entries.forEach { tab ->
-                val selected = tab == selectedTab
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                        .clickable { onSelectTab(tab) }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = tab.icon,
-                        contentDescription = tab.label,
-                        tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    if (selected) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(tab.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimary)
+    val topicIndex by vm.topicIndex.collectAsState()
+    val feeds by vm.feeds.collectAsState()
+    val saved by vm.saved.collectAsState()
+    val query by vm.query.collectAsState()
+    val topic = vm.topics[topicIndex]
+
+    val padding = PaddingValues(
+        start = 16.dp, end = 16.dp,
+        top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp,
+        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + bottomPadding,
+    )
+
+    AnimatedContent(
+        targetState = tab,
+        transitionSpec = {
+            (fadeIn(springTween(380)) + scaleIn(springTween(380), initialScale = 0.985f))
+                .togetherWith(fadeOut(tween(140)))
+                .using(SizeTransform(clip = false))
+        },
+        label = "tabFeed",
+    ) { t ->
+        val visible: List<Article> = when (t) {
+            NavTab.TODAY, NavTab.AUDIO -> (feeds[topic.id] as? FeedResult.Success)?.articles.orEmpty()
+            NavTab.SAVED -> saved
+            NavTab.DISCOVER -> {
+                val all = remember(feeds) {
+                    feeds.values.filterIsInstance<FeedResult.Success>().flatMap { it.articles }
+                        .distinctBy { it.id }.sortedByDescending { it.publishedAt ?: 0L }
+                }
+                remember(all, query) {
+                    if (query.isBlank()) all.take(60)
+                    else all.filter { a ->
+                        a.title.contains(query, ignoreCase = true) || (a.source?.contains(query, ignoreCase = true) == true)
+                    }
+                }
+            }
+        }
+        LaunchedEffect(t, visible.firstOrNull()?.id) { visible.firstOrNull()?.let(onFirstArticle) }
+
+        EditorialGrid(stateFor(t), padding, Modifier.fillMaxSize()) {
+            fullRow("masthead") { Masthead(EDITION) }
+            fun feed(articles: List<Article>, category: String, ticker: Boolean, title: String) = feedItems(
+                articles = articles, category = category, compact = compact,
+                selectedId = ui.selectedId, savedIds = ui.savedIds, likedIds = ui.likedIds,
+                onOpen = onOpen, onToggleSaved = { vm.toggleSaved(it) }, onToggleLiked = { vm.toggleLiked(it) },
+                showTicker = ticker, sectionTitle = title,
+            )
+            when (t) {
+                NavTab.TODAY, NavTab.AUDIO -> {
+                    fullRow("pills") { CategoryPills(vm.topics, topicIndex, onSelect = { vm.selectTopic(it) }) }
+                    when (val r = feeds[topic.id]) {
+                        is FeedResult.Success -> {
+                            if (t == NavTab.AUDIO) fullRow("briefing-${topic.id}") { HeadlineBriefingCard(topic.label, r.articles) }
+                            feed(r.articles, topic.label, ticker = t == NavTab.TODAY, title = if (t == NavTab.AUDIO) "Listen Next" else "Bento Dispatch")
+                        }
+                        is FeedResult.Error -> fullRow("err-${topic.id}") {
+                            MessageCard("Unable to load ${topic.label}", r.message, "Try again") { vm.retry(topic) }
+                        }
+                        is FeedResult.Empty -> fullRow("empty-${topic.id}") {
+                            MessageCard("No stories right now", "This edition has nothing new yet. Check back later.", "Refresh") { vm.retry(topic) }
+                        }
+                        null, FeedResult.Loading -> skeletonItems()
+                    }
+                }
+                NavTab.DISCOVER -> {
+                    fullRow("search") { SearchPill(query, vm::setQuery) }
+                    if (visible.isEmpty()) {
+                        fullRow("discover-empty") {
+                            if (query.isBlank()) MessageCard("Gathering every edition…", "Discover searches across all topics once they load.")
+                            else MessageCard("Nothing matches “$query”", "Try a publisher name or a different keyword.")
+                        }
+                    } else {
+                        feed(visible, "Discover", ticker = false, title = if (query.isBlank()) "Latest Everywhere" else "Results")
+                    }
+                }
+                NavTab.SAVED -> {
+                    if (visible.isEmpty()) {
+                        fullRow("saved-empty") {
+                            MessageCard("No saved stories yet", "Tap the bookmark icon on any story to curate your offline reading list.")
+                        }
+                    } else {
+                        feed(visible, "Saved", ticker = false, title = "Saved Stories")
                     }
                 }
             }
@@ -276,41 +409,176 @@ private fun BottomNavPill(
 }
 
 @Composable
-private fun SideRail(
+private fun SearchPill(query: String, onQuery: (String) -> Unit) {
+    val g = Glass
+    Row(
+        Modifier.fillMaxWidth().padding(bottom = 4.dp).glassSurface(CircleShape, fill = g.glassPill, elevation = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.Search, contentDescription = null, tint = g.textSecondary, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(10.dp))
+        Box(Modifier.weight(1f)) {
+            if (query.isEmpty()) Text("Search stories and publishers", style = sans(14.sp), color = g.textMuted)
+            BasicTextField(
+                value = query,
+                onValueChange = onQuery,
+                singleLine = true,
+                textStyle = sans(14.sp).copy(color = g.textPrimary),
+                cursorBrush = SolidColor(g.accent),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** Audio tab: narrate the current edition's top headlines back-to-back. */
+@Composable
+private fun HeadlineBriefingCard(topicLabel: String, articles: List<Article>) {
+    val g = Glass
+    val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
+    val narrator = rememberNarrator(context)
+    var playing by remember(topicLabel) { mutableStateOf(false) }
+    DisposableEffect(narrator) { narrator.onDone = { playing = false }; onDispose { narrator.onDone = null } }
+    LaunchedEffect(topicLabel) { narrator.stop() }
+    val count = minOf(8, articles.size)
+    GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), contentPadding = PaddingValues(18.dp)) {
+        Text("AUDIO BRIEFING", style = mono(10.sp, FontWeight.SemiBold, 0.16.sp), color = g.accentSoft)
+        Spacer(Modifier.height(4.dp))
+        Text("$topicLabel in $count headlines", style = serif(22.sp, FontWeight.Bold, lineHeight = 26.sp), color = g.textPrimary)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Narrated on-device — nothing leaves your phone. Open any story below for its full narrated read.",
+            style = sans(12.sp, lineHeight = 18.sp), color = g.textPrimary.copy(alpha = 0.6f),
+        )
+        Spacer(Modifier.height(14.dp))
+        Row(
+            Modifier.glowShadow(g.accent).clip(CircleShape).background(g.accent)
+                .clickable(enabled = narrator.ready) {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (playing) narrator.stop()
+                    else narrator.speak(
+                        "Your $topicLabel briefing from OpenWire. " +
+                            articles.take(count).joinToString(" ") { a -> "${a.title}. ${a.source?.let { "From $it." } ?: ""}" },
+                    )
+                    playing = !playing
+                }
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .animateContentSize(springTween(260)),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, null, tint = Color.White, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(if (playing) "Pause" else "Play briefing", style = sans(12.sp, FontWeight.SemiBold), color = Color.White)
+        }
+    }
+}
+
+// ---- Navigation chrome --------------------------------------------------------------
+
+@Composable
+private fun BottomNavPill(
     selectedTab: NavTab,
     onSelectTab: (NavTab) -> Unit,
+    compact: Boolean,
+    haze: HazeState,
+    modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = Modifier.width(64.dp).fillMaxHeight().padding(vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    val g = Glass
+    val scale by animateFloatAsState(if (compact) 0.9f else 1f, springTween(380), label = "navScale")
+    val alpha by animateFloatAsState(if (compact) 0.85f else 1f, tween(300), label = "navAlpha")
+    Row(
+        modifier = modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale; this.alpha = alpha }
+            .glassSurface(CircleShape, fill = Color.Transparent, elevation = 16.dp)
+            .frostedGlass(haze)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(
-            painter = painterResource(R.mipmap.ic_launcher),
-            contentDescription = "OpenWire",
-            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(14.dp)),
-        )
-        Spacer(modifier = Modifier.weight(1f))
         NavTab.entries.forEach { tab ->
-            val selected = tab == selectedTab
-            Box(
+            val active = tab == selectedTab
+            val bg by animateColorAsState(if (active) g.accent else Color.Transparent, springTween(320), label = "navBg")
+            val tint by animateColorAsState(if (active) Color.White else g.textPrimary.copy(alpha = 0.7f), springTween(320), label = "navTint")
+            Row(
                 modifier = Modifier
-                    .size(42.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent)
-                    .clickable { onSelectTab(tab) },
-                contentAlignment = Alignment.Center,
+                    .glowShadow(g.accent, if (active) 8.dp else 0.dp)
+                    .clip(CircleShape)
+                    .background(bg)
+                    .clickable { onSelectTab(tab) }
+                    .padding(horizontal = if (active) 14.dp else 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = tab.icon,
-                    contentDescription = tab.label,
-                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
+                Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(16.dp))
+                AnimatedVisibility(
+                    active,
+                    enter = expandHorizontally(springTween(360)) + fadeIn(springTween(360)),
+                    exit = shrinkHorizontally(springTween(300)) + fadeOut(tween(120)),
+                ) {
+                    Text(tab.label, style = sans(12.sp, FontWeight.SemiBold), color = Color.White, modifier = Modifier.padding(start = 8.dp))
+                }
             }
         }
-        Spacer(modifier = Modifier.weight(1f))
-        Box(modifier = Modifier.size(34.dp).clip(CircleShape).background(Obsidian), contentAlignment = Alignment.Center) {
-            Text("M", color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
+private fun SideRail(selectedTab: NavTab, onSelectTab: (NavTab) -> Unit, onToggleTheme: (Boolean) -> Unit) {
+    val g = Glass
+    val systemDark = isSystemInDarkTheme()
+    Box(Modifier.width(64.dp).fillMaxHeight()) {
+        Column(
+            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Image(
+                painter = painterResource(R.mipmap.ic_launcher),
+                contentDescription = "OpenWire",
+                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(16.dp)),
+            )
+            Spacer(Modifier.height(20.dp))
+            Box(Modifier.width(24.dp).height(1.dp).background(g.hairline))
+            Spacer(Modifier.height(20.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                NavTab.entries.forEach { tab ->
+                    val active = tab == selectedTab
+                    val bg by animateColorAsState(if (active) g.accent.copy(alpha = 0.15f) else Color.Transparent, springTween(320), label = "railBg")
+                    val border by animateColorAsState(if (active) g.accent.copy(alpha = 0.30f) else Color.Transparent, springTween(320), label = "railBorder")
+                    val tint by animateColorAsState(if (active) g.accentSoft else g.textPrimary.copy(alpha = 0.6f), springTween(320), label = "railTint")
+                    Box(
+                        Modifier.size(40.dp).clip(RoundedCornerShape(16.dp))
+                            .background(bg)
+                            .border(1.dp, border, RoundedCornerShape(16.dp))
+                            .clickable { onSelectTab(tab) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            // Where the prototype shows a profile photo: OpenWire has no accounts, so this
+            // slot toggles Black Glass ↔ Editorial Paper instead.
+            Box(
+                Modifier.size(36.dp).clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape)
+                    .clickable { onToggleTheme(systemDark) },
+                contentAlignment = Alignment.Center,
+            ) {
+                AnimatedContent(
+                    g.isDark,
+                    transitionSpec = { (fadeIn(tween(250)) + scaleIn(tween(250), 0.6f)) togetherWith fadeOut(tween(150)) },
+                    label = "themeIcon",
+                ) { dark ->
+                    Icon(
+                        if (dark) Icons.Outlined.DarkMode else Icons.Outlined.LightMode,
+                        contentDescription = if (dark) "Switch to Editorial Paper" else "Switch to Black Glass",
+                        tint = if (dark) g.indigo else Amber400,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
         }
+        Box(Modifier.align(Alignment.CenterEnd).width(1.dp).fillMaxHeight().background(g.hairline))
     }
 }

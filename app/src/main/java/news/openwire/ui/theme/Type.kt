@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.theme
 
 import androidx.compose.material3.Typography

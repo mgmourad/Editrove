@@ -1,6 +1,9 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.di
 
 import android.content.Context
+import news.openwire.data.local.AppearanceStore
+import news.openwire.data.local.LibraryStore
 import news.openwire.data.local.OpenWireDatabase
 import news.openwire.data.remote.ArchiveChecker
 import news.openwire.data.remote.ArticleTextExtractor
@@ -32,6 +35,12 @@ class AppContainer(context: Context) {
     val articleTextExtractor: ArticleTextExtractor by lazy {
         ArticleTextExtractor()
     }
+
+    /** Saved + liked stories (local only). */
+    val libraryStore: LibraryStore by lazy { LibraryStore(context) }
+
+    /** Black Glass / Editorial Paper preference. */
+    val appearanceStore: AppearanceStore by lazy { AppearanceStore(context) }
 
     val feedRepository: FeedRepository by lazy {
         val remote = FallbackNewsRemote(

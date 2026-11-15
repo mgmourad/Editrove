@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.domain.engine
 
 import news.openwire.domain.model.DomainRule

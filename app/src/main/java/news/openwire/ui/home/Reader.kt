@@ -1,42 +1,56 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
 import android.content.Context
 import android.speech.tts.TextToSpeech
-import androidx.compose.animation.core.LinearEasing
+import android.speech.tts.UtteranceProgressListener
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -44,224 +58,461 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import java.util.Locale
-import kotlin.math.PI
-import kotlin.math.sin
 import kotlinx.coroutines.CoroutineScope
 import news.openwire.data.remote.ArticleContent
 import news.openwire.data.remote.ArticleTextExtractor
 import news.openwire.domain.engine.NewsProcessor
 import news.openwire.domain.model.Article
+import news.openwire.ui.theme.Glass
+import news.openwire.ui.theme.Indigo
 import news.openwire.ui.theme.NewsreaderFamily
-import news.openwire.ui.theme.Rose
+import news.openwire.ui.theme.Slate900
 
+private sealed interface BodyState {
+    data object Loading : BodyState
+    data class Loaded(val content: ArticleContent) : BodyState
+    data object Failed : BodyState
+}
+
+/** Everything the reader needs besides the article itself. */
+class ReaderActions(
+    val router: ArticleRouter,
+    val extractor: ArticleTextExtractor,
+    val scope: CoroutineScope,
+    val onToggleSaved: (Article) -> Unit,
+    val onToggleLiked: (Article) -> Unit,
+)
+
+/**
+ * The detail pane (unfolded). Selecting a new story crossfades + slides it in,
+ * like the prototype's `article-enter` animation.
+ */
 @Composable
-fun ReaderContent(
-    article: Article,
-    router: ArticleRouter,
-    extractor: ArticleTextExtractor,
-    scope: CoroutineScope,
-    context: Context,
+fun ReaderPane(
+    article: Article?,
+    category: String,
+    saved: Boolean,
+    liked: Boolean,
+    actions: ReaderActions,
     modifier: Modifier = Modifier,
 ) {
-    val url = article.targetUrl ?: article.originalUrl ?: ""
-    val content by produceState<ArticleContent?>(initialValue = null, article.id) {
-        value = if (url.isNotEmpty()) extractor.extract(url) else null
-    }
-
-    Column(modifier = modifier.verticalScroll(rememberScrollState()).padding(20.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = (article.source ?: article.domain ?: "").uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(text = "•", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = NewsProcessor.formatRelativeTime(article.publishedAt),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    AnimatedContent(
+        targetState = article,
+        contentKey = { it?.id },
+        transitionSpec = {
+            (fadeIn(springTween(450)) + slideInVertically(springTween(450)) { 40 } + scaleIn(springTween(450), initialScale = 0.99f))
+                .togetherWith(fadeOut(tween(150)))
+        },
+        modifier = modifier,
+        label = "readerPane",
+    ) { a ->
+        if (a == null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Select a story", style = sans(13.sp), color = Glass.textSecondary)
+            }
+        } else {
+            val scroll = rememberScrollState()
+            Column(
+                Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = 28.dp, vertical = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ArticleBody(a, category, showMetaBar = true, saved = saved, liked = liked, actions = actions)
+            }
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(article.title, style = MaterialTheme.typography.headlineMedium)
-        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
 
-        if (article.imageUrl != null) {
-            GlassCard(contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                AsyncImage(
-                    model = article.imageUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().height(220.dp),
+/**
+ * Cover-screen reader: a full-screen sheet that springs up from the bottom with
+ * a "Back to Feed" pill and like/bookmark actions.
+ */
+@Composable
+fun ReaderSheet(
+    article: Article,
+    category: String,
+    saved: Boolean,
+    liked: Boolean,
+    actions: ReaderActions,
+    onClose: () -> Unit,
+) {
+    val g = Glass
+    val haze = rememberHazeState()
+    val headerHeight = 61.dp
+    Box(Modifier.fillMaxSize().background(g.deviceBg)) {
+        // Scrolling body is the blur source; the top bar floats over it as frosted glass.
+        Column(
+            Modifier.fillMaxSize().hazeSource(haze).background(g.deviceBg).verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .padding(start = 20.dp, end = 20.dp, top = headerHeight + 20.dp, bottom = 64.dp),
+        ) {
+            ArticleBody(article, category, showMetaBar = false, saved = saved, liked = liked, actions = actions)
+        }
+        Column(Modifier.fillMaxWidth().frostedGlass(haze, blur = 24.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().statusBarsPadding().height(headerHeight - 1.dp).padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(g.chipFill)
+                        .clickable(onClick = onClose)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = g.textPrimary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Back to Feed", style = sans(12.sp, FontWeight.SemiBold), color = g.textPrimary)
+                }
+                Spacer(Modifier.weight(1f))
+                SpringToggle(liked, ToggleKind.LIKE, { actions.onToggleLiked(article) }, background = g.chipFill, padding = 8.dp)
+                Spacer(Modifier.width(8.dp))
+                SpringToggle(saved, ToggleKind.BOOKMARK, { actions.onToggleSaved(article) }, background = g.chipFill, padding = 8.dp)
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(g.hairline))
+        }
+    }
+}
+
+/** Shared editorial article layout (prototype `buildArticleHTML`). */
+@Composable
+private fun ArticleBody(
+    article: Article,
+    category: String,
+    showMetaBar: Boolean,
+    saved: Boolean,
+    liked: Boolean,
+    actions: ReaderActions,
+) {
+    val g = Glass
+    val url = article.originalUrl ?: article.targetUrl ?: ""
+    val state by produceState<BodyState>(BodyState.Loading, article.id) {
+        value = if (url.isEmpty()) BodyState.Failed
+        else actions.extractor.extract(url)?.let { BodyState.Loaded(it) } ?: BodyState.Failed
+    }
+    val content = (state as? BodyState.Loaded)?.content
+
+    Column(Modifier.widthIn(max = 672.dp).fillMaxWidth()) {
+        if (showMetaBar) {
+            Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.clip(CircleShape).background(g.accent.copy(alpha = 0.15f))
+                        .border(1.dp, g.accent.copy(alpha = 0.30f), CircleShape)
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                ) { Text(category.uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.1.em), color = g.accentSoft) }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "${article.publication()} • ${NewsProcessor.formatRelativeTime(article.publishedAt)}",
+                    style = mono(12.sp, tracking = 0.sp),
+                    color = g.textPrimary.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                SpringToggle(liked, ToggleKind.LIKE, { actions.onToggleLiked(article) }, background = g.chipFill, border = g.hairline, padding = 8.dp)
+                Spacer(Modifier.width(8.dp))
+                SpringToggle(saved, ToggleKind.BOOKMARK, { actions.onToggleSaved(article) }, background = g.chipFill, border = g.hairline, padding = 8.dp)
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(g.hairline))
+            Spacer(Modifier.height(20.dp))
+        }
+
+        // Editorial serif headline
+        Text(article.title, style = serif(28.sp, FontWeight.Bold, lineHeight = 32.sp, tracking = (-0.01).em), color = g.textPrimary)
+        Spacer(Modifier.height(12.dp))
+
+        // Deck / standfirst — the publisher's own description, when we have it
+        content?.description?.let {
+            Text(it, style = sans(15.sp, lineHeight = 24.sp), color = g.textPrimary.copy(alpha = 0.75f))
+            Spacer(Modifier.height(20.dp))
+        }
+
+        // Byline
+        Row(Modifier.fillMaxWidth().padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(36.dp).clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(Indigo, g.accent)))
+                    .padding(1.5.dp).clip(CircleShape).background(Slate900),
+                contentAlignment = Alignment.Center,
+            ) { SourceLogo(article.domain, article.source, size = 22.dp) }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    content?.author ?: article.source ?: article.domain ?: "",
+                    style = sans(12.sp, FontWeight.SemiBold), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    if (content?.author != null) (article.source ?: article.domain ?: "") else (article.domain ?: ""),
+                    style = sans(11.sp), color = g.textPrimary.copy(alpha = 0.6f), maxLines = 1,
                 )
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                Modifier.clip(CircleShape).background(g.chipFill.copy(alpha = g.chipFill.alpha / 2))
+                    .border(1.dp, g.hairline, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
+            ) {
+                Text(
+                    content?.let { "${it.readMinutes} min read" } ?: "— min read",
+                    style = mono(11.sp, tracking = 0.sp), color = g.textPrimary.copy(alpha = 0.6f),
+                )
+            }
         }
 
-        AudioPlayerCard(article = article, content = content, context = context)
-        Spacer(modifier = Modifier.height(20.dp))
+        // Liquid Glass narrated-briefing player
+        AudioBriefingCard(article, content)
+        Spacer(Modifier.height(24.dp))
 
-        if (content == null) {
-            Box(modifier = Modifier.fillMaxWidth().height(60.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+        // Feature image (16:9, 24dp radius) with caption
+        article.imageUrl?.let { img ->
+            Box(
+                Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                    .sharedArticleImage(article.id, hasImage = true, cornerRadius = 24.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
+            ) { AsyncImage(img, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+            Text(
+                "PHOTOGRAPHY // ${article.publication()}",
+                style = mono(10.sp, tracking = 0.05.em),
+                color = g.textPrimary.copy(alpha = 0.5f),
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+            Spacer(Modifier.height(24.dp))
+        }
+
+        when (val s = state) {
+            BodyState.Loading -> BodySkeleton()
+            BodyState.Failed -> Text(
+                "The full text couldn't be loaded in the reader. Open it on the publisher's site below — OpenWire will route around the paywall where it can.",
+                style = sans(14.sp, lineHeight = 22.sp),
+                color = g.textSecondary,
+            )
+            is BodyState.Loaded -> {
+                s.content.pullQuote?.let { quote ->
+                    Row(Modifier.fillMaxWidth().padding(bottom = 24.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+                        Box(Modifier.width(2.dp).fillMaxHeight().background(g.accent))
+                        Spacer(Modifier.width(16.dp))
+                        Text(
+                            quote,
+                            style = serif(20.sp, FontWeight.Normal, lineHeight = 26.sp).copy(fontStyle = FontStyle.Italic),
+                            color = g.textPrimary.copy(alpha = 0.95f),
+                        )
+                    }
+                }
+                s.content.paragraphs.forEachIndexed { i, para ->
+                    if (i == 0) DropCapParagraph(para) else BodyParagraph(para)
+                    Spacer(Modifier.height(16.dp))
+                }
             }
-        } else {
-            ArticleBody(content!!.text)
-            Spacer(modifier = Modifier.height(20.dp))
-            GlassCard(onClick = { router.open(scope, context, article) }) {
-                Text("Continue on publisher site →", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        }
+
+        Spacer(Modifier.height(8.dp))
+        val context = LocalContext.current
+        GlassCard(onClick = { actions.router.open(actions.scope, context, article) }, contentPadding = PaddingValues(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Continue on ${article.source ?: "publisher site"}",
+                    style = sans(13.sp, FontWeight.SemiBold), color = g.accentSoft, modifier = Modifier.weight(1f),
+                )
+                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = g.accentSoft, modifier = Modifier.size(16.dp))
             }
         }
     }
 }
 
+private val bodyStyle = sans(14.5.sp, lineHeight = 25.sp)
+
 @Composable
-private fun ArticleBody(text: String) {
-    val paragraphs = text.split("\n\n").filter { it.isNotBlank() }
-    paragraphs.forEachIndexed { index, para ->
-        if (index == 0) {
-            val first = para.firstOrNull()?.toString() ?: ""
-            val rest = para.drop(1)
-            val annotated = buildAnnotatedString {
-                withStyle(
-                    SpanStyle(
-                        fontFamily = NewsreaderFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 46.sp,
-                        color = Rose,
-                    ),
-                ) { append(first) }
-                append(rest)
-            }
-            Text(annotated, style = MaterialTheme.typography.bodyLarge)
-        } else {
+private fun BodyParagraph(text: String) {
+    Text(text, style = bodyStyle, color = Glass.textPrimary.copy(alpha = 0.9f))
+}
+
+/**
+ * First paragraph with a floated rose drop cap spanning two lines: the opening
+ * lines wrap beside the cap, the remainder flows full-width beneath it.
+ */
+@Composable
+private fun DropCapParagraph(text: String) {
+    val g = Glass
+    if (text.length < 2) { BodyParagraph(text); return }
+    var split by remember(text) { mutableIntStateOf(-1) }
+    Column {
+        Row {
             Text(
-                text = para,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(top = 16.dp),
+                text.take(1),
+                style = serif(48.sp, FontWeight.Bold, lineHeight = 44.sp),
+                color = g.accent,
+                modifier = Modifier.padding(end = 10.dp, top = 2.dp),
+            )
+            Text(
+                text.drop(1),
+                style = bodyStyle,
+                color = g.textPrimary.copy(alpha = 0.9f),
+                maxLines = 2,
+                overflow = TextOverflow.Clip,
+                onTextLayout = { layout ->
+                    split = if (layout.lineCount >= 2 && layout.hasVisualOverflow) layout.getLineEnd(1, visibleEnd = false) else Int.MAX_VALUE
+                },
             )
         }
+        if (split in 0 until text.length - 1) {
+            Text(text.drop(1).substring(split).trimStart(), style = bodyStyle, color = g.textPrimary.copy(alpha = 0.9f))
+        }
     }
 }
 
 @Composable
-private fun AudioPlayerCard(article: Article, content: ArticleContent?, context: Context) {
-    var playing by remember { mutableStateOf(false) }
-    val tts = remember { mutableStateOf<TextToSpeech?>(null) }
-
-    DisposableEffect(Unit) {
-        lateinit var engine: TextToSpeech
-        engine = TextToSpeech(context) { status ->
-            if (status == TextToSpeech.SUCCESS) tts.value = engine
+private fun BodySkeleton() {
+    val t = rememberInfiniteTransition(label = "bodySk")
+    val a by t.animateFloat(0.25f, 0.6f, infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "a")
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        listOf(1f, 0.95f, 0.98f, 0.7f, 0f, 1f, 0.92f, 0.6f).forEach { w ->
+            if (w == 0f) Spacer(Modifier.height(6.dp))
+            else Box(Modifier.fillMaxWidth(w).height(12.dp).clip(CircleShape).background(Glass.textPrimary.copy(alpha = a * 0.25f)))
         }
-        onDispose { engine.stop(); engine.shutdown() }
     }
+}
 
-    GlassCard {
+// ---- Narrated briefing (on-device TTS) ---------------------------------------------
+
+private val WaveHeights = listOf(35, 65, 90, 50, 80, 100, 60, 40, 85, 70, 95, 45, 75, 60, 85, 50, 70, 90, 40, 65)
+
+@Composable
+private fun AudioBriefingCard(article: Article, content: ArticleContent?) {
+    val g = Glass
+    val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
+    val narrator = rememberNarrator(context)
+    var playing by remember(article.id) { mutableStateOf(false) }
+    LaunchedEffect(article.id) { narrator.stop() }
+    DisposableEffect(narrator) { narrator.onDone = { playing = false }; onDispose { narrator.onDone = null } }
+
+    GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Rose)
-                    .clickable {
-                        val engine = tts.value
-                        if (playing) {
-                            engine?.stop()
-                            playing = false
-                        } else if (engine != null) {
-                            engine.language = Locale.US
-                            engine.setSpeechRate(1.0f)
-                            val text = article.title + ". " + (content?.text ?: "")
-                            engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "openwire-tts")
-                            playing = true
-                        }
+                Modifier.glowShadow(g.accent, 14.dp).size(40.dp).clip(CircleShape).background(g.accent)
+                    .clickable(enabled = narrator.ready) {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (playing) narrator.stop() else narrator.speak(buildNarration(article, content))
+                        playing = !playing
                     },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (playing) "Pause" else "Play",
+                    if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = if (playing) "Pause briefing" else "Play briefing",
                     tint = Color.White,
+                    modifier = Modifier.size(18.dp),
                 )
             }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Listen to narrated briefing", style = MaterialTheme.typography.bodyMedium)
-                Spacer(modifier = Modifier.height(6.dp))
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Listen to Narrated Briefing",
+                        style = sans(11.sp, FontWeight.SemiBold), color = g.textPrimary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        content?.narrationSeconds?.let { "%02d:%02d".format(it / 60, it % 60) } ?: "--:--",
+                        style = mono(10.sp, tracking = 0.sp), color = g.textPrimary.copy(alpha = 0.6f),
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
                 Waveform(playing)
             }
         }
     }
 }
 
+private fun buildNarration(article: Article, content: ArticleContent?): String = buildString {
+    append(article.title).append(". ")
+    article.source?.let { append("From ").append(it).append(". ") }
+    content?.description?.let { append(it).append(" ") }
+    content?.text?.let { append(it) }
+}
+
+/** `wavePulse`: bars breathe between 35% and 100% height, staggered 70ms apart. */
 @Composable
 private fun Waveform(playing: Boolean) {
-    val heights = listOf(35, 65, 90, 50, 80, 100, 60, 40, 85, 70, 95, 45, 75, 60, 85, 50, 70, 90, 40, 65)
-    val transition = rememberInfiniteTransition(label = "wave")
-    val progress by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Restart),
-        label = "waveProgress",
-    )
-    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        heights.forEachIndexed { index, h ->
-            val animated = if (playing) {
-                val wave = sin((progress * 2 * PI + index * 0.5).toFloat()).toFloat()
-                h * (0.35f + 0.65f * (wave + 1f) / 2f)
-            } else h.toFloat()
+    val g = Glass
+    val t = rememberInfiniteTransition(label = "wave")
+    Row(Modifier.height(16.dp).fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        WaveHeights.forEachIndexed { i, h ->
+            val pulse by t.animateFloat(
+                0.35f, 1f,
+                infiniteRepeatable(tween(450), RepeatMode.Reverse, StartOffset(i * 70)),
+                label = "bar$i",
+            )
             Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .height((animated * 0.14f).dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(MaterialTheme.colorScheme.primary),
+                Modifier.width(4.dp).fillMaxHeight(h / 100f)
+                    .graphicsLayer {
+                        transformOrigin = TransformOrigin(0.5f, 1f)
+                        scaleY = if (playing) pulse else 1f
+                    }
+                    .clip(CircleShape).background(g.accent.copy(alpha = 0.85f)),
             )
         }
     }
 }
 
-@Composable
-fun ReaderOverlay(
-    article: Article,
-    router: ArticleRouter,
-    extractor: ArticleTextExtractor,
-    scope: CoroutineScope,
-    context: Context,
-    onClose: () -> Unit,
-) {
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text("OpenWire", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-            }
-            ReaderContent(
-                article = article,
-                router = router,
-                extractor = extractor,
-                scope = scope,
-                context = context,
-                modifier = Modifier.fillMaxSize(),
-            )
+/** Thin wrapper over Android TextToSpeech that chunks long text (engine input is capped). */
+internal class Narrator(context: Context) {
+    var ready by mutableStateOf(false)
+        private set
+    var onDone: (() -> Unit)? = null
+    private var lastId: String? = null
+    private val tts: TextToSpeech = TextToSpeech(context.applicationContext) { status ->
+        ready = status == TextToSpeech.SUCCESS
+    }.apply {
+        setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) { if (utteranceId == lastId) onDone?.invoke() }
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) { onDone?.invoke() }
+        })
+    }
+
+    fun speak(text: String) {
+        tts.language = Locale.getDefault().takeIf { tts.isLanguageAvailable(it) >= 0 } ?: Locale.US
+        val max = TextToSpeech.getMaxSpeechInputLength() - 100
+        val chunks = text.split(Regex("(?<=[.!?])\\s+")).fold(mutableListOf(StringBuilder())) { acc, s ->
+            if (acc.last().length + s.length > max) acc.add(StringBuilder())
+            acc.last().append(s).append(' ')
+            acc
+        }
+        chunks.forEachIndexed { i, c ->
+            val id = "openwire-$i"
+            lastId = id
+            tts.speak(c.toString(), if (i == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, id)
         }
     }
+
+    fun stop() { tts.stop() }
+    fun shutdown() { tts.stop(); tts.shutdown() }
+}
+
+@Composable
+internal fun rememberNarrator(context: Context): Narrator {
+    val narrator = remember { Narrator(context) }
+    DisposableEffect(narrator) { onDispose { narrator.shutdown() } }
+    return narrator
 }

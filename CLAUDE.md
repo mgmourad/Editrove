@@ -19,9 +19,11 @@ Read these before making changes:
 
 ## Status
 
-Documentation and planning are complete; the Android codebase is **not yet
-scaffolded**. Until the Gradle project exists, "build" means the standard
-Gradle commands below once the scaffold lands.
+The multi-module Gradle project is scaffolded and runs. The UI follows the
+reference prototype (`pulse_news_2026_adaptive_liquid_glass_prototype.html`,
+branded **OpenWire** — never "Pulse" or "OpenWire+"): Liquid Glass / Black Glass + Editorial Paper themes,
+cover-screen Bento feed with floating pill nav and slide-up reader, and an
+unfolded rail + 50/50 feed/reader layout (owner preference over the mock's 38/62) at >= 600dp.
 
 ## Commands
 

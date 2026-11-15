@@ -59,7 +59,7 @@ class FeedRepositoryTest {
                 ArticleDto(id = "c", title = "Other story", pubDate = "2026-09-14T12:00:00Z"),
             ),
         )
-        val repo = FeedRepository(remote, FakeArticleDao())
+        val repo = FeedRepositoryImpl(remote, FakeArticleDao())
         val results = repo.observeTopic(topic()).toList()
         val last = results.last() as FeedResult.Success
         assertEquals(2, last.articles.size)
@@ -68,14 +68,14 @@ class FeedRepositoryTest {
 
     @Test
     fun networkErrorWithEmptyCacheSurfacesError() = runTest {
-        val repo = FeedRepository(FakeNewsRemote(error = true), FakeArticleDao())
+        val repo = FeedRepositoryImpl(FakeNewsRemote(error = true), FakeArticleDao())
         val results = repo.observeTopic(topic()).toList()
         assertTrue(results.last() is FeedResult.Error)
     }
 
     @Test
     fun liveOnlyTopicReturnsEmpty() = runTest {
-        val repo = FeedRepository(FakeNewsRemote(), FakeArticleDao())
+        val repo = FeedRepositoryImpl(FakeNewsRemote(), FakeArticleDao())
         val results = repo.observeTopic(topic(snapshotFile = null, liveOnly = true)).toList()
         assertTrue(results.last() is FeedResult.Empty)
     }

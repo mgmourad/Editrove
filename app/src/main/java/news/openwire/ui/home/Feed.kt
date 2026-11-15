@@ -106,7 +106,7 @@ fun Article.badgeLabel(): String? = badge?.takeIf { it.isNotBlank() } ?: status?
 
 // ---- Masthead + category pills ----------------------------------------------
 
-/** "SUNDAY • NOV 15" / OpenWire masthead with the edition pill and settings on the right. */
+/** "SUNDAY • NOV 15" / Editrove masthead with the edition pill and settings on the right. */
 @Composable
 fun Masthead(edition: String, onEdition: () -> Unit, onSettings: () -> Unit, modifier: Modifier = Modifier) {
     val g = Glass
@@ -120,7 +120,7 @@ fun Masthead(edition: String, onEdition: () -> Unit, onSettings: () -> Unit, mod
         Column(modifier = Modifier.padding(end = 8.dp)) {
             Text(date, style = mono(11.sp, FontWeight.SemiBold, 0.18.em), color = g.accent)
             Text(
-                "OpenWire",
+                "Editrove",
                 style = serif(30.sp, FontWeight.Bold, lineHeight = 30.sp, tracking = (-0.02).em),
                 color = g.textPrimary,
                 maxLines = 1,

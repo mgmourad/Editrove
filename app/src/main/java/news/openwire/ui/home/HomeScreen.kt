@@ -133,7 +133,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
     val haptics = LocalHapticFeedback.current
     val actions = remember {
         ReaderActions(
-            router = ArticleRouter(app.container.domainRegistry, app.container.archiveChecker),
+            router = app.container.articleRouter,
             extractor = app.container.articleTextExtractor,
             scope = scope,
             onToggleSaved = { vm.toggleSaved(it) },
@@ -441,7 +441,7 @@ private fun TabFeed(
                     fullRow("search") { SearchPill(query, vm::setQuery) }
                     val pastedUrl = news.openwire.domain.engine.SharedUrl.extract(query).takeIf { query.contains('.') && !query.trim().contains(' ') }
                     if (!pastedUrl.isNullOrEmpty()) fullRow("open-link") {
-                        MessageCard("Open this link", pastedUrl + "\nOpenWire will route it around its paywall.", "Open") { vm.openLink(pastedUrl) }
+                        MessageCard("Open this link", pastedUrl + "\nEditrove will route it around its paywall.", "Open") { vm.openLink(pastedUrl) }
                     }
                     if (visible.isEmpty()) {
                         fullRow("discover-empty") {
@@ -518,7 +518,7 @@ private fun HeadlineBriefingCard(topicLabel: String, articles: List<Article>) {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     if (playing) narrator.stop()
                     else narrator.speak(
-                        "Your $topicLabel briefing from OpenWire. " +
+                        "Your $topicLabel briefing from Editrove. " +
                             articles.take(count).joinToString(" ") { a -> "${a.title}. ${a.source?.let { "From $it." } ?: ""}" },
                     )
                     playing = !playing
@@ -592,8 +592,8 @@ private fun SideRail(selectedTab: NavTab, onSelectTab: (NavTab) -> Unit, onToggl
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Image(
-                painter = painterResource(R.mipmap.ic_launcher),
-                contentDescription = "OpenWire",
+                painter = painterResource(R.drawable.ic_brand),
+                contentDescription = "Editrove",
                 modifier = Modifier.size(36.dp).clip(RoundedCornerShape(16.dp)),
             )
             Spacer(Modifier.height(20.dp))
@@ -624,7 +624,7 @@ private fun SideRail(selectedTab: NavTab, onSelectTab: (NavTab) -> Unit, onToggl
                 Icon(androidx.compose.material.icons.Icons.Outlined.Settings, contentDescription = "Settings", tint = g.textPrimary.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
             }
             Spacer(Modifier.height(16.dp))
-            // Where the prototype shows a profile photo: OpenWire has no accounts, so this
+            // Where the prototype shows a profile photo: Editrove has no accounts, so this
             // slot toggles Black Glass ↔ Editorial Paper instead.
             Box(
                 Modifier.size(36.dp).clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape)
@@ -675,7 +675,7 @@ private fun LinkDialog(onOpen: (String) -> Unit, onDismiss: () -> Unit) {
             Spacer(Modifier.height(4.dp))
             Text("Read any article", style = serif(22.sp, FontWeight.Bold), color = g.textPrimary)
             Spacer(Modifier.height(4.dp))
-            Text("Paste a link — OpenWire picks the right way around its paywall and opens it in the reader.", style = sans(12.sp, lineHeight = 18.sp), color = g.textSecondary)
+            Text("Paste a link — Editrove picks the right way around its paywall and opens it in the reader.", style = sans(12.sp, lineHeight = 18.sp), color = g.textSecondary)
             Spacer(Modifier.height(14.dp))
             Box(Modifier.fillMaxWidth().glassSurface(RoundedCornerShape(16.dp), fill = g.glassPill, elevation = 0.dp).padding(14.dp)) {
                 if (text.isEmpty()) Text("https://…", style = sans(14.sp), color = g.textMuted)

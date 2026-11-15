@@ -236,6 +236,23 @@ private fun ArticleBody(
             Spacer(Modifier.height(20.dp))
         }
 
+        // Reader-service pill: tells you how this story is unlocked and opens that page.
+        val context = LocalContext.current
+        val service = remember(article.id) { actions.router.serviceFor(article) }
+        if (service != null) {
+            Row(
+                Modifier.padding(bottom = 12.dp).clip(CircleShape)
+                    .background(g.indigo.copy(alpha = 0.14f)).border(1.dp, g.indigo.copy(alpha = 0.32f), CircleShape)
+                    .clickable { actions.router.open(actions.scope, context, article) }
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Read on ${service.name}", style = mono(10.sp, FontWeight.SemiBold, 0.06.em), color = g.indigo)
+                Spacer(Modifier.width(4.dp))
+                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = g.indigo, modifier = Modifier.size(12.dp))
+            }
+        }
+
         // Editorial serif headline
         Text(article.title.ifBlank { content?.title?.takeIf { it.isNotBlank() } ?: article.source ?: article.domain ?: "Article" }, style = serif(28.sp, FontWeight.Bold, lineHeight = 32.sp, tracking = (-0.01).em), color = g.textPrimary)
         Spacer(Modifier.height(12.dp))
@@ -278,7 +295,26 @@ private fun ArticleBody(
 
         // Liquid Glass narrated-briefing player
         AudioBriefingCard(article, content)
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
+
+        // On-device summary: the article's own key sentences.
+        val keyPoints = remember(content) { content?.let { news.openwire.domain.engine.Summarizer.keyPoints(it.text, 3) }.orEmpty() }
+        androidx.compose.animation.AnimatedVisibility(keyPoints.isNotEmpty(), enter = androidx.compose.animation.expandVertically(springTween(420)) + androidx.compose.animation.fadeIn()) {
+            GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), contentPadding = PaddingValues(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("SUMMARY", style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = g.accentSoft, modifier = Modifier.weight(1f))
+                    Text("Key points · on this device", style = sans(10.sp), color = g.textSecondary)
+                }
+                keyPoints.forEach { point ->
+                    Row(Modifier.padding(top = 10.dp)) {
+                        Box(Modifier.padding(top = 7.dp).size(5.dp).clip(CircleShape).background(g.accent))
+                        Spacer(Modifier.width(10.dp))
+                        Text(point, style = sans(13.5.sp, lineHeight = 21.sp), color = g.textPrimary.copy(alpha = 0.92f))
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
 
         // Feature image (16:9, 24dp radius) with caption
         article.imageUrl?.let { img ->
@@ -301,7 +337,8 @@ private fun ArticleBody(
         when (val s = state) {
             BodyState.Loading -> BodySkeleton()
             BodyState.Failed -> Text(
-                "The full text couldn't be loaded in the reader. Open it on the publisher's site below — OpenWire will route around the paywall where it can.",
+                if (service != null) "This publisher blocks in-app reading and no archive copy exists yet. Read it on ${service.name} below — it opens in your browser."
+                else "The full text couldn't be loaded in the reader. Open it below — Editrove will route around the paywall where it can.",
                 style = sans(14.sp, lineHeight = 22.sp),
                 color = g.textSecondary,
             )
@@ -321,11 +358,27 @@ private fun ArticleBody(
                     if (i == 0) DropCapParagraph(para) else BodyParagraph(para)
                     Spacer(Modifier.height(16.dp))
                 }
+                if (s.content.partial) {
+                    Text(
+                        "This is the free preview — the rest is behind the paywall and no archive copy has the full text yet. Use the button below to open it through a reader service.",
+                        style = sans(13.sp, lineHeight = 20.sp), color = g.textSecondary,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
+                if (s.content.via != news.openwire.data.remote.TextSource.PUBLISHER) {
+                    val viaUrl = s.content.viaUrl
+                    Text(
+                        "Text via ${s.content.via.label} ↗",
+                        style = mono(10.sp, tracking = 0.06.em), color = g.textPrimary.copy(alpha = 0.55f),
+                        modifier = Modifier.clip(CircleShape).clickable(enabled = viaUrl != null) {
+                            viaUrl?.let { androidx.browser.customtabs.CustomTabsIntent.Builder().build().launchUrl(context, android.net.Uri.parse(it)) }
+                        }.padding(vertical = 6.dp),
+                    )
+                }
             }
         }
 
         Spacer(Modifier.height(8.dp))
-        val context = LocalContext.current
         GlassCard(onClick = {
             actions.router.open(actions.scope, context, article) {
                 android.widget.Toast.makeText(
@@ -337,7 +390,7 @@ private fun ArticleBody(
         }, contentPadding = PaddingValues(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Continue on ${article.source ?: "publisher site"}",
+                    service?.let { "Read on ${it.name}" } ?: "Continue on ${article.source ?: "publisher site"}",
                     style = sans(13.sp, FontWeight.SemiBold), color = g.accentSoft, modifier = Modifier.weight(1f),
                 )
                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = g.accentSoft, modifier = Modifier.size(16.dp))

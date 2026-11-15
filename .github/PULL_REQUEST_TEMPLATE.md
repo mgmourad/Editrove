@@ -1,5 +1,5 @@
 <!--
-Thank you for contributing to OpenWire. Before submitting, please:
+Thank you for contributing to Editrove. Before submitting, please:
 - Read CONTRIBUTING.md and SPEC.md.
 - Ensure tests pass (`./gradlew test lint`).
 - Link any related issue.

@@ -1,11 +1,11 @@
-# OpenWire Android — Specification (SPEC)
+# Editrove Android — Specification (SPEC)
 
 - **Version:** 1.0
 - **Last updated:** 2026-11-15
 - **Status:** Approved — pre-implementation
 - **License:** GNU AGPL-3.0
 
-> This SPEC is the authoritative description of **what** OpenWire for Android is
+> This SPEC is the authoritative description of **what** Editrove for Android is
 > and how it behaves. Architecture decisions live in
 > [`ARCHITECTURE.md`](ARCHITECTURE.md) and
 > [`adr/`](adr/). Working guidance for contributors and AI agents lives in
@@ -16,7 +16,7 @@
 
 ## 1. Overview
 
-OpenWire is a fast, frictionless, advertising- and tracking-free news
+Editrove is a fast, frictionless, advertising- and tracking-free news
 aggregator. Its defining capability is **smart paywall routing**: open/free
 articles open directly, metered publishers route through reader/bypass tools,
 and hard paywalls fall back to archive snapshots — or grey out when no readable
@@ -31,7 +31,7 @@ background refresh, and notifications.
 
 ## 2. Goals
 
-1. A polished, single-activity Compose app rendering the OpenWire topic feeds
+1. A polished, single-activity Compose app rendering the Editrove topic feeds
    with images, badges, relative time, and sort options.
 2. A first-class **paywall strategy engine** (direct / smry / removepaywall /
    unwall / freedium / reader / archive.is / wayback) ported from the PWA.
@@ -133,7 +133,7 @@ strategy:
 ### 6.5 Quick-URL opener
 - An in-app "paste a URL" dialog.
 - An Android **share target** (`ACTION_SEND` / `ACTION_PROCESS_TEXT`), so a user
-  can share an article from any app into OpenWire and have it routed by the
+  can share an article from any app into Editrove and have it routed by the
   paywall engine.
 
 ### 6.6 Offline and background

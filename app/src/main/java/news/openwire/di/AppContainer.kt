@@ -19,6 +19,7 @@ import news.openwire.data.remote.ImageResolver
 import news.openwire.data.remote.NewsRemoteDataSource
 import news.openwire.data.remote.PublishedMetadata
 import news.openwire.data.remote.RssNormalizer
+import news.openwire.data.remote.ServiceHealth
 import news.openwire.data.repository.FeedRepository
 import news.openwire.data.repository.FeedRepositoryImpl
 import news.openwire.domain.engine.DomainRegistry
@@ -40,6 +41,12 @@ class AppContainer(context: Context) {
     val archiveChecker: ArchiveChecker by lazy { ArchiveChecker() }
     val articleTextExtractor: ArticleTextExtractor by lazy { ArticleTextExtractor() }
     val imageResolver: ImageResolver by lazy { ImageResolver() }
+    val serviceHealth: ServiceHealth by lazy { ServiceHealth() }
+
+    /** Paywall routing with service health checks and fallbacks. */
+    val articleRouter: news.openwire.ui.home.ArticleRouter by lazy {
+        news.openwire.ui.home.ArticleRouter(domainRegistry, archiveChecker, serviceHealth) { settingsRepository.settings.value.disabledServices }
+    }
 
     val settingsRepository: SettingsRepository by lazy { PrefsSettingsRepository(context) }
     val feedCatalog: FeedCatalogSource by lazy { FeedCatalogSource(context) }

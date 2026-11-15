@@ -195,5 +195,5 @@ class FeedRepositoryImpl(
         FeedCheck(ok = false, error = e.message ?: "Unable to retrieve headlines.")
     }
 
-    private companion object { const val TAG = "OpenWire" }
+    private companion object { const val TAG = "Editrove" }
 }

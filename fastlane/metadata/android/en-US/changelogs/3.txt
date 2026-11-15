@@ -1,0 +1,5 @@
+0.3.0 — OpenWire is now Editrove
+• New name: Editrove — editorial judgment meets a trove of stories. New package id (news.editrove): uninstall the 0.2.0 preview first.
+• Reader: on-device summary of each article's key points, and a "Read on smry.ai" pill (or whichever reader service the publisher uses).
+• Paywalled text now comes from the publisher, then the Wayback Machine, then archive.today — no more blank pages.
+• Reader services fall back automatically when one is down or changed; check and switch them off in Settings › Paywall rules.

@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
                     registry = container.domainRegistry,
                     repository = container.feedRepository,
                     catalog = { container.feedCatalog.catalog },
+                    health = container.serviceHealth,
                 )
             }
         }
@@ -87,7 +88,7 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
-    /** Share target, "OpenWire" in the text-selection menu, and notification taps. */
+    /** Share target, "Open in Editrove" in the text-selection menu, and notification taps. */
     private fun handleIntent(intent: Intent?) {
         intent ?: return
         when (intent.action) {

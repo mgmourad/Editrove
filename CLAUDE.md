@@ -4,7 +4,7 @@ Guidance for AI agents (and humans) working in this repository.
 
 ## Project
 
-OpenWire is a native Android news aggregator (Kotlin + Jetpack Compose) with a
+Editrove is a native Android news aggregator (Kotlin + Jetpack Compose) with a
 smart paywall-routing engine, rebuilt from the original OpenWire PWA. It is
 **ad-free, tracking-free, and serverless** (built-in topics read pre-generated
 JSON; custom feeds and non-default local editions use live RSS). Distributed
@@ -21,8 +21,8 @@ Read these before making changes:
 
 v0.2.0: the SPEC §6 v1 feature set is implemented across `app/`, `data/`,
 `domain/` and `notifications/`. The UI follows the reference prototype
-(`pulse_news_2026_adaptive_liquid_glass_prototype.html`, branded **OpenWire** —
-never "Pulse" or "OpenWire+"): Liquid Glass / Black Glass + Editorial Paper,
+(`pulse_news_2026_adaptive_liquid_glass_prototype.html`, branded **Editrove** —
+never "Pulse" or "Editrove+"): Liquid Glass / Black Glass + Editorial Paper,
 cover-screen Bento feed with floating pill nav and slide-up reader, and an
 unfolded rail + 50/50 feed/reader layout (owner preference over the mock's 38/62).
 
@@ -108,7 +108,7 @@ The article JSON shape is documented in `SPEC.md` §7.
 ## Conventions
 
 - **Kotlin**, Jetpack Compose, Material 3, coroutines + `Flow`.
-- `applicationId = news.openwire`, `minSdk = 26`, target latest stable.
+- `applicationId = news.editrove` (code packages stay `news.openwire`), `minSdk = 26`, target latest stable.
 - Package root: `news.openwire`.
 - Prefer **immutable data classes** in `domain/model`.
 - Ported logic should be **pure functions** wherever possible, mirroring the

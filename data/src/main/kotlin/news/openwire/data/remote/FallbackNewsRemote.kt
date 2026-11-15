@@ -18,6 +18,6 @@ class FallbackNewsRemote(
         }
 
     companion object {
-        private const val TAG = "OpenWire"
+        private const val TAG = "Editrove"
     }
 }

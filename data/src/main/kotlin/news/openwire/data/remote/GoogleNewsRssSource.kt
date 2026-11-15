@@ -29,7 +29,7 @@ class GoogleNewsRssSource(
     suspend fun fetchFeed(url: String): ParsedFeed = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 15) OpenWire/1.0 (+https://openwire.news)")
+            .header("User-Agent", "Mozilla/5.0 (Linux; Android 15) Editrove/0.3 (+https://github.com/mgmourad/Editrove)")
             .header("Accept", "application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8")
             .build()
         client.newCall(request).execute().use { response ->

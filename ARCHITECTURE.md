@@ -1,9 +1,9 @@
-# OpenWire Android — Architecture
+# Editrove Android — Architecture
 
 - **Last updated:** 2026-11-15
 - **Companion to:** [`SPEC.md`](SPEC.md), [`adr/`](adr/)
 
-This document describes how OpenWire for Android is structured and how data
+This document describes how Editrove for Android is structured and how data
 flows through it.
 
 ## 1. Principles
@@ -19,10 +19,10 @@ flows through it.
 ## 2. Module layout
 
 ```
-OpenWire-Android/
+Editrove/
 ├── app/                         # Android application module
 │   ├── MainActivity.kt
-│   ├── OpenWireApp.kt           # Application class, Hilt entry
+│   ├── EditroveApp.kt           # Application class, Hilt entry
 │   ├── ui/
 │   │   ├── theme/               # Material 3 theme, color, typography, dark mode
 │   │   ├── home/                # topic bar, feed list, article cards

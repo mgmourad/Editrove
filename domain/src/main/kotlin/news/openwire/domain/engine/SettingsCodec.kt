@@ -40,7 +40,7 @@ object SettingsCodec {
     fun export(settings: UserSettings, customRules: Map<String, DomainRule>, allTopics: List<Topic>, exportedAtIso: String): String {
         val root = buildJsonObject {
             put("version", 1)
-            put("appName", "OpenWire")
+            put("appName", "Editrove")
             put("platform", "android")
             put("exportedAt", exportedAtIso)
             putJsonObject("topics") {
@@ -75,6 +75,7 @@ object SettingsCodec {
                 put("notificationsEnabled", settings.notificationsEnabled)
                 put("notifyTopics", JsonArray(settings.notifyTopics.map(::JsonPrimitive)))
                 put("backgroundRefresh", settings.backgroundRefresh)
+                put("disabledServices", JsonArray(settings.disabledServices.map { JsonPrimitive(it.wireValue) }))
             }
         }
         return json.encodeToString(JsonObject.serializer(), root)
@@ -92,12 +93,12 @@ object SettingsCodec {
     private fun JsonElement?.strings() = arr()?.mapNotNull { it.str() }.orEmpty()
     private fun mapTopicId(id: String) = SourceLibrary.TOPIC_ALIASES[id.uppercase()] ?: id.uppercase()
 
-    /** Parses an OpenWire (Android or PWA) backup. Throws IllegalArgumentException when it is not one. */
+    /** Parses an Editrove or original OpenWire (web app) backup. Throws IllegalArgumentException when it is not one. */
     fun import(text: String, defaults: UserSettings = UserSettings()): Imported {
         val root = try { Json.parseToJsonElement(text).obj() } catch (e: Exception) { null }
-            ?: throw IllegalArgumentException("This file isn't an OpenWire settings backup.")
+            ?: throw IllegalArgumentException("This file isn't an Editrove (or OpenWire) settings backup.")
         if (root["topics"] == null && root["rssFeeds"] == null && root["paywallRules"] == null) {
-            throw IllegalArgumentException("This file isn't an OpenWire settings backup.")
+            throw IllegalArgumentException("This file isn't an Editrove (or OpenWire) settings backup.")
         }
         val notes = mutableListOf<String>()
         val defaultIds = TopicRegistry.defaultTopics().map { it.id }.toSet()
@@ -161,6 +162,8 @@ object SettingsCodec {
             notifyTopics = prefs?.get("notifyTopics").strings().map(::mapTopicId).filter { it in knownIds }.toSet()
                 .takeIf { prefs?.get("notifyTopics") != null } ?: defaults.notifyTopics,
             backgroundRefresh = prefs?.get("backgroundRefresh").bool() ?: defaults.backgroundRefresh,
+            disabledServices = prefs?.get("disabledServices").strings().mapNotNull { Strategy.fromWire(it) }.toSet()
+                .takeIf { prefs?.get("disabledServices") != null } ?: defaults.disabledServices,
         )
         return Imported(settings, rules, notes)
     }

@@ -40,6 +40,7 @@ class SettingsViewModel(
     private val repository: FeedRepository,
     private val catalog: () -> List<FeedSource>,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val health: news.openwire.data.remote.ServiceHealth? = null,
 ) : ViewModel() {
 
     val settings: StateFlow<UserSettings> = settingsRepo.settings
@@ -182,6 +183,25 @@ class SettingsViewModel(
     fun resetAllRules() {
         registry.resetToDefaults()
         _rules.value = registry.getAllRules()
+    }
+
+    // ---- Reader services (fallback chain) ----
+
+    private val _serviceStatus = MutableStateFlow<Map<Strategy, news.openwire.data.remote.ServiceHealth.Status?>>(emptyMap())
+    /** Strategy → last check (null while checking). */
+    val serviceStatus: StateFlow<Map<Strategy, news.openwire.data.remote.ServiceHealth.Status?>> = _serviceStatus.asStateFlow()
+
+    fun checkServices() {
+        val h = health ?: return
+        val all = news.openwire.domain.engine.BypassServices.ALL
+        _serviceStatus.value = all.associate { it.strategy to null }
+        all.forEach { svc ->
+            viewModelScope.launch { _serviceStatus.update { it + (svc.strategy to h.check(svc.strategy, force = true)) } }
+        }
+    }
+
+    fun setServiceEnabled(strategy: Strategy, enabled: Boolean) = settingsRepo.update { s ->
+        s.copy(disabledServices = if (enabled) s.disabledServices - strategy else s.disabledServices + strategy)
     }
 
     // ---- Notifications / preferences ----

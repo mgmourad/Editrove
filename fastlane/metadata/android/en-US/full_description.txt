@@ -1,4 +1,4 @@
-<p><b>OpenWire</b> is a fast, ad-free and tracking-free news reader for Android with a smart paywall-routing engine. No accounts, no analytics and no server of its own — your settings and saved stories never leave your device.</p>
+<p><b>Editrove</b> is a fast, ad-free and tracking-free news reader for Android with a smart paywall-routing engine. No accounts, no analytics and no server of its own — your settings and saved stories never leave your device.</p>
 
 <p><b>Read without barriers</b></p>
 <ul>
@@ -19,4 +19,4 @@
 
 <p><b>Designed for foldables</b>: a Liquid Glass interface with a floating navigation pill on the cover screen and a side-by-side reader when unfolded, in Black Glass or Editorial Paper themes.</p>
 
-<p>OpenWire for Android is a fork of the original OpenWire web app by Anson Lai and is free software under the AGPL-3.0.</p>
+<p>Editrove for Android is a fork of the original OpenWire web app by Anson Lai and is free software under the AGPL-3.0.</p>

@@ -71,6 +71,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         val notificationsEnabled: Boolean = false,
         val notifyTopics: Set<String> = emptySet(),
         val backgroundRefresh: Boolean = true,
+        val disabledServices: Set<String> = emptySet(),
     ) {
         fun toSettings() = UserSettings(
             edition = LocalEdition(city, region, country),
@@ -83,6 +84,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
             notificationsEnabled = notificationsEnabled,
             notifyTopics = notifyTopics,
             backgroundRefresh = backgroundRefresh,
+            disabledServices = disabledServices.mapNotNull { Strategy.fromWire(it) }.toSet(),
         )
 
         companion object {
@@ -92,6 +94,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 s.hiddenTopics, s.topicOrder,
                 s.customFeeds.map { StoredFeed(it.id, it.name, it.url, it.domain, it.topics, it.maxArticles, it.enabled) },
                 s.disabledSources, s.sortMode.name, s.notificationsEnabled, s.notifyTopics, s.backgroundRefresh,
+                s.disabledServices.map { it.wireValue }.toSet(),
             )
         }
     }

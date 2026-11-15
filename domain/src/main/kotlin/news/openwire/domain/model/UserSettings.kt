@@ -21,4 +21,6 @@ data class UserSettings(
     val notifyTopics: Set<String> = emptySet(),
     /** Periodic background refresh of snapshots (SPEC §6.6). */
     val backgroundRefresh: Boolean = true,
+    /** Bypass services the user switched off (e.g. one that changed or shut down); routing skips them. */
+    val disabledServices: Set<Strategy> = emptySet(),
 )

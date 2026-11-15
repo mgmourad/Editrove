@@ -1,6 +1,6 @@
-# Contributing to OpenWire
+# Contributing to Editrove
 
-Thank you for your interest in contributing. OpenWire is open source (AGPL-3.0)
+Thank you for your interest in contributing. Editrove is open source (AGPL-3.0)
 and welcomes forks, issues, and pull requests.
 
 ## Getting started

@@ -1,9 +1,11 @@
-# OpenWire — Android
+# Editrove — Android
+
+*Editorial judgment meets a trove of stories.*
 
 A fast, frictionless, **ad-free and tracking-free** news aggregator for Android,
 with a smart paywall-routing engine. Read the news without barriers.
 
-OpenWire classifies every publisher by its paywall, routes open articles
+Editrove classifies every publisher by its paywall, routes open articles
 directly, routes metered ones through reader/bypass tools, and falls back to
 archive snapshots for hard paywalls — greying out headlines that have no
 readable copy.
@@ -25,7 +27,7 @@ readable copy.
 - **Offline-first** — Room caching + background refresh (WorkManager).
 - **Notifications** — local, per-topic opt-in, default off.
 - **Quick-URL** — paste any article URL, or share one from another app, and
-  OpenWire routes it through the paywall engine.
+  Editrove routes it through the paywall engine.
 - **Privacy** — no ads, no analytics, no tracking.
 
 ## Technology

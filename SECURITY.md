@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-If you discover a security vulnerability in OpenWire, please **do not open a
+If you discover a security vulnerability in Editrove, please **do not open a
 public issue**. Report it privately to the maintainer. Include:
 
 - A description of the vulnerability and its impact.
@@ -18,7 +18,7 @@ fixes.
 
 ## Design & threat model
 
-OpenWire is designed to minimize attack surface and user exposure:
+Editrove is designed to minimize attack surface and user exposure:
 
 - **No accounts, no personal data** — the app stores only local preferences and
   cached headlines on the device.
@@ -28,7 +28,7 @@ OpenWire is designed to minimize attack surface and user exposure:
 
 ## Considerations for contributors
 
-- **Paywall bypass.** OpenWire's paywall-routing engine is an intentional
+- **Paywall bypass.** Editrove's paywall-routing engine is an intentional
   feature. It is distributed off-Play-Store and, as a result, is not subject to
   Google Play policy, but contributors and downstream distributors should be
   aware of the evolving legal landscape around paywall-bypass and article-access

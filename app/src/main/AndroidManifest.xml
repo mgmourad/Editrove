@@ -7,6 +7,7 @@
         android:name=".OpenWireApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:enableOnBackInvokedCallback="true"
@@ -23,13 +24,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Share an article from any app into OpenWire's paywall engine (SPEC §6.5). -->
+            <!-- Share an article from any app into Editrove's paywall engine (SPEC §6.5). -->
             <intent-filter android:label="@string/share_label">
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
-            <!-- "Open in OpenWire" in the text-selection menu. -->
+            <!-- "Open in Editrove" in the text-selection menu. -->
             <intent-filter android:label="@string/share_label">
                 <action android:name="android.intent.action.PROCESS_TEXT" />
                 <category android:name="android.intent.category.DEFAULT" />

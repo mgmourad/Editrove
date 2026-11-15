@@ -50,6 +50,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -117,7 +118,7 @@ import news.openwire.ui.theme.Glass
 private enum class Page(val title: String) {
     HOME("Settings"), EDITION("Edition"), TOPICS("Topics"), ADD_TOPIC("New topic"), SOURCES("Sources"),
     ADD_SOURCE("Add a source"), RULES("Paywall rules"), NOTIFICATIONS("Notifications & refresh"),
-    APPEARANCE("Appearance"), BACKUP("Backup & restore"), ABOUT("About OpenWire"),
+    APPEARANCE("Appearance"), BACKUP("Backup & restore"), ABOUT("About Editrove"),
 }
 
 /**
@@ -228,9 +229,9 @@ private fun LazyListScope.homePage(vm: SettingsViewModel, themeMode: ThemeMode, 
         Section {
             NavRow(Icons.Outlined.Link, "Open a link", "Paste any article URL — routed around its paywall") { onOpenLink() }
             Divider()
-            NavRow(Icons.Outlined.Save, "Backup & restore", "Export, import (incl. the OpenWire web app)") { go(Page.BACKUP) }
+            NavRow(Icons.Outlined.Save, "Backup & restore", "Export, import (incl. the original OpenWire web app)") { go(Page.BACKUP) }
             Divider()
-            NavRow(Icons.Outlined.Info, "About OpenWire", "Open source · no ads · no tracking") { go(Page.ABOUT) }
+            NavRow(Icons.Outlined.Info, "About Editrove", "Open source · no ads · no tracking") { go(Page.ABOUT) }
         }
     }
 }
@@ -430,7 +431,7 @@ private fun AddSourcePage(vm: SettingsViewModel, onDone: () -> Unit) {
     val chosen = remember { mutableStateListOf<String>() }
     val topics by vm.allTopics.collectAsState()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Hint("Paste any RSS or Atom feed. OpenWire reads it directly on your phone — no converter services.")
+        Hint("Paste any RSS or Atom feed. Editrove reads it directly on your phone — no converter services.")
         Section {
             Field("Name (optional)", name, { name = it }, placeholder = "e.g. Polygon")
             Spacer(Modifier.height(10.dp))
@@ -457,6 +458,46 @@ private fun AddSourcePage(vm: SettingsViewModel, onDone: () -> Unit) {
 
 private fun LazyListScope.rulesPage(vm: SettingsViewModel) {
     item { Hint("Each publisher is routed by a strategy. Hard paywalls use archive snapshots; if none exists the headline is greyed out and locked.") }
+    item {
+        val s by vm.settings.collectAsState()
+        val status by vm.serviceStatus.collectAsState()
+        LaunchedEffect(Unit) { if (status.isEmpty()) vm.checkServices() }
+        Section {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("READER SERVICES", style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = Glass.textSecondary)
+                    Text("If one is down, changed or switched off, Editrove falls back to the next — then to archive snapshots.", style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary)
+                }
+                SmallIcon(androidx.compose.material.icons.Icons.Filled.Refresh, "Check services") { vm.checkServices() }
+            }
+            news.openwire.domain.engine.BypassServices.ALL.forEach { svc ->
+                Divider()
+                val st = status[svc.strategy]
+                val enabled = svc.strategy !in s.disabledServices
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(8.dp).clip(CircleShape).background(
+                            when { !enabled -> Glass.textMuted; st == null -> Amber400; st.up -> Emerald400; else -> Glass.accent },
+                        ),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(svc.name, style = sans(14.sp, FontWeight.Medium), color = if (enabled) Glass.textPrimary else Glass.textMuted)
+                        Text(
+                            when {
+                                !enabled -> "Switched off — skipped when routing"
+                                st == null -> if (status.containsKey(svc.strategy)) "Checking…" else svc.homeUrl
+                                st.up -> "Reachable" + (st.code?.let { " · HTTP $it" } ?: "")
+                                else -> "Unavailable · ${st.error}"
+                            },
+                            style = sans(11.sp), color = Glass.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    GlassSwitch(enabled) { vm.setServiceEnabled(svc.strategy, it) }
+                }
+            }
+        }
+    }
     item {
         var domain by rememberSaveable { mutableStateOf("") }
         var strategy by rememberSaveable { mutableStateOf(Strategy.SMRY) }
@@ -535,10 +576,10 @@ private fun NotificationsPage(vm: SettingsViewModel) {
     val topics by vm.allTopics.collectAsState()
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         vm.setNotificationsEnabled(granted)
-        if (!granted) Toast.makeText(context, "Notifications are blocked for OpenWire in system settings.", Toast.LENGTH_LONG).show()
+        if (!granted) Toast.makeText(context, "Notifications are blocked for Editrove in system settings.", Toast.LENGTH_LONG).show()
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Hint("Notifications are generated on your phone — OpenWire has no server and no push. Every topic is off until you opt in.")
+        Hint("Notifications are generated on your phone — Editrove has no server and no push. Every topic is off until you opt in.")
         Section {
             SwitchRow("Notifications", "Master switch for new-headline alerts", s.notificationsEnabled) { on ->
                 if (on && Build.VERSION.SDK_INT >= 33 &&
@@ -622,7 +663,7 @@ private fun AboutPage() {
     val version = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "" }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Section {
-            Text("OpenWire", style = serif(28.sp, FontWeight.Bold), color = Glass.textPrimary)
+            Text("Editrove", style = serif(28.sp, FontWeight.Bold), color = Glass.textPrimary)
             Text("Version $version", style = mono(11.sp), color = Glass.textSecondary)
             Spacer(Modifier.height(10.dp))
             Text(
@@ -633,7 +674,7 @@ private fun AboutPage() {
         Section {
             Label("Credits")
             Text(
-                "OpenWire for Android is a fork of the original OpenWire web app by Anson Lai, whose paywall engine, source catalog and feed pipeline it ports and builds on.",
+                "Editrove — editorial judgment meets a trove of stories. Editrove began as a fork of the original OpenWire web app by Anson Lai, whose paywall engine, source catalog and feed pipeline it ports and builds on.",
                 style = sans(13.sp, lineHeight = 20.sp), color = Glass.textPrimary,
             )
             Spacer(Modifier.height(10.dp))
@@ -641,7 +682,7 @@ private fun AboutPage() {
         }
         Section {
             Label("License")
-            Text("Free software under the GNU Affero General Public License v3.0. Source code: github.com/mgmourad/OpenWire-Android", style = sans(13.sp, lineHeight = 20.sp), color = Glass.textPrimary)
+            Text("Free software under the GNU Affero General Public License v3.0. Source code: github.com/mgmourad/Editrove", style = sans(13.sp, lineHeight = 20.sp), color = Glass.textPrimary)
         }
     }
 }

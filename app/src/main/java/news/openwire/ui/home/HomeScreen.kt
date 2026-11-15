@@ -3,8 +3,8 @@ package news.openwire.ui.home
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -40,9 +40,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.res.painterResource
+import news.openwire.R
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -74,9 +77,8 @@ fun HomeScreen() {
     val selectedTab = remember { mutableStateOf(NavTab.TODAY) }
     val haptics = LocalHapticFeedback.current
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val expanded = maxWidth >= 600.dp
-        if (expanded) {
+    val expanded = LocalConfiguration.current.screenWidthDp >= 600
+    if (expanded) {
             ExpandedLayout(
                 topics = topics,
                 pagerState = pagerState,
@@ -103,7 +105,6 @@ fun HomeScreen() {
                 selectedTab = selectedTab.value,
                 onSelectTab = { selectedTab.value = it; haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
             )
-        }
     }
 }
 
@@ -252,12 +253,11 @@ private fun SideRail(
         modifier = Modifier.width(64.dp).fillMaxHeight().padding(vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.primary),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("O", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimary)
-        }
+        Image(
+            painter = painterResource(R.mipmap.ic_launcher),
+            contentDescription = "OpenWire",
+            modifier = Modifier.size(38.dp).clip(RoundedCornerShape(14.dp)),
+        )
         Spacer(modifier = Modifier.weight(1f))
         NavTab.entries.forEach { tab ->
             val selected = tab == selectedTab

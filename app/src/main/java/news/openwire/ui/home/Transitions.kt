@@ -15,6 +15,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.background
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -98,5 +105,56 @@ fun Modifier.frostedGlass(state: HazeState?, blur: Dp = 28.dp): Modifier {
             blurRadius = blur,
             noiseFactor = 0.04f,
         ),
+    )
+}
+
+/**
+ * Frosted glass behind the status bar: the feed blurs as it scrolls under it,
+ * tinted with the app's glass colour and finished with a hairline rim.
+ */
+@Composable
+fun StatusBarGlass(state: HazeState?, modifier: Modifier = Modifier) {
+    val g = Glass
+    val top = androidx.compose.foundation.layout.WindowInsets.statusBars
+        .asPaddingValues().calculateTopPadding()
+    androidx.compose.foundation.layout.Box(
+        modifier.fillMaxWidth().height(top + 6.dp)
+            .then(
+                if (state != null) Modifier.hazeEffect(
+                    state,
+                    HazeStyle(backgroundColor = g.deviceBg, tint = HazeTint(g.deviceBg.copy(alpha = 0.55f)), blurRadius = 24.dp, noiseFactor = 0.04f),
+                ) { progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(startIntensity = 1f, endIntensity = 0.75f) }
+                else Modifier.background(g.deviceBg.copy(alpha = 0.85f)),
+            )
+            .drawBehind {
+                drawLine(g.hairline, androidx.compose.ui.geometry.Offset(0f, size.height - 1), androidx.compose.ui.geometry.Offset(size.width, size.height - 1), 1.dp.toPx())
+            },
+    )
+}
+
+/**
+ * Bottom of the screen: a blur that fades in towards the edge (progressive haze
+ * plus a tint gradient), so content dissolves under the navigation pill.
+ */
+@Composable
+fun BottomFadeGlass(state: HazeState?, height: Dp, modifier: Modifier = Modifier) {
+    val g = Glass
+    val bottom = androidx.compose.foundation.layout.WindowInsets.navigationBars
+        .asPaddingValues().calculateBottomPadding()
+    androidx.compose.foundation.layout.Box(
+        modifier.fillMaxWidth().height(bottom + height)
+            .then(
+                if (state != null) Modifier.hazeEffect(
+                    state,
+                    HazeStyle(backgroundColor = g.deviceBg, tint = HazeTint(g.deviceBg.copy(alpha = 0.35f)), blurRadius = 22.dp, noiseFactor = 0.03f),
+                ) { progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(startIntensity = 0f, endIntensity = 1f) }
+                else Modifier,
+            )
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    0f to androidx.compose.ui.graphics.Color.Transparent,
+                    1f to g.deviceBg.copy(alpha = 0.7f),
+                ),
+            ),
     )
 }

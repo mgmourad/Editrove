@@ -19,6 +19,11 @@ data class FeedSource(
     val access: String? = null,
     /** The primary aggregator (Google News) pseudo-source. */
     val isPrimary: Boolean = false,
+    /**
+     * Added by Editrove on top of the shared pipeline catalog, so published snapshots
+     * don't include it yet — woven in live on top of the snapshot.
+     */
+    val extra: Boolean = false,
 )
 
 /** Feed ordering (SPEC §6.1): curated fair-share weave, or by date. */

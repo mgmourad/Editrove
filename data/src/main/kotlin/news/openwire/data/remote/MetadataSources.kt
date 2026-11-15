@@ -29,13 +29,14 @@ class FeedCatalogSource(private val context: Context) {
         val id: String, val name: String, val url: String, val domain: String = "",
         val topics: List<String> = emptyList(), val maxArticles: Int = 8, val enabled: Boolean = true,
         val category: String? = null, val kind: String = "publisher", val access: String? = null,
+        val origin: String? = null,
     )
 
     val catalog: List<FeedSource> by lazy {
         runCatching {
             val text = context.assets.open("feed_catalog.json").bufferedReader().use { it.readText() }
             lenientJson.decodeFromString<List<Dto>>(text).map {
-                FeedSource(it.id, it.name, it.url, it.domain, it.topics, it.maxArticles, it.enabled, it.category, it.kind, false, it.access)
+                FeedSource(it.id, it.name, it.url, it.domain, it.topics, it.maxArticles, it.enabled, it.category, it.kind, false, it.access, extra = it.origin == "editrove")
             }
         }.getOrDefault(emptyList())
     }

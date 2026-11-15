@@ -513,7 +513,7 @@ private fun buildNarration(article: Article, content: ArticleContent?): String =
 
 /** `wavePulse`: bars breathe between 35% and 100% height, staggered 70ms apart. */
 @Composable
-private fun Waveform(playing: Boolean) {
+internal fun Waveform(playing: Boolean) {
     val g = Glass
     val t = rememberInfiniteTransition(label = "wave")
     Row(Modifier.height(16.dp).fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {

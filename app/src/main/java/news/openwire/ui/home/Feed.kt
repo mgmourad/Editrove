@@ -121,11 +121,11 @@ fun Masthead(edition: String, onEdition: () -> Unit, onSettings: () -> Unit, mod
             Text(date, style = mono(11.sp, FontWeight.SemiBold, 0.18.em), color = g.accent)
             Text(
                 "Editrove",
-                style = serif(30.sp, FontWeight.Bold, lineHeight = 30.sp, tracking = (-0.02).em),
+                style = serif(40.sp, FontWeight.Bold, lineHeight = 40.sp, tracking = (-0.02).em),
                 color = g.textPrimary,
                 maxLines = 1,
                 softWrap = false,
-                modifier = Modifier.padding(top = 2.dp),
+                modifier = Modifier.padding(top = 12.dp),
             )
         }
         Spacer(Modifier.weight(1f))

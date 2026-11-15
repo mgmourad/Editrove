@@ -968,5 +968,666 @@
   ],
   "maxArticles": 7,
   "enabled": true
+ },
+ {
+  "id": "wapo_national",
+  "name": "Washington Post",
+  "domain": "washingtonpost.com",
+  "url": "https://feeds.washingtonpost.com/rss/national",
+  "topics": [
+   "US",
+   "TOP"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "wapo_world",
+  "name": "Washington Post World",
+  "domain": "washingtonpost.com",
+  "url": "https://feeds.washingtonpost.com/rss/world",
+  "topics": [
+   "INTERNATIONAL"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "wapo_politics",
+  "name": "Washington Post Politics",
+  "domain": "washingtonpost.com",
+  "url": "https://feeds.washingtonpost.com/rss/politics",
+  "topics": [
+   "POLITICS"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Politics",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "wapo_local",
+  "name": "Washington Post Local",
+  "domain": "washingtonpost.com",
+  "url": "https://feeds.washingtonpost.com/rss/local",
+  "topics": [
+   "WASHINGTON_DC"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "nbc_top",
+  "name": "NBC News",
+  "domain": "nbcnews.com",
+  "url": "https://feeds.nbcnews.com/nbcnews/public/news",
+  "topics": [
+   "US",
+   "TOP",
+   "LATEST"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "cbs_top",
+  "name": "CBS News",
+  "domain": "cbsnews.com",
+  "url": "https://www.cbsnews.com/latest/rss/main",
+  "topics": [
+   "US",
+   "TOP",
+   "LATEST"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "latimes",
+  "name": "Los Angeles Times",
+  "domain": "latimes.com",
+  "url": "https://www.latimes.com/world-nation/rss2.0.xml",
+  "topics": [
+   "US",
+   "INTERNATIONAL"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "axios",
+  "name": "Axios",
+  "domain": "axios.com",
+  "url": "https://api.axios.com/feed/",
+  "topics": [
+   "US",
+   "POLITICS",
+   "TOP"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "thehill",
+  "name": "The Hill",
+  "domain": "thehill.com",
+  "url": "https://thehill.com/feed/",
+  "topics": [
+   "POLITICS",
+   "US"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Politics",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "time",
+  "name": "TIME",
+  "domain": "time.com",
+  "url": "https://time.com/feed/",
+  "topics": [
+   "TOP",
+   "US"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "atlantic",
+  "name": "The Atlantic",
+  "domain": "theatlantic.com",
+  "url": "https://www.theatlantic.com/feed/all/",
+  "topics": [
+   "POLITICS",
+   "LIFESTYLE"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "newyorker",
+  "name": "The New Yorker",
+  "domain": "newyorker.com",
+  "url": "https://www.newyorker.com/feed/news",
+  "topics": [
+   "POLITICS",
+   "ENTERTAINMENT"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "newsweek",
+  "name": "Newsweek",
+  "domain": "newsweek.com",
+  "url": "https://www.newsweek.com/rss",
+  "topics": [
+   "US",
+   "LATEST"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "vox",
+  "name": "Vox",
+  "domain": "vox.com",
+  "url": "https://www.vox.com/rss/index.xml",
+  "topics": [
+   "POLITICS"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Politics",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "sky_world",
+  "name": "Sky News",
+  "domain": "news.sky.com",
+  "url": "https://feeds.skynews.com/feeds/rss/world.xml",
+  "topics": [
+   "INTERNATIONAL",
+   "TOP"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "euronews",
+  "name": "Euronews",
+  "domain": "euronews.com",
+  "url": "https://www.euronews.com/rss?format=mrss&level=theme&name=news",
+  "topics": [
+   "INTERNATIONAL"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "economist",
+  "name": "The Economist",
+  "domain": "economist.com",
+  "url": "https://www.economist.com/latest/rss.xml",
+  "topics": [
+   "INTERNATIONAL",
+   "BUSINESS"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Business",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "forbes_business",
+  "name": "Forbes",
+  "domain": "forbes.com",
+  "url": "https://www.forbes.com/business/feed/",
+  "topics": [
+   "BUSINESS"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Business",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "bi",
+  "name": "Business Insider",
+  "domain": "businessinsider.com",
+  "url": "https://feeds.businessinsider.com/custom/all",
+  "topics": [
+   "BUSINESS",
+   "TECHNOLOGY"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Business",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "cnbc_finance",
+  "name": "CNBC Finance",
+  "domain": "cnbc.com",
+  "url": "https://www.cnbc.com/id/10000664/device/rss/rss.html",
+  "topics": [
+   "FINANCE"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Finance",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "espn",
+  "name": "ESPN",
+  "domain": "espn.com",
+  "url": "https://www.espn.com/espn/rss/news",
+  "topics": [
+   "SPORTS"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Sports",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "cbs_sports",
+  "name": "CBS Sports",
+  "domain": "cbssports.com",
+  "url": "https://www.cbssports.com/rss/headlines/",
+  "topics": [
+   "SPORTS"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Sports",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "yahoo_sports",
+  "name": "Yahoo Sports",
+  "domain": "sports.yahoo.com",
+  "url": "https://sports.yahoo.com/rss/",
+  "topics": [
+   "SPORTS"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Sports",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "bbc_sport",
+  "name": "BBC Sport",
+  "domain": "bbc.co.uk",
+  "url": "https://feeds.bbci.co.uk/sport/rss.xml",
+  "topics": [
+   "SPORTS"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Sports",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "engadget",
+  "name": "Engadget",
+  "domain": "engadget.com",
+  "url": "https://www.engadget.com/rss.xml",
+  "topics": [
+   "TECHNOLOGY"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Technology",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "cnet",
+  "name": "CNET",
+  "domain": "cnet.com",
+  "url": "https://www.cnet.com/rss/news/",
+  "topics": [
+   "TECHNOLOGY"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Technology",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "zdnet",
+  "name": "ZDNET",
+  "domain": "zdnet.com",
+  "url": "https://www.zdnet.com/news/rss.xml",
+  "topics": [
+   "TECHNOLOGY"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Technology",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "mit_tr",
+  "name": "MIT Technology Review",
+  "domain": "technologyreview.com",
+  "url": "https://www.technologyreview.com/feed/",
+  "topics": [
+   "TECHNOLOGY",
+   "AI"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Technology",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "verge_ai",
+  "name": "The Verge AI",
+  "domain": "theverge.com",
+  "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+  "topics": [
+   "AI"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Technology",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "techcrunch_ai",
+  "name": "TechCrunch AI",
+  "domain": "techcrunch.com",
+  "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+  "topics": [
+   "AI"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Technology",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "the_decoder",
+  "name": "The Decoder",
+  "domain": "the-decoder.com",
+  "url": "https://the-decoder.com/feed/",
+  "topics": [
+   "AI"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Technology",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "ars_ai",
+  "name": "Ars Technica AI",
+  "domain": "arstechnica.com",
+  "url": "https://arstechnica.com/ai/feed/",
+  "topics": [
+   "AI"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Technology",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "openai_news",
+  "name": "OpenAI News",
+  "domain": "openai.com",
+  "url": "https://openai.com/news/rss.xml",
+  "topics": [
+   "AI"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Technology",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "google_ai",
+  "name": "Google AI Blog",
+  "domain": "blog.google",
+  "url": "https://blog.google/technology/ai/rss/",
+  "topics": [
+   "AI"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Technology",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "nasa",
+  "name": "NASA",
+  "domain": "nasa.gov",
+  "url": "https://www.nasa.gov/news-release/feed/",
+  "topics": [
+   "SCIENCE"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Science",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "new_scientist",
+  "name": "New Scientist",
+  "domain": "newscientist.com",
+  "url": "https://www.newscientist.com/feed/home/",
+  "topics": [
+   "SCIENCE"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Science",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "live_science",
+  "name": "Live Science",
+  "domain": "livescience.com",
+  "url": "https://www.livescience.com/feeds/all",
+  "topics": [
+   "SCIENCE"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Science",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "space_com",
+  "name": "Space.com",
+  "domain": "space.com",
+  "url": "https://www.space.com/feeds/all",
+  "topics": [
+   "SCIENCE"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Science",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "rolling_stone",
+  "name": "Rolling Stone",
+  "domain": "rollingstone.com",
+  "url": "https://www.rollingstone.com/feed/",
+  "topics": [
+   "ENTERTAINMENT"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Entertainment",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "billboard",
+  "name": "Billboard",
+  "domain": "billboard.com",
+  "url": "https://www.billboard.com/feed/",
+  "topics": [
+   "ENTERTAINMENT"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Entertainment",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "gq",
+  "name": "GQ",
+  "domain": "gq.com",
+  "url": "https://www.gq.com/feed/rss",
+  "topics": [
+   "LIFESTYLE"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Lifestyle",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "bon_appetit",
+  "name": "Bon Appétit",
+  "domain": "bonappetit.com",
+  "url": "https://www.bonappetit.com/feed/rss",
+  "topics": [
+   "LIFESTYLE"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Lifestyle",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "cnt",
+  "name": "Condé Nast Traveler",
+  "domain": "cntraveler.com",
+  "url": "https://www.cntraveler.com/feed/rss",
+  "topics": [
+   "LIFESTYLE"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "Lifestyle",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "wtop",
+  "name": "WTOP News",
+  "domain": "wtop.com",
+  "url": "https://wtop.com/feed/",
+  "topics": [
+   "WASHINGTON_DC"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "wcp",
+  "name": "Washington City Paper",
+  "domain": "washingtoncitypaper.com",
+  "url": "https://washingtoncitypaper.com/feed/",
+  "topics": [
+   "WASHINGTON_DC"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
+ },
+ {
+  "id": "dcnewsnow",
+  "name": "DC News Now",
+  "domain": "dcnewsnow.com",
+  "url": "https://www.dcnewsnow.com/feed/",
+  "topics": [
+   "WASHINGTON_DC"
+  ],
+  "maxArticles": 8,
+  "enabled": true,
+  "category": "News",
+  "kind": "publisher",
+  "origin": "editrove"
  }
 ]

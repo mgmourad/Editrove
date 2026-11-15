@@ -81,13 +81,44 @@ class FeedRepositoryImpl(
             val fresh = NewsProcessor.deduplicate(
                 NewsProcessor.sortByDate(remote.fetchTopic(file).map { it.toArticle() }, SortDirection.NEWEST),
             )
-            store(topic.id, fresh)
-            emit(FeedResult.Success(fresh, fromCache = false, updatedAt = clock()))
+            emit(FeedResult.Success(fresh, fromCache = false, updatedAt = clock(), refreshing = extrasFor(topic).isNotEmpty()))
+            val woven = weaveExtras(topic, fresh)
+            store(topic.id, woven)
+            if (woven !== fresh) emit(FeedResult.Success(woven, fromCache = false, updatedAt = clock()))
         } catch (e: Exception) {
             Log.w(TAG, "Snapshot ${topic.id} failed", e)
             if (cached.isEmpty()) emit(FeedResult.Error(e.message ?: "Network error"))
             else emit(FeedResult.Success(cached, fromCache = true, updatedAt = feedState?.lastUpdated(topic.id) ?: 0L))
         }
+    }
+
+    /** Editrove-added sources for a snapshot topic (the published snapshot doesn't carry them). */
+    private fun extrasFor(topic: Topic): List<FeedSource> {
+        val s = settings()
+        return SourceLibrary.feedsForTopic(topic, catalog(), emptyList(), s.disabledSources).filter { it.extra }
+    }
+
+    /** Weaves Editrove-added sources into a published snapshot, fairly and deduplicated. */
+    private suspend fun weaveExtras(topic: Topic, snapshot: List<Article>): List<Article> {
+        val extras = extrasFor(topic)
+        if (extras.isEmpty()) return snapshot
+        val gate = Semaphore(4)
+        val groups = coroutineScope {
+            extras.mapIndexed { i, cfg ->
+                async {
+                    gate.withPermit {
+                        runCatching {
+                            rssSource.fetchFeed(cfg.url).items.take(cfg.maxArticles + 4).mapIndexed { idx, item ->
+                                normalizer.normalize(item, topic.id, idx, feedName = cfg.name, feedUrl = cfg.url, idPrefix = "x$i")
+                            }
+                        }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { FeedWeaver.Group(cfg, it) }
+                    }
+                }
+            }.awaitAll().filterNotNull()
+        }
+        if (groups.isEmpty()) return snapshot
+        val woven = FeedWeaver.weave(snapshot, groups, norm, FeedWeaver.Options(leadAnchorCount = if (topic.id == "LATEST") 0 else 2, maxTotalArticles = 80))
+        return if (topic.id == "LATEST") NewsProcessor.sortByDate(woven, SortDirection.NEWEST) else woven
     }
 
     private data class Fetched(val source: FeedSource, val articles: List<Article>?, val error: String?)

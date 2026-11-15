@@ -68,6 +68,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -162,7 +163,9 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
     val linkDialog by vm.linkDialog.collectAsState()
     val themeMode by vm.themeMode.collectAsState()
 
-    CompositionLocalProvider(LocalImageResolver provides app.container.imageResolver) {
+    val briefing = rememberBriefingPlayer()
+
+    CompositionLocalProvider(LocalImageResolver provides app.container.imageResolver, LocalBriefingPlayer provides briefing) {
     SharedTransitionLayout {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= ExpandedBreakpoint
@@ -171,6 +174,8 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
             val category = categoryLabel(vm, tab, topicIndex)
 
             if (expanded) {
+                val haze = rememberHazeState()
+                Box(Modifier.fillMaxSize().hazeSource(haze)) {
                 AmbientBackdrop()
                 Row(Modifier.fillMaxSize()) {
                     SideRail(tab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) }, onSettings = { vm.openSettings() })
@@ -183,6 +188,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                             onFirstArticle = { vm.ensureSelection(it) },
                         )
                         Box(Modifier.align(Alignment.CenterEnd).width(1.dp).fillMaxHeight().background(Glass.hairline))
+                        PaneMiniPlayer(briefing, Modifier.align(Alignment.BottomCenter))
                     }
                     ReaderPane(
                         article = selected,
@@ -193,6 +199,9 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                         modifier = Modifier.weight(1f).fillMaxHeight().statusBarsPadding().navigationBarsPadding(),
                     )
                 }
+                }
+                StatusBarGlass(haze, Modifier.align(Alignment.TopCenter))
+                BottomFadeGlass(haze, 20.dp, Modifier.align(Alignment.BottomCenter))
             } else {
                 val openId = if (sheetOpen) selected?.id else null
                 CompositionLocalProvider(LocalImageTransition provides ImageTransition(this@SharedTransitionLayout, null, openId)) {
@@ -314,14 +323,30 @@ private fun CompactLayout(
             }
         }
     }
+    val player = LocalBriefingPlayer.current
+    val audioState = stateFor(NavTab.AUDIO)
+    val briefingCardVisible by remember(audioState) {
+        derivedStateOf { audioState.layoutInfo.visibleItemsInfo.any { (it.key as? String)?.startsWith("briefing-") == true } }
+    }
+    val showPlayer = player != null && player.active && !(tab == NavTab.AUDIO && briefingCardVisible)
     Box(Modifier.fillMaxSize().nestedScroll(connection)) {
         Box(Modifier.fillMaxSize().hazeSource(haze)) {
             AmbientBackdrop()
             TabFeed(
                 vm = vm, tab = tab, compact = true, stateFor = stateFor, ui = ui,
                 onOpen = { vm.openArticle(it) },
-                bottomPadding = 112.dp,
+                bottomPadding = if (showPlayer) 200.dp else 128.dp,
             )
+        }
+        StatusBarGlass(haze, Modifier.align(Alignment.TopCenter))
+        BottomFadeGlass(haze, 110.dp, Modifier.align(Alignment.BottomCenter))
+        if (player != null) AnimatedVisibility(
+            showPlayer,
+            enter = slideInVertically(springTween(420)) { it / 2 } + fadeIn(springTween(300)),
+            exit = slideOutVertically(springTween(320)) { it / 2 } + fadeOut(tween(200)),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            FloatingPlayerPill(player, haze, Modifier.navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 100.dp))
         }
         BottomNavPill(
             selectedTab = tab,
@@ -361,15 +386,20 @@ private fun TabFeed(
         bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + bottomPadding,
     )
 
-    AnimatedContent(
-        targetState = tab,
-        transitionSpec = {
-            (fadeIn(springTween(380)) + scaleIn(springTween(380), initialScale = 0.985f))
-                .togetherWith(fadeOut(tween(140)))
-                .using(SizeTransform(clip = false))
-        },
-        label = "tabFeed",
-    ) { t ->
+    // Swipe left/right between the bottom-bar pages; the pager and the nav stay in sync.
+    val pager = androidx.compose.foundation.pager.rememberPagerState(initialPage = tab.ordinal) { NavTab.entries.size }
+    LaunchedEffect(tab) { if (pager.currentPage != tab.ordinal) pager.animateScrollToPage(tab.ordinal, animationSpec = springTween(420)) }
+    LaunchedEffect(pager) {
+        androidx.compose.runtime.snapshotFlow { pager.settledPage }.collect { page ->
+            if (page != vm.tab.value.ordinal) vm.selectTab(NavTab.entries[page])
+        }
+    }
+    androidx.compose.foundation.pager.HorizontalPager(
+        state = pager,
+        modifier = Modifier.fillMaxSize(),
+        key = { NavTab.entries[it].name },
+    ) { page ->
+        val t = NavTab.entries[page]
         val visible: List<Article> = when (t) {
             NavTab.TODAY, NavTab.AUDIO -> (feeds[topic.id] as? FeedResult.Success)?.articles.orEmpty()
             NavTab.SAVED -> saved
@@ -491,16 +521,15 @@ private fun SearchPill(query: String, onQuery: (String) -> Unit) {
     }
 }
 
-/** Audio tab: narrate the current edition's top headlines back-to-back. */
+/** Audio tab: narrate the current edition's top headlines back-to-back (shared player keeps playing while you scroll). */
 @Composable
 private fun HeadlineBriefingCard(topicLabel: String, articles: List<Article>) {
     val g = Glass
-    val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
-    val narrator = rememberNarrator(context)
-    var playing by remember(topicLabel) { mutableStateOf(false) }
-    DisposableEffect(narrator) { narrator.onDone = { playing = false }; onDispose { narrator.onDone = null } }
-    LaunchedEffect(topicLabel) { narrator.stop() }
+    val player = LocalBriefingPlayer.current ?: return
+    val title = "$topicLabel briefing"
+    val mine = player.title == title
+    val playing = mine && player.playing
     val count = minOf(8, articles.size)
     GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), contentPadding = PaddingValues(18.dp)) {
         Text("AUDIO BRIEFING", style = mono(10.sp, FontWeight.SemiBold, 0.16.sp), color = g.accentSoft)
@@ -508,28 +537,34 @@ private fun HeadlineBriefingCard(topicLabel: String, articles: List<Article>) {
         Text("$topicLabel in $count headlines", style = serif(22.sp, FontWeight.Bold, lineHeight = 26.sp), color = g.textPrimary)
         Spacer(Modifier.height(4.dp))
         Text(
-            "Narrated on-device — nothing leaves your phone. Open any story below for its full narrated read.",
+            "Narrated on-device — nothing leaves your phone. Keep scrolling while it plays; open any story for its full narrated read.",
             style = sans(12.sp, lineHeight = 18.sp), color = g.textPrimary.copy(alpha = 0.6f),
         )
         Spacer(Modifier.height(14.dp))
-        Row(
-            Modifier.glowShadow(g.accent).clip(CircleShape).background(g.accent)
-                .clickable(enabled = narrator.ready) {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    if (playing) narrator.stop()
-                    else narrator.speak(
-                        "Your $topicLabel briefing from Editrove. " +
-                            articles.take(count).joinToString(" ") { a -> "${a.title}. ${a.source?.let { "From $it." } ?: ""}" },
-                    )
-                    playing = !playing
-                }
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-                .animateContentSize(springTween(260)),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, null, tint = Color.White, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(if (playing) "Pause" else "Play briefing", style = sans(12.sp, FontWeight.SemiBold), color = Color.White)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.glowShadow(g.accent).clip(CircleShape).background(g.accent)
+                    .clickable(enabled = player.ready) {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        when {
+                            mine -> player.toggle()
+                            else -> player.play(
+                                title,
+                                "Your $topicLabel briefing from Editrove. " +
+                                    articles.take(count).joinToString(" ") { a -> "${a.title}. ${a.source?.let { "From $it." } ?: ""}" },
+                            )
+                        }
+                    }
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    .animateContentSize(springTween(260)),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (playing) "Pause" else if (mine) "Resume" else "Play briefing", style = sans(12.sp, FontWeight.SemiBold), color = Color.White)
+            }
+            Spacer(Modifier.width(14.dp))
+            Box(Modifier.weight(1f).height(16.dp)) { Waveform(playing) }
         }
     }
 }
@@ -552,8 +587,8 @@ private fun BottomNavPill(
             .graphicsLayer { scaleX = scale; scaleY = scale; this.alpha = alpha }
             .glassSurface(CircleShape, fill = Color.Transparent, elevation = 16.dp)
             .frostedGlass(haze)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         NavTab.entries.forEach { tab ->
@@ -566,16 +601,16 @@ private fun BottomNavPill(
                     .clip(CircleShape)
                     .background(bg)
                     .clickable { onSelectTab(tab) }
-                    .padding(horizontal = if (active) 14.dp else 12.dp, vertical = 8.dp),
+                    .padding(horizontal = if (active) 18.dp else 14.dp, vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(16.dp))
+                Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(20.dp))
                 AnimatedVisibility(
                     active,
                     enter = expandHorizontally(springTween(360)) + fadeIn(springTween(360)),
                     exit = shrinkHorizontally(springTween(300)) + fadeOut(tween(120)),
                 ) {
-                    Text(tab.label, style = sans(12.sp, FontWeight.SemiBold), color = Color.White, modifier = Modifier.padding(start = 8.dp))
+                    Text(tab.label, style = sans(13.5.sp, FontWeight.SemiBold), color = Color.White, modifier = Modifier.padding(start = 8.dp))
                 }
             }
         }
@@ -698,5 +733,19 @@ private fun LinkDialog(onOpen: (String) -> Unit, onDismiss: () -> Unit) {
                 ) { Text("Open", style = sans(13.sp, FontWeight.SemiBold), color = Color.White) }
             }
         }
+    }
+}
+
+
+/** Unfolded posture: the mini-player floats at the bottom of the feed pane. */
+@Composable
+private fun PaneMiniPlayer(player: BriefingPlayer, modifier: Modifier) {
+    AnimatedVisibility(
+        player.active,
+        enter = slideInVertically(springTween(420)) { it } + fadeIn(),
+        exit = slideOutVertically(springTween(320)) { it } + fadeOut(),
+        modifier = modifier,
+    ) {
+        FloatingPlayerPill(player, haze = null, modifier = Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 16.dp))
     }
 }

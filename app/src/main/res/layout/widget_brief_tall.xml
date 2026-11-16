@@ -8,12 +8,11 @@
     <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
             <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
-            <ImageView android:id="@+id/brief_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:scaleType="center" android:tint="@color/brief_accent_soft" android:importantForAccessibility="yes" />
+                <ImageView android:id="@+id/brief_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:scaleType="center" android:tint="@color/brief_accent_soft" />
             </FrameLayout>
             <ProgressBar android:id="@+id/brief_refreshing" android:layout_width="18dp" android:layout_height="18dp" android:layout_marginEnd="8dp"
                 android:indeterminate="true" android:indeterminateTint="@color/brief_text_secondary" android:visibility="gone" />
-            <ImageView android:id="@+id/brief_refresh" android:layout_width="28dp" android:layout_height="28dp" android:layout_marginEnd="6dp"
+            <ImageView android:id="@+id/brief_refresh" android:layout_width="30dp" android:layout_height="30dp" android:layout_marginEnd="6dp"
                 android:background="@drawable/brief_round_chip" android:padding="6dp" android:src="@drawable/bic_refresh"
                 android:contentDescription="Refresh" android:visibility="gone" />
             <LinearLayout android:id="@+id/brief_speed" android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -24,40 +23,44 @@
                     android:scaleType="center" android:tint="@color/brief_text_secondary" />
             </LinearLayout>
         </LinearLayout>
-            <ImageView android:id="@+id/brief_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp"
-                android:scaleType="center" android:tint="@color/brief_text" android:importantForAccessibility="yes" />
-            <ImageView android:id="@+id/brief_sub" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp"
-                android:scaleType="center" android:tint="@color/brief_text_60" android:importantForAccessibility="yes" />
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:gravity="center_vertical" android:orientation="horizontal">
-            <LinearLayout android:id="@+id/brief_play" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        <ImageView android:id="@+id/brief_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp"
+            android:scaleType="center" android:tint="@color/brief_text" />
+        <ImageView android:id="@+id/brief_sub" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+            android:scaleType="center" android:tint="@color/brief_text_60" />
+        <FrameLayout android:layout_width="match_parent" android:layout_height="24dp" android:layout_marginTop="14dp">
+            <ProgressBar android:id="@+id/brief_wave_live" android:layout_width="match_parent" android:layout_height="24dp"
+                android:minHeight="24dp" android:maxHeight="24dp" android:indeterminate="true" android:indeterminateOnly="true"
+                android:indeterminateDrawable="@drawable/brief_wave_live_56" android:visibility="gone" />
+            <ImageView android:id="@+id/brief_wave_rest" android:layout_width="match_parent" android:layout_height="24dp"
+                android:scaleType="fitXY" android:src="@drawable/brief_wave_56" android:visibility="gone" android:importantForAccessibility="no" />
+            <ImageView android:id="@+id/brief_wave_idle" android:layout_width="match_parent" android:layout_height="24dp"
+                android:scaleType="fitXY" android:src="@drawable/brief_wave_56" android:importantForAccessibility="no" />
+        </FrameLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:gravity="center_vertical" android:orientation="horizontal">
+            <LinearLayout android:id="@+id/brief_play" android:layout_width="wrap_content" android:layout_height="46dp"
                 android:background="@drawable/brief_pill_accent" android:gravity="center_vertical" android:orientation="horizontal"
-                android:paddingStart="14dp" android:paddingTop="10dp" android:paddingEnd="16dp" android:paddingBottom="10dp">
-                <ImageView android:id="@+id/brief_play_icon" android:layout_width="18dp" android:layout_height="18dp" android:src="@drawable/bic_play_white" android:importantForAccessibility="no" />
-                <ImageView android:id="@+id/brief_play_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp"
+                android:paddingStart="18dp" android:paddingEnd="22dp">
+                <ImageView android:id="@+id/brief_play_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/bic_play_white" android:importantForAccessibility="no" />
+                <ImageView android:id="@+id/brief_play_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp"
                     android:scaleType="center" android:tint="#FFFFFFFF" />
             </LinearLayout>
-            <ImageView android:id="@+id/brief_prev" android:layout_width="32dp" android:layout_height="32dp" android:layout_marginStart="6dp"
-                android:background="@drawable/brief_round_chip" android:padding="7dp" android:src="@drawable/bic_skip_prev" android:contentDescription="Previous story" android:visibility="gone" />
-            <ImageView android:id="@+id/brief_back" android:layout_width="32dp" android:layout_height="32dp" android:layout_marginStart="6dp"
+            <FrameLayout android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+            <ImageView android:id="@+id/brief_prev" android:layout_width="44dp" android:layout_height="44dp"
+                android:background="@drawable/brief_round_chip" android:padding="11dp" android:src="@drawable/bic_skip_prev" android:contentDescription="Previous story" android:visibility="gone" />
+            <FrameLayout android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+            <ImageView android:id="@+id/brief_back" android:layout_width="44dp" android:layout_height="44dp"
                 android:background="@drawable/brief_round_chip" android:scaleType="center" android:tint="@color/brief_text_secondary" android:contentDescription="Back 15 seconds" android:visibility="gone" />
-            <ImageView android:id="@+id/brief_fwd" android:layout_width="32dp" android:layout_height="32dp" android:layout_marginStart="6dp"
+            <FrameLayout android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+            <ImageView android:id="@+id/brief_fwd" android:layout_width="44dp" android:layout_height="44dp"
                 android:background="@drawable/brief_round_chip" android:scaleType="center" android:tint="@color/brief_text_secondary" android:contentDescription="Forward 15 seconds" android:visibility="gone" />
-            <ImageView android:id="@+id/brief_next" android:layout_width="32dp" android:layout_height="32dp" android:layout_marginStart="6dp"
-                android:background="@drawable/brief_round_chip" android:padding="7dp" android:src="@drawable/bic_skip_next" android:contentDescription="Next story" android:visibility="gone" />
-            <FrameLayout android:layout_width="0dp" android:layout_height="16dp" android:layout_weight="1" android:layout_marginStart="10dp">
-                <ProgressBar android:id="@+id/brief_wave_live" android:layout_width="match_parent" android:layout_height="16dp"
-                    android:minHeight="16dp" android:maxHeight="16dp" android:indeterminate="true" android:indeterminateOnly="true"
-                    android:indeterminateDrawable="@drawable/brief_wave_live_20" android:visibility="gone" />
-                <ImageView android:id="@+id/brief_wave_rest" android:layout_width="match_parent" android:layout_height="16dp"
-                    android:scaleType="fitXY" android:src="@drawable/brief_wave_20" android:visibility="gone" android:importantForAccessibility="no" />
-                <ImageView android:id="@+id/brief_wave_idle" android:layout_width="match_parent" android:layout_height="16dp"
-                    android:scaleType="fitXY" android:src="@drawable/brief_wave_40" android:importantForAccessibility="no" />
-            </FrameLayout>
+            <FrameLayout android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+            <ImageView android:id="@+id/brief_next" android:layout_width="44dp" android:layout_height="44dp"
+                android:background="@drawable/brief_round_chip" android:padding="11dp" android:src="@drawable/bic_skip_next" android:contentDescription="Next story" android:visibility="gone" />
         </LinearLayout>
-            <ImageView android:id="@+id/brief_now" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10dp"
-                android:scaleType="center" android:tint="@color/brief_text_80" android:importantForAccessibility="yes" android:visibility="gone" />
-            <ImageView android:id="@+id/brief_list_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="14dp"
-                android:scaleType="center" android:tint="@color/brief_text_secondary" android:importantForAccessibility="yes" />
+        <ImageView android:id="@+id/brief_now" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10dp"
+            android:scaleType="center" android:tint="@color/brief_text_80" android:visibility="gone" />
+        <ImageView android:id="@+id/brief_list_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="14dp"
+            android:scaleType="center" android:tint="@color/brief_text_secondary" />
         <ListView android:id="@+id/brief_list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="6dp"
             android:divider="@null" android:dividerHeight="0dp" android:scrollbars="none" />
     </LinearLayout>

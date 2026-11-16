@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- The in-app waveform (Reader.kt Waveform) at rest. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="277dp" android:height="16dp" android:viewportWidth="277" android:viewportHeight="16">
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="193dp" android:height="16dp" android:viewportWidth="193" android:viewportHeight="16">
     <group android:name="b0" android:pivotX="2" android:pivotY="16">
         <path android:pathData="M0,12.40 A2,2 0 0 1 4,12.40 L4,14 A2,2 0 0 1 0,14 Z" android:fillColor="@color/brief_wave" />
     </group>
@@ -85,41 +85,5 @@
     </group>
     <group android:name="b27" android:pivotX="191" android:pivotY="16">
         <path android:pathData="M189,2.80 A2,2 0 0 1 193,2.80 L193,14 A2,2 0 0 1 189,14 Z" android:fillColor="@color/brief_wave" />
-    </group>
-    <group android:name="b28" android:pivotX="198" android:pivotY="16">
-        <path android:pathData="M196,3.60 A2,2 0 0 1 200,3.60 L200,14 A2,2 0 0 1 196,14 Z" android:fillColor="@color/brief_wave" />
-    </group>
-    <group android:name="b29" android:pivotX="205" android:pivotY="16">
-        <path android:pathData="M203,5.20 A2,2 0 0 1 207,5.20 L207,14 A2,2 0 0 1 203,14 Z" android:fillColor="@color/brief_wave" />
-    </group>
-    <group android:name="b30" android:pivotX="212" android:pivotY="16">
-        <path android:pathData="M210,10.80 A2,2 0 0 1 214,10.80 L214,14 A2,2 0 0 1 210,14 Z" android:fillColor="@color/brief_wave" />
-    </group>
-    <group android:name="b31" android:pivotX="219" android:pivotY="16">
-        <path android:pathData="M217,11.60 A2,2 0 0 1 221,11.60 L221,14 A2,2 0 0 1 217,14 Z" android:fillColor="@color/brief_wave" />
-    </group>
-    <group android:name="b32" android:pivotX="226" android:pivotY="16">
-        <path android:pathData="M224,2.00 A2,2 0 0 1 228,2.00 L228,14 A2,2 0 0 1 224,14 Z" android:fillColor="@color/brief_wave" />
-    </group>
-    <group android:name="b33" android:pivotX="233" android:pivotY="16">
-        <path android:pathData="M231,6.00 A2,2 0 0 1 235,6.00 L235,14 A2,2 0 0 1 231,14 Z" android:fillColor="@color/brief_wave" />
-    </group>
-    <group android:name="b34" android:pivotX="240" android:pivotY="16">
-        <path android:pathData="M238,7.60 A2,2 0 0 1 242,7.60 L242,14 A2,2 0 0 1 238,14 Z" android:fillColor="@color/brief_wave" />
-    </group>
-    <group android:name="b35" android:pivotX="247" android:pivotY="16">
-        <path android:pathData="M245,8.40 A2,2 0 0 1 249,8.40 L249,14 A2,2 0 0 1 245,14 Z" android:fillColor="@color/brief_wave" />
-    </group>
-    <group android:name="b36" android:pivotX="254" android:pivotY="16">
-        <path android:pathData="M252,8.40 A2,2 0 0 1 256,8.40 L256,14 A2,2 0 0 1 252,14 Z" android:fillColor="@color/brief_wave" />
-    </group>
-    <group android:name="b37" android:pivotX="261" android:pivotY="16">
-        <path android:pathData="M259,12.40 A2,2 0 0 1 263,12.40 L263,14 A2,2 0 0 1 259,14 Z" android:fillColor="@color/brief_wave" />
-    </group>
-    <group android:name="b38" android:pivotX="268" android:pivotY="16">
-        <path android:pathData="M266,11.60 A2,2 0 0 1 270,11.60 L270,14 A2,2 0 0 1 266,14 Z" android:fillColor="@color/brief_wave" />
-    </group>
-    <group android:name="b39" android:pivotX="275" android:pivotY="16">
-        <path android:pathData="M273,4.40 A2,2 0 0 1 277,4.40 L277,14 A2,2 0 0 1 273,14 Z" android:fillColor="@color/brief_wave" />
     </group>
 </vector>

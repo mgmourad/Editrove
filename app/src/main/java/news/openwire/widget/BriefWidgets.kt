@@ -107,7 +107,9 @@ object BriefWidgets {
         val layout = when (shape) { Shape.SMALL -> R.layout.widget_brief_small; Shape.WIDE -> R.layout.widget_brief; Shape.TALL -> R.layout.widget_brief_tall }
         val v = RemoteViews(context.packageName, layout)
         val d = context.resources.displayMetrics.density
-        val content = ((size.width - if (compact) 32f else 36f) * d).toInt()
+        val content = ((size.width - when (shape) { Shape.SMALL -> 28f; Shape.WIDE -> 32f; Shape.TALL -> 36f }) * d).toInt()
+        // Short widgets drop the subtitle; the progress moves into the header label.
+        val short = shape == Shape.WIDE && size.height < 235f
         fun text(viewId: Int, value: String, face: WidgetText.Face, sp: Float, width: Int, lines: Int = 1, lineHeight: Float? = null, tracking: Float = 0f) {
             v.setImageViewBitmap(viewId, WidgetText.render(context, value, face, sp, width, lines, lineHeight, tracking))
             v.setContentDescription(viewId, value)
@@ -118,7 +120,9 @@ object BriefWidgets {
         val speedText = if (compact) speed else "${prefs.detail.label} · $speed"
         text(R.id.brief_speed_text, speedText, WidgetText.Face.SANS_MEDIUM, 11f, (160 * d).toInt())
         val headerSpace = content - ((if (showRefresh) 34 else 0) + 40 + speedText.length * 7) * d
-        text(R.id.brief_label, if (showRefresh) label.uppercase() else if (compact) "BRIEFING" else "AUDIO BRIEFING", WidgetText.Face.MONO_SEMIBOLD, 10f, headerSpace.toInt().coerceAtLeast((60 * d).toInt()), tracking = 0.16f)
+        val headerBase = if (showRefresh) label.uppercase() else if (compact) "BRIEFING" else "AUDIO BRIEFING"
+        val headerProgress = if ((short || compact) && mine && player.storyIndex in 0 until count) " · ${player.storyIndex + 1} OF $count" else ""
+        text(R.id.brief_label, headerBase + headerProgress, WidgetText.Face.MONO_SEMIBOLD, 10f, headerSpace.toInt().coerceAtLeast((60 * d).toInt()), tracking = 0.16f)
         v.setOnClickPendingIntent(R.id.brief_speed, broadcast(context, provider, ACTION_SPEED, id))
         val busy = id in refreshing
         v.setViewVisibility(R.id.brief_refresh, if (showRefresh && !busy) View.VISIBLE else View.GONE)
@@ -132,7 +136,7 @@ object BriefWidgets {
             prefs.detail == BriefingDetail.SUMMARIES -> "$label: $count stories, summarised"
             else -> "$label: $count stories in full"
         }
-        if (compact) text(R.id.brief_title, title, WidgetText.Face.SERIF_BOLD, 18f, content, lines = 3, lineHeight = 21f)
+        if (compact) text(R.id.brief_title, title, WidgetText.Face.SERIF_BOLD, 17f, content, lines = 2, lineHeight = 20f)
         else text(R.id.brief_title, title, WidgetText.Face.SERIF_BOLD, 22f, content, lines = 2, lineHeight = 26f)
         if (!compact) {
             val sub = when {
@@ -141,7 +145,8 @@ object BriefWidgets {
                 else -> "Read by your on-device voice like a news broadcast — nothing leaves your phone."
             }
             // Short widgets keep the subtitle to one line so the controls never get squeezed.
-            text(R.id.brief_sub, sub, WidgetText.Face.SANS, 12f, content, lines = if (size.height < 205f) 1 else 2, lineHeight = 18f)
+            if (short) v.setViewVisibility(R.id.brief_sub, View.GONE)
+            else text(R.id.brief_sub, sub, WidgetText.Face.SANS, 12f, content, lines = 2, lineHeight = 18f)
         }
         v.setOnClickPendingIntent(R.id.brief_title, PendingIntent.getActivity(
             context, id * 16 + 9, WidgetData.openApp(context, tab = "AUDIO", topic = topicId), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
@@ -149,7 +154,7 @@ object BriefWidgets {
 
         // Play pill and transport (previous / −15 / +15 / next appear once it's this briefing).
         v.setImageViewResource(R.id.brief_play_icon, if (playing) R.drawable.bic_pause_white else R.drawable.bic_play_white)
-        if (!compact) text(R.id.brief_play_text, if (playing) "Pause" else if (mine) "Resume" else "Play briefing", WidgetText.Face.SANS_SEMIBOLD, 12f, (140 * d).toInt())
+        if (!compact) text(R.id.brief_play_text, if (playing) "Pause" else if (mine) "Resume" else "Play briefing", WidgetText.Face.SANS_SEMIBOLD, 14f, (160 * d).toInt())
         v.setContentDescription(R.id.brief_play, if (playing) "Pause briefing" else "Play briefing")
         v.setOnClickPendingIntent(R.id.brief_play, service(context, id, 1, BriefingService.ACTION_PLAY_TOPIC) { putTopic(topicId, label) })
         val transport = if (mine) View.VISIBLE else View.GONE
@@ -161,8 +166,8 @@ object BriefWidgets {
             v.setViewVisibility(R.id.brief_back, transport)
             v.setViewVisibility(R.id.brief_fwd, transport)
             if (mine) {
-                v.setImageViewBitmap(R.id.brief_back, WidgetText.render(context, "−15", WidgetText.Face.MONO_SEMIBOLD, 10f, (30 * d).toInt()))
-                v.setImageViewBitmap(R.id.brief_fwd, WidgetText.render(context, "+15", WidgetText.Face.MONO_SEMIBOLD, 10f, (30 * d).toInt()))
+                v.setImageViewBitmap(R.id.brief_back, WidgetText.render(context, "−15", WidgetText.Face.MONO_SEMIBOLD, 12f, (40 * d).toInt()))
+                v.setImageViewBitmap(R.id.brief_fwd, WidgetText.render(context, "+15", WidgetText.Face.MONO_SEMIBOLD, 12f, (40 * d).toInt()))
             }
             v.setOnClickPendingIntent(R.id.brief_back, service(context, id, 4, BriefingService.ACTION_SEEK) { putExtra(BriefingService.EXTRA_SECONDS, -15f) })
             v.setOnClickPendingIntent(R.id.brief_fwd, service(context, id, 5, BriefingService.ACTION_SEEK) { putExtra(BriefingService.EXTRA_SECONDS, 15f) })
@@ -172,7 +177,7 @@ object BriefWidgets {
         v.setViewVisibility(R.id.brief_wave_rest, if (mine && !playing) View.VISIBLE else View.GONE)
         v.setViewVisibility(R.id.brief_wave_idle, if (!mine) View.VISIBLE else View.GONE)
 
-        if (!compact) {
+        if (shape == Shape.TALL) {
             val now = if (mine) player.storyTitle else null
             v.setViewVisibility(R.id.brief_now, if (now != null) View.VISIBLE else View.GONE)
             if (now != null) text(R.id.brief_now, "Now: $now", WidgetText.Face.SANS_MEDIUM, 12f, content)

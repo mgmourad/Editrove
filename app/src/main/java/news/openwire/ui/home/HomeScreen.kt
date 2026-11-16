@@ -59,6 +59,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
@@ -94,6 +96,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
@@ -647,8 +650,17 @@ private fun HeadlineBriefingCard(topicLabel: String, articles: List<Article>, pr
                 Spacer(Modifier.width(6.dp))
                 Text(if (playing) "Pause" else if (mine) "Resume" else "Play briefing", style = sans(12.sp, FontWeight.SemiBold), color = Color.White)
             }
-            Spacer(Modifier.width(14.dp))
+            if (mine) {
+                Spacer(Modifier.width(6.dp))
+                SkipButton(Icons.Filled.SkipPrevious, "Previous story") { player.skipPrevious() }
+                SkipButton(Icons.Filled.SkipNext, "Next story") { player.skipNext() }
+            }
+            Spacer(Modifier.width(10.dp))
             Box(Modifier.weight(1f).height(16.dp)) { Waveform(playing) }
+        }
+        if (mine && player.storyTitle != null) {
+            Spacer(Modifier.height(10.dp))
+            Text("Now: " + player.storyTitle, style = sans(12.sp, FontWeight.Medium), color = g.textPrimary.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

@@ -46,6 +46,10 @@ class AppContainer(context: Context) {
     val updateManager: news.openwire.update.UpdateManager by lazy {
         news.openwire.update.UpdateManager(context, settingsRepository, news.openwire.data.remote.ReleaseSource(news.openwire.BuildConfig.UPDATE_REPO))
     }
+    /** Audio briefing engine — app-scoped so playback survives leaving the app and locking the phone. */
+    val briefingPlayer: news.openwire.ui.home.BriefingPlayer by lazy {
+        news.openwire.ui.home.BriefingPlayer(context, prefs = { settingsRepository.settings.value.briefing }, extractor = articleTextExtractor)
+    }
     val changelog: news.openwire.update.Changelog by lazy { news.openwire.update.Changelog(context) }
 
     /** Paywall routing with service health checks and fallbacks. */

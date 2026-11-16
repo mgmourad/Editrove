@@ -21,6 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -78,6 +80,18 @@ class BriefingPlayer(
     /** A briefing is loaded (playing or paused). */
     val active: Boolean get() = title != null
 
+    /** Story being read (-1 = the open, == count = the sign-off). */
+    var storyIndex by androidx.compose.runtime.mutableIntStateOf(-1)
+        private set
+    /** Headline of the story being read, for the lock screen. */
+    var storyTitle by mutableStateOf<String?>(null)
+        private set
+    val storyCount: Int get() = stories.size
+
+    /** Called on the main thread whenever playback state, position or story changes (media session). */
+    var onChange: (() -> Unit)? = null
+    private fun notifyChange() = onChange?.invoke()
+
     private sealed interface Seg {
         data class Speech(val text: String) : Seg
         data object Sting : Seg
@@ -86,6 +100,9 @@ class BriefingPlayer(
 
     private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
     private var segs = mutableListOf<Seg>()
+    /** Story index for each segment (open = -1, sign-off = stories.size), kept 1:1 with [segs]. */
+    private var segStory = mutableListOf<Int>()
+    private var storyStartedAt = 0L
     private var pos = 0
     private var session = 0
     private var stories: List<news.openwire.domain.model.Article> = emptyList()
@@ -140,20 +157,23 @@ class BriefingPlayer(
         stories = articles.take(p.count)
         title = "$topicLabel briefing"
         content.clear()
-        segs = buildList {
-            add(Seg.Speech(news.openwire.domain.engine.BriefingScript.intro(topicLabel, stories.size, detail, java.time.LocalDateTime.now())))
-            stories.indices.forEach { i ->
-                if (i > 0 && p.stings) add(Seg.Sting)
-                add(Seg.Story(i))
-            }
-            add(Seg.Speech(news.openwire.domain.engine.BriefingScript.outro(topicLabel)))
-        }.toMutableList()
+        val built = mutableListOf<Pair<Seg, Int>>()
+        built += Seg.Speech(news.openwire.domain.engine.BriefingScript.intro(topicLabel, stories.size, detail, java.time.LocalDateTime.now())) to -1
+        stories.indices.forEach { i ->
+            if (i > 0 && p.stings) built += Seg.Sting to i
+            built += Seg.Story(i) to i
+        }
+        built += Seg.Speech(news.openwire.domain.engine.BriefingScript.outro(topicLabel)) to stories.size
+        segs = built.map { it.first }.toMutableList()
+        segStory = built.map { it.second }.toMutableList()
         pos = 0
         narrationStarted = false
         prefetch(0); prefetch(1)
         audio?.requestAudioFocus(focus)
         playing = true
         session++
+        markStory(0)
+        BriefingService.start(app)
         val cueRes = CUES.getOrNull(p.openingCue - 1)
         if (cueRes != null) {
             cue = android.media.MediaPlayer.create(app, cueRes)?.apply { setVolume(1f, 1f); start() }
@@ -173,6 +193,7 @@ class BriefingPlayer(
         // The opening cue belongs to the open; it doesn't come back on resume.
         cueJob?.cancel(); cue?.release(); cue = null
         playing = false
+        notifyChange()
     }
 
     fun resume() {
@@ -182,15 +203,63 @@ class BriefingPlayer(
         session++
         // A sting is only a bridge — resume with the story it introduces.
         if (segs.getOrNull(pos) == Seg.Sting) pos++
+        BriefingService.start(app)
+        notifyChange()
         run()
+    }
+
+    /** Jump to the next story (through its transition sting). Past the last story: the sign-off. */
+    fun skipNext() {
+        if (segs.isEmpty()) return
+        val next = segStory.indexOfFirst { it > storyIndex.coerceAtLeast(-1) }
+        if (next < 0) { finish(); return }
+        jumpTo(next)
+    }
+
+    /**
+     * Restart the current story — or, within its first few seconds (or during the
+     * open), go back to the previous one. Lands on the story itself, not its sting.
+     */
+    fun skipPrevious() {
+        if (segs.isEmpty()) return
+        val restart = storyIndex > 0 && android.os.SystemClock.elapsedRealtime() - storyStartedAt > RESTART_WINDOW_MS
+        val target = if (restart || storyIndex <= 0) storyIndex.coerceAtLeast(-1) else storyIndex - 1
+        val i = segs.indices.firstOrNull { segStory[it] == target && segs[it] != Seg.Sting } ?: 0
+        jumpTo(i)
+    }
+
+    private fun jumpTo(i: Int) {
+        session++
+        tts.stop()
+        stepJob?.cancel()
+        stingJob?.cancel(); sting?.release(); sting = null
+        pos = i
+        markStory(i)
+        if (playing) run() else notifyChange()
+    }
+
+    private fun markStory(i: Int) {
+        val k = segStory.getOrNull(i) ?: return
+        if (k != storyIndex) storyStartedAt = android.os.SystemClock.elapsedRealtime()
+        storyIndex = k
+        storyTitle = stories.getOrNull(k)?.title
+        progress = when {
+            k < 0 -> "Opening"
+            k >= stories.size -> "Sign-off"
+            else -> "Story ${k + 1} of ${stories.size}"
+        }
+        notifyChange()
     }
 
     /** Stops and unloads (closes the floating player). */
     fun stop() {
         stopAudio()
         title = null
-        segs.clear()
+        segs.clear(); segStory.clear()
         progress = ""
+        storyTitle = null
+        storyIndex = -1
+        notifyChange()
     }
 
     private fun stopAudio() {
@@ -212,6 +281,7 @@ class BriefingPlayer(
 
     private fun advance() {
         pos++
+        markStory(pos)
         run()
     }
 
@@ -223,7 +293,6 @@ class BriefingPlayer(
             is Seg.Speech -> speak(seg.text, s)
             Seg.Sting -> playSting(s)
             is Seg.Story -> {
-                progress = "Story ${seg.index + 1} of ${stories.size}"
                 prefetch(seg.index + 1); prefetch(seg.index + 2)
                 stepJob = scope.launch {
                     val a = stories[seg.index]
@@ -316,9 +385,12 @@ class BriefingPlayer(
 
     private fun finish() {
         stopAudio()
-        segs.clear()
+        segs.clear(); segStory.clear()
         progress = ""
         title = null
+        storyTitle = null
+        storyIndex = -1
+        notifyChange()
     }
 
     fun shutdown() { stopAudio(); tts.shutdown() }
@@ -338,20 +410,17 @@ class BriefingPlayer(
         private const val STING_UNDER_VOICE = 0.25f
         private const val STING_LEAD_MS = 1600L
         private const val STORY_WAIT_MS = 7000L
+        private const val RESTART_WINDOW_MS = 4000L
     }
 }
 
 val LocalBriefingPlayer = staticCompositionLocalOf<BriefingPlayer?> { null }
 
+/** The app-wide briefing player (outlives screens so it keeps playing in the background). */
 @Composable
 fun rememberBriefingPlayer(): BriefingPlayer {
     val context = LocalContext.current
-    val container = (context.applicationContext as news.openwire.OpenWireApp).container
-    val player = remember {
-        BriefingPlayer(context, prefs = { container.settingsRepository.settings.value.briefing }, extractor = container.articleTextExtractor)
-    }
-    DisposableEffect(player) { onDispose { player.shutdown() } }
-    return player
+    return remember { (context.applicationContext as news.openwire.OpenWireApp).container.briefingPlayer }
 }
 
 /**
@@ -373,6 +442,7 @@ fun FloatingPlayerPill(player: BriefingPlayer, haze: HazeState?, modifier: Modif
             .padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        SkipButton(Icons.Filled.SkipPrevious, "Previous story") { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); player.skipPrevious() }
         Box(
             Modifier.glowShadow(g.accent, 10.dp).size(40.dp).clip(CircleShape).background(g.accent)
                 .clickable { haptics.performHapticFeedback(HapticFeedbackType.LongPress); player.toggle() },
@@ -384,11 +454,12 @@ fun FloatingPlayerPill(player: BriefingPlayer, haze: HazeState?, modifier: Modif
                 tint = Color.White, modifier = Modifier.size(20.dp),
             )
         }
-        Spacer(Modifier.width(12.dp))
+        SkipButton(Icons.Filled.SkipNext, "Next story") { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); player.skipNext() }
+        Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
-            Text("AUDIO BRIEFING", style = mono(9.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft)
+            Text(("AUDIO BRIEFING  ·  " + player.progress.uppercase()).trimEnd(' ', '·'), style = mono(9.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, maxLines = 1)
             Text(
-                listOf(player.title.orEmpty(), player.progress).filter { it.isNotBlank() }.joinToString("  ·  "),
+                player.storyTitle ?: listOf(player.title.orEmpty(), player.progress).filter { it.isNotBlank() }.joinToString("  ·  "),
                 style = sans(13.sp, FontWeight.SemiBold), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(4.dp))
@@ -400,4 +471,13 @@ fun FloatingPlayerPill(player: BriefingPlayer, haze: HazeState?, modifier: Modif
             contentAlignment = Alignment.Center,
         ) { Icon(Icons.Filled.Close, contentDescription = "Close player", tint = g.textSecondary, modifier = Modifier.size(18.dp)) }
     }
+}
+
+
+@Composable
+internal fun SkipButton(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(34.dp).clip(CircleShape).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, contentDescription = description, tint = Glass.textPrimary, modifier = Modifier.size(20.dp)) }
 }

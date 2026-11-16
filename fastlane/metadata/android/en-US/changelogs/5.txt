@@ -3,4 +3,5 @@ Editrove 0.5.0 — A briefing that sounds like the news
 • Choose Headlines, Summaries or Full articles, and how many stories (3 to 20).
 • Pick the voice and the playback speed (your phone's own text-to-speech voices).
 • Four opening cues and a transition sting between stories. The cue starts at full volume, then sits under the narrator and fades away.
+• Briefings keep playing in the background and with the screen locked, with lock-screen controls and artwork. Previous and next jump between stories, from the lock screen, headphones or in the app.
 • The tab bar now follows your swipe instantly, and the masthead sits clear of the top fade.

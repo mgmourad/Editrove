@@ -49,8 +49,9 @@ open in a reader with the publisher's standfirst, a drop cap, a pull quote and a
 
 ### 🎧 A briefing that sounds like the news
 Audio briefings play like a broadcast: an opening cue that sinks under the anchor, dated
-open, hand-offs and transition stings between stories, and a sign-off. Choose **Headlines,
-Summaries or Full articles**, the number of stories, the voice and the speed. A **floating
+open, hand-offs and transition stings between stories, and a sign-off. Choose **Headlines**
+(each headline and its subtitle), **Summaries** (plus the key points from the story's Summary
+box) or **Full articles**, the number of stories, the voice and the speed. A **floating
 mini-player** follows you down the page.
 
 </td>
@@ -144,7 +145,7 @@ check manually or turn on automatic installs.
 
 ```bash
 ./gradlew assembleDebug        # debug APK
-./gradlew test                 # 101 JVM unit tests (domain, data, ViewModels)
+./gradlew test                 # 105 JVM unit tests (domain, data, ViewModels)
 ./gradlew lintDebug            # Android lint
 ./gradlew assembleRelease      # signed release (see below)
 ```

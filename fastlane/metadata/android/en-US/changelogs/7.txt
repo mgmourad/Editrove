@@ -1,0 +1,6 @@
+Editrove 0.6.1 — Smoother, and briefings that tell you more
+• Fixed lag after turning on notifications or background refresh. The hourly refresh now finishes about three times faster and uses about a tenth of the CPU it did.
+• The LIVE ticker drifts for half a minute and then rests, so an idle screen no longer redraws constantly. New headlines or a swipe start it again.
+• Discover's Top Across Editions is ranked in the background, so opening it no longer stutters.
+• Audio briefings, Summaries: after the headline and subtitle, the narrator now reads the key points from the story's Summary box.
+• Audio briefings, Headlines: each headline is now followed by its subtitle.

@@ -274,7 +274,8 @@ class BriefingPlayer(
     }
 
     private fun prefetch(i: Int) {
-        if (detail == news.openwire.domain.model.BriefingDetail.HEADLINES || extractor == null || i !in stories.indices || content.containsKey(i)) return
+        // Every level fetches the article: Headlines reads its subtitle too.
+        if (extractor == null || i !in stories.indices || content.containsKey(i)) return
         val url = stories[i].originalUrl ?: return
         content[i] = scope.async(kotlinx.coroutines.Dispatchers.IO) { runCatching { extractor.extract(url) }.getOrNull() }
     }
@@ -303,8 +304,13 @@ class BriefingPlayer(
                         news.openwire.domain.engine.BriefingScript.Story(
                             title = a.title,
                             source = a.source,
-                            summary = c?.description ?: c?.let { news.openwire.domain.engine.Summarizer.keyPoints(it.text, 2).joinToString(" ") } ?: a.summary,
+                            summary = a.summary,
                             body = c?.takeIf { !it.partial }?.text?.replace("\n\n", " "),
+                            subtitle = c?.description,
+                            // Same key points as the Summary box in the reader.
+                            keyPoints = if (detail == news.openwire.domain.model.BriefingDetail.SUMMARIES) {
+                                c?.let { news.openwire.domain.engine.Summarizer.keyPoints(it.text, 3) }.orEmpty()
+                            } else emptyList(),
                         ),
                         detail,
                     )

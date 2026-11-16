@@ -16,6 +16,9 @@ object Summarizer {
         "about", "after", "into", "over", "more", "most", "some", "such", "do", "does", "did", "just", "up", "out",
     )
 
+    /** Splits text into sentences (no length filtering). */
+    fun split(text: String): List<String> = text.replace(RX_1, " ").split(RX_2).map { it.trim() }.filter { it.isNotEmpty() }
+
     fun sentences(text: String): List<String> = text
         .replace(RX_1, " ")
         .split(RX_2)

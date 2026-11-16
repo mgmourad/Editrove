@@ -13,8 +13,21 @@ import news.openwire.domain.model.BriefingDetail
  */
 object BriefingScript {
 
-    /** One story as the narrator will read it. */
-    data class Story(val title: String, val source: String?, val summary: String? = null, val body: String? = null)
+    /**
+     * One story as the narrator will read it.
+     *
+     * @param subtitle the publisher's standfirst (the deck under the headline).
+     * @param keyPoints the on-device summary — the same key points the reader's Summary box shows.
+     * @param summary a public excerpt, used when there's no subtitle or article text.
+     */
+    data class Story(
+        val title: String,
+        val source: String?,
+        val summary: String? = null,
+        val body: String? = null,
+        val subtitle: String? = null,
+        val keyPoints: List<String> = emptyList(),
+    )
 
     fun intro(topic: String, count: Int, detail: BriefingDetail, now: LocalDateTime): String {
         val greeting = when (now.hour) { in 4..11 -> "Good morning"; in 12..16 -> "Good afternoon"; else -> "Good evening" }
@@ -51,16 +64,29 @@ object BriefingScript {
     /** Everything said for one story, as separate lines (natural pauses between them). */
     fun story(index: Int, total: Int, story: Story, detail: BriefingDetail): List<String> = buildList {
         add(lead(index, total, detail))
-        add(clean(story.title).let { if (it.endsWith(".") || it.endsWith("?") || it.endsWith("!")) it else "$it." })
+        val title = sentence(clean(story.title))
+        add(title)
+        // Headlines and Summaries both read the subtitle (or, without one, the public excerpt).
+        val subtitle = deck(story)?.takeIf { FeedWeaver.calculateTitleSimilarity(it, title) < 0.7 }
         when (detail) {
-            BriefingDetail.HEADLINES -> attribution(story.source, index)?.let(::add)
-            BriefingDetail.SUMMARIES -> {
+            BriefingDetail.HEADLINES -> {
+                subtitle?.let(::add)
                 attribution(story.source, index)?.let(::add)
-                val summary = story.summary?.let(::clean)?.takeIf { it.length > 40 }
-                if (summary != null) { add(INTO_SUMMARY[index % INTO_SUMMARY.size]); add(summary) }
+            }
+            BriefingDetail.SUMMARIES -> {
+                subtitle?.let(::add)
+                attribution(story.source, index)?.let(::add)
+                // The Summary box's key points, minus any that just repeat the subtitle.
+                val points = story.keyPoints.map { sentence(clean(it)) }.filter { p ->
+                    p.length > 20 && (subtitle == null || FeedWeaver.calculateTitleSimilarity(p, subtitle) < 0.6)
+                }
+                if (points.isNotEmpty()) {
+                    add(INTO_SUMMARY[index % INTO_SUMMARY.size])
+                    addAll(points)
+                }
             }
             BriefingDetail.FULL -> {
-                val body = story.body?.let(::clean)?.takeIf { it.length > 200 } ?: story.summary?.let(::clean)
+                val body = story.body?.let(::clean)?.takeIf { it.length > 200 } ?: (story.subtitle ?: story.summary)?.let(::clean)
                 if (body != null) {
                     story.source?.takeIf { it.isNotBlank() }?.let { add("$it reports.") }
                     add(body)
@@ -69,6 +95,16 @@ object BriefingScript {
             }
         }
     }
+
+    /** The standfirst to read: the subtitle, else the excerpt; at most two sentences. */
+    private fun deck(story: Story): String? {
+        val raw = (story.subtitle?.takeIf { it.isNotBlank() } ?: story.summary)?.let(::clean)?.takeIf { it.length > 20 } ?: return null
+        val sentences = Summarizer.split(raw)
+        val short = if (sentences.size > 2) sentences.take(2).joinToString(" ") else raw
+        return sentence(short.take(400))
+    }
+
+    private fun sentence(t: String) = if (t.endsWith(".") || t.endsWith("?") || t.endsWith("!") || t.endsWith("”") || t.endsWith("\"")) t else "$t."
 
     fun outro(topic: String): String =
         "And that's your ${topic.trim()} briefing. For the full stories, open them in Editrove. Thanks for listening."

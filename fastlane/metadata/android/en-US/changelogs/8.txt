@@ -1,0 +1,7 @@
+Editrove 0.7.0 Beta 1 — Editrove on your home screen
+• Three new home-screen widgets in Liquid Glass: Black Glass in dark mode, Editorial Paper in light. Each one changes its layout as you resize it: compact, wide, full size, and a two-column version for an unfolded foldable.
+• The Editrove Daily Brief: play your audio briefing from the home screen. Pause, back or ahead 15 seconds, change the speed (1.0×, 1.25×, 1.5×), tap the progress bar to jump, and tap any story in the Up Next list to hear it now.
+• Top Stories: the curated front page with photos, sources, times, section labels and bookmarks.
+• Topic of Choice: follow any topic and switch it right in the widget. The colour changes with the topic, and each widget remembers its own.
+• Widgets update as soon as the app or background refresh loads new stories.
+• Briefings now pause and resume mid-story instead of restarting the story.

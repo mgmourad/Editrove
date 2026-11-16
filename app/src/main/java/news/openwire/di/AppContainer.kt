@@ -33,7 +33,7 @@ import news.openwire.domain.model.Strategy
  */
 class AppContainer(context: Context) {
 
-    private val database: OpenWireDatabase by lazy { OpenWireDatabase.create(context) }
+    internal val database: OpenWireDatabase by lazy { OpenWireDatabase.create(context) }
 
     /** Paywall engine with the user's persisted per-domain overrides. */
     val domainRegistry = DomainRegistry(PrefsDomainRuleStore(context))
@@ -49,6 +49,7 @@ class AppContainer(context: Context) {
     /** Audio briefing engine — app-scoped so playback survives leaving the app and locking the phone. */
     val briefingPlayer: news.openwire.ui.home.BriefingPlayer by lazy {
         news.openwire.ui.home.BriefingPlayer(context, prefs = { settingsRepository.settings.value.briefing }, extractor = articleTextExtractor)
+            .also { news.openwire.widget.WidgetSync.attach(context, it) }
     }
     val changelog: news.openwire.update.Changelog by lazy { news.openwire.update.Changelog(context) }
 
@@ -80,6 +81,7 @@ class AppContainer(context: Context) {
             metadata = publishedMetadata,
             feedState = feedState,
             interests = { libraryStore.interestDomains() },
+            onStored = { news.openwire.widget.WidgetSync.feedsChanged(context) },
         )
     }
 

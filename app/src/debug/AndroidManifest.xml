@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Debug builds only: hosts the home-screen widgets at fixed sizes for testing. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity android:name="news.openwire.debug.WidgetStudioActivity" android:exported="true" android:label="Widget Studio" />
+    </application>
+</manifest>

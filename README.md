@@ -109,6 +109,12 @@ and notifications all live on your device. Updates arrive straight from GitHub R
   <img src=".github/readme/full_light.webp" width="49%" alt="Full view in the light theme">
 </p>
 
+<p align="center"><b>On your home screen</b> — the Daily Brief, Top Stories and Topic of Choice widgets, in Black Glass and Editorial Paper</p>
+
+<p align="center">
+  <img src=".github/readme/widgets.webp" width="98%" alt="Editrove widgets: Daily Brief player with chapter queue, Top Stories Bento, and the light theme">
+</p>
+
 <p align="center"><b>Out of your way</b> — what's new after each update · every setting in one place</p>
 
 <p align="center">
@@ -124,6 +130,7 @@ and notifications all live on your device. Updates arrive straight from GitHub R
 | **Sources** | 117 feeds, including the Washington Post, NBC, CBS, BBC, NPR, Axios, The Economist, The Atlantic, Bloomberg, WSJ, ESPN, MIT Technology Review, NASA and more. Each gets a fair share; 2 stories from one outlet in a row at most |
 | **Paywall engine** | Per-publisher strategies with an editable rules list; archive checks with grey-out; a reader-service health check and fallback chain |
 | **Reading** | In-app reader with on-device summary, narration, pull quotes and drop caps; text from the publisher, then Wayback, then archive.today |
+| **Widgets** | Three Liquid Glass home-screen widgets that change layout as you resize them (2×2, 4×2, 4×4 and an unfolded 6×3): **The Editrove Daily Brief** (play/pause, ±15 s, speed, tap-to-seek, tap a chapter to jump), **Top Stories** (photos, sections, bookmarks) and **Topic of Choice** (switch topics in the widget) |
 | **Open anything** | Share a link from any app, select a URL and pick *Open in Editrove*, or paste one. It's routed and opened in the reader |
 | **Smart curation** | An on-device editorial ranker: where editors placed a story, how many outlets cover it, freshness, source authority and section fit (hard news leads the front page), then de-duplicated and diversified. "Also covered by" shows who else is running a story, and an optional, local-only tuning favours outlets you save and like. Applies to every topic, Discover and the audio briefing |
 | **Stay current** | Pull to refresh; curated, newest or oldest order; background refresh; opt-in local notifications per topic |

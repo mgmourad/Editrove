@@ -45,6 +45,35 @@
             </intent-filter>
         </activity>
         <receiver android:name="news.openwire.update.InstallResultReceiver" android:exported="false" />
+
+        <!-- Home-screen widgets (Jetpack Glance). -->
+        <receiver
+            android:name="news.openwire.widget.AudioBriefWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_audio_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_audio_info" />
+        </receiver>
+        <receiver
+            android:name="news.openwire.widget.TopStoriesWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_top_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_top_info" />
+        </receiver>
+        <receiver
+            android:name="news.openwire.widget.TopicWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_topic_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_topic_info" />
+        </receiver>
         <service
             android:name="news.openwire.ui.home.BriefingService"
             android:exported="false"

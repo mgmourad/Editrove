@@ -57,6 +57,8 @@ class FeedRepositoryImpl(
     private val clock: () -> Long = System::currentTimeMillis,
     /** Outlets of the reader's saved/liked stories (local only), for Curated tuning. */
     private val interests: () -> List<String> = { emptyList() },
+    /** A topic's cache was rewritten (home-screen widgets redraw). */
+    private val onStored: (String) -> Unit = {},
 ) : FeedRepository {
 
     private val norm: (String) -> String = { registry.normalizeDomain(it) }
@@ -96,6 +98,7 @@ class FeedRepositoryImpl(
     private suspend fun store(topicId: String, articles: List<Article>) {
         runCatching { dao.replaceTopic(topicId, articles.mapIndexed { i, a -> a.toEntity(topicId, i) }) }
         feedState?.markUpdated(topicId, clock())
+        runCatching { onStored(topicId) }
     }
 
     private suspend fun FlowCollector<FeedResult>.observeSnapshot(topic: Topic) {

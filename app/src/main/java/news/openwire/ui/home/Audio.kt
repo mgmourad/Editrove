@@ -90,7 +90,15 @@ class BriefingPlayer(
 
     /** Called on the main thread whenever playback state, position or story changes (media session). */
     var onChange: (() -> Unit)? = null
-    private fun notifyChange() = onChange?.invoke()
+    private val listeners = java.util.concurrent.CopyOnWriteArraySet<() -> Unit>()
+    /** Extra observers (home-screen widgets); called on the main thread like [onChange]. */
+    fun addListener(l: () -> Unit) { listeners += l }
+    private fun notifyChange() { onChange?.invoke(); listeners.forEach { it() } }
+
+    /** Topic the loaded briefing is for (e.g. "Top Stories"). */
+    val topicLabel: String get() = topic
+    /** The stories in the loaded briefing, in order. */
+    val chapters: List<news.openwire.domain.model.Article> get() = stories
 
     private sealed interface Seg {
         data class Speech(val text: String) : Seg
@@ -116,6 +124,15 @@ class BriefingPlayer(
     private var stepJob: kotlinx.coroutines.Job? = null
     private var narrationStarted = false
 
+    // Position inside the segment being spoken: its lines, the line being read and when it began.
+    private var lines: List<String> = emptyList()
+    /** Lines that continue a paragraph (short pause after the previous one, not an anchor pause). */
+    private var softLines: Set<Int> = emptySet()
+    private var lineIndex = 0
+    private var lineStartedAt = 0L
+    /** Line to resume from after a pause or seek. */
+    private var resumeLine = 0
+
     private val audio = app.getSystemService(android.media.AudioManager::class.java)
     private val focus = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN)
         .setAudioAttributes(MEDIA)
@@ -126,26 +143,30 @@ class BriefingPlayer(
         setAudioAttributes(SPEECH)
         setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
-                val (s, _, _) = parse(utteranceId) ?: return
-                scope.launch { if (s == session) onSpeechStarted() }
+                val u = parse(utteranceId) ?: return
+                scope.launch {
+                    if (u.session != session) return@launch
+                    onSpeechStarted()
+                    if (u.pos == pos && !u.silence) { lineIndex = u.line; lineStartedAt = android.os.SystemClock.elapsedRealtime(); notifyChange() }
+                }
             }
             override fun onDone(utteranceId: String?) {
-                val (s, p, last) = parse(utteranceId) ?: return
-                if (last) scope.launch { if (s == session && p == pos) advance() }
+                val u = parse(utteranceId) ?: return
+                if (u.last) scope.launch { if (u.session == session && u.pos == pos) advance() }
             }
             @Deprecated("Deprecated in Java")
             override fun onError(utteranceId: String?) {
-                val (s, p, _) = parse(utteranceId) ?: return
-                scope.launch { if (s == session && p == pos) advance() }
+                val u = parse(utteranceId) ?: return
+                scope.launch { if (u.session == session && u.pos == pos) advance() }
             }
         })
     }
 
-    /** utteranceId = "b:session:segment:last" */
-    private fun parse(id: String?): Triple<Int, Int, Boolean>? = id?.split(':')?.takeIf { it.size == 4 && it[0] == "b" }?.let {
-        val s = it[1].toIntOrNull() ?: return null
-        val p = it[2].toIntOrNull() ?: return null
-        Triple(s, p, it[3] == "1")
+    private data class Utterance(val session: Int, val pos: Int, val line: Int, val silence: Boolean, val last: Boolean)
+
+    /** utteranceId = "b:session:segment:line:kind" (kind: s = speech, p = pause, e = final pause). */
+    private fun parse(id: String?): Utterance? = id?.split(':')?.takeIf { it.size == 5 && it[0] == "b" }?.let {
+        Utterance(it[1].toIntOrNull() ?: return null, it[2].toIntOrNull() ?: return null, it[3].toIntOrNull() ?: return null, it[4] != "s", it[4] == "e")
     }
 
     /** Starts a briefing for [topicLabel] from the given (already ordered) stories. */
@@ -186,6 +207,7 @@ class BriefingPlayer(
 
     fun pause() {
         if (!playing) return
+        resumeLine = if (segs.getOrNull(pos) is Seg.Speech) lineIndex else 0
         session++
         tts.stop()
         stepJob?.cancel()
@@ -228,7 +250,9 @@ class BriefingPlayer(
         jumpTo(i)
     }
 
-    private fun jumpTo(i: Int) {
+    private fun jumpTo(i: Int, line: Int = 0) {
+        resumeLine = line
+        lineIndex = line
         session++
         tts.stop()
         stepJob?.cancel()
@@ -281,6 +305,7 @@ class BriefingPlayer(
     }
 
     private fun advance() {
+        resumeLine = 0; lineIndex = 0
         pos++
         markStory(pos)
         run()
@@ -291,7 +316,7 @@ class BriefingPlayer(
         val seg = segs.getOrNull(pos) ?: run { finish(); return }
         val s = session
         when (seg) {
-            is Seg.Speech -> speak(seg.text, s)
+            is Seg.Speech -> { val from = resumeLine; resumeLine = 0; speak(seg.text, s, from) }
             Seg.Sting -> playSting(s)
             is Seg.Story -> {
                 prefetch(seg.index + 1); prefetch(seg.index + 2)
@@ -321,29 +346,124 @@ class BriefingPlayer(
         }
     }
 
-    private fun speak(text: String, s: Int) {
+    private fun speak(text: String, s: Int, from: Int = 0) {
         val p = prefs()
         tts.setSpeechRate(p.speed)
         p.voice?.let { name -> runCatching { tts.voices?.firstOrNull { it.name == name } }.getOrNull()?.let { tts.voice = it } }
         // Lines become separate utterances with short anchor pauses between them.
-        val chunks = text.split(SENTENCE_BREAK).flatMap(::chunk).filter { it.isNotBlank() }
-        chunks.forEachIndexed { k, c ->
-            tts.speak(c, if (k == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, "b:$s:$pos:0")
-            tts.playSilentUtterance(if (k == chunks.lastIndex) 250 else 450, TextToSpeech.QUEUE_ADD, "b:$s:$pos:${if (k == chunks.lastIndex) 1 else 0}")
+        val parsed = parseLines(text)
+        val chunks = parsed.map { it.first }
+        lines = chunks
+        softLines = parsed.indices.filter { parsed[it].second }.toSet()
+        val start = from.coerceIn(0, (chunks.size - 1).coerceAtLeast(0))
+        lineIndex = start
+        lineStartedAt = android.os.SystemClock.elapsedRealtime()
+        for (k in start until chunks.size) {
+            tts.speak(chunks[k], if (k == start) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, "b:$s:$pos:$k:s")
+            val gap = when { k == chunks.lastIndex -> 250L; (k + 1) in softLines -> 90L; else -> 450L }
+            tts.playSilentUtterance(gap, TextToSpeech.QUEUE_ADD, "b:$s:$pos:$k:${if (k == chunks.lastIndex) "e" else "p"}")
         }
-        if (chunks.isEmpty()) advance()
+        if (start >= chunks.size) advance()
     }
 
-    /** Engine input is capped (~4000 chars): split long text on sentence boundaries. */
-    private fun chunk(text: String): List<String> {
-        val max = TextToSpeech.getMaxSpeechInputLength() - 200
-        if (text.length <= max) return listOf(text)
-        val out = mutableListOf(StringBuilder())
-        text.split(RX_1).forEach { sentence ->
-            if (out.last().length + sentence.length > max) out.add(StringBuilder())
-            out.last().append(sentence).append(' ')
+    private fun linesOf(text: String) = parseLines(text).map { it.first }
+
+    /**
+     * Script lines, with long passages (full articles) cut into groups of sentences so
+     * seeking moves by roughly a sentence or two. second = continues the previous line.
+     */
+    private fun parseLines(text: String): List<Pair<String, Boolean>> = text.split(SENTENCE_BREAK).flatMap { line ->
+        if (line.length <= 320) listOf(line to false)
+        else {
+            val groups = mutableListOf(StringBuilder())
+            line.split(RX_1).forEach { sentence ->
+                if (groups.last().isNotEmpty() && groups.last().length + sentence.length > 280) groups.add(StringBuilder())
+                groups.last().append(sentence).append(' ')
+            }
+            groups.mapIndexed { i, g -> g.toString().trim() to (i > 0) }
         }
-        return out.map { it.toString() }
+    }.filter { it.first.isNotBlank() }
+
+    // ---- Timeline (for the widget's scrubber, ±15 s and elapsed / remaining) ---------------
+
+    private fun wordsPerSecond() = 2.55f * prefs().speed.coerceIn(0.5f, 2.5f)
+    private fun lineSeconds(line: String) = line.split(' ').count { it.isNotBlank() } / wordsPerSecond() + 0.45f
+
+    /** Estimated length of segment [i] in seconds; stories not written yet use a typical length. */
+    private fun segmentSeconds(i: Int): Float = when (val seg = segs.getOrNull(i)) {
+        is Seg.Speech -> (if (i == pos && lines.isNotEmpty()) lines else linesOf(seg.text)).sumOf { lineSeconds(it).toDouble() }.toFloat()
+        Seg.Sting -> STING_LEAD_MS / 1000f
+        is Seg.Story -> when (detail) {
+            news.openwire.domain.model.BriefingDetail.HEADLINES -> 14f
+            news.openwire.domain.model.BriefingDetail.SUMMARIES -> 42f
+            news.openwire.domain.model.BriefingDetail.FULL -> 210f
+        } / prefs().speed.coerceIn(0.5f, 2.5f)
+        null -> 0f
+    }
+
+    /** Seconds into the current segment. */
+    private fun withinSegment(): Float {
+        if (segs.getOrNull(pos) !is Seg.Speech || lines.isEmpty()) return 0f
+        val k = (if (playing) lineIndex else resumeLine).coerceIn(0, lines.size)
+        val before = lines.take(k).sumOf { lineSeconds(it).toDouble() }.toFloat()
+        val into = if (playing) ((android.os.SystemClock.elapsedRealtime() - lineStartedAt) / 1000f).coerceIn(0f, lines.getOrNull(k)?.let(::lineSeconds) ?: 0f) else 0f
+        return before + into
+    }
+
+    /** Estimated (elapsed, total) seconds of the whole briefing. */
+    fun timeline(): Pair<Float, Float> {
+        if (segs.isEmpty()) return 0f to 0f
+        val total = segs.indices.sumOf { segmentSeconds(it).toDouble() }.toFloat()
+        val elapsed = (0 until pos).sumOf { segmentSeconds(it).toDouble() }.toFloat() + withinSegment()
+        return elapsed.coerceAtMost(total) to total
+    }
+
+    /** Moves [seconds] back or forward, by whole sentences, crossing into neighbouring stories as needed. */
+    fun seekBy(seconds: Float) {
+        if (segs.isEmpty()) return
+        val (elapsed, _) = timeline()
+        seekTo(elapsed + seconds)
+    }
+
+    /** Jumps to a point of the briefing given as a fraction of its estimated length. */
+    fun seekToFraction(f: Float) {
+        val (_, total) = timeline()
+        seekTo(f.coerceIn(0f, 1f) * total)
+    }
+
+    private fun seekTo(target: Float) {
+        if (segs.isEmpty()) return
+        var t = target.coerceAtLeast(0f)
+        var i = 0
+        while (i < segs.size) {
+            val len = segmentSeconds(i)
+            if (t < len || i == segs.lastIndex) break
+            t -= len; i++
+        }
+        if (i >= segs.size) { finish(); return }
+        // A sting is a bridge: land on the story it introduces.
+        if (segs[i] == Seg.Sting) { i++; t = 0f }
+        val seg = segs.getOrNull(i) ?: run { finish(); return }
+        val segLines = if (seg is Seg.Speech) (if (i == pos && lines.isNotEmpty()) lines else linesOf(seg.text)) else emptyList()
+        var line = 0
+        var acc = 0f
+        while (line < segLines.size - 1 && acc + lineSeconds(segLines[line]) <= t) { acc += lineSeconds(segLines[line]); line++ }
+        if (i != pos) markStory(i)
+        jumpTo(i, line)
+    }
+
+    /** Starts story [k] of the loaded briefing right away. */
+    fun jumpToStory(k: Int) {
+        if (segs.isEmpty()) return
+        val i = segs.indices.firstOrNull { segStory[it] == k && segs[it] != Seg.Sting } ?: return
+        markStory(i)
+        jumpTo(i)
+        if (!playing) resume()
+    }
+
+    /** Re-reads the current sentence so a new speed takes effect immediately. */
+    fun applySpeedNow() {
+        if (playing && segs.getOrNull(pos) is Seg.Speech) jumpTo(pos, lineIndex) else notifyChange()
     }
 
     private fun onSpeechStarted() {

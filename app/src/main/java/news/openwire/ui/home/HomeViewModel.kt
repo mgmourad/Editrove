@@ -114,6 +114,8 @@ class HomeViewModel(
     val themeMode: StateFlow<ThemeMode> = appearance.mode
 
     private val loadJobs = mutableMapOf<String, Job>()
+    /** When each topic last came back fresh from the network (not the cache). */
+    private val freshAt = mutableMapOf<String, Long>()
     /** What each loaded topic was built from; a change (edition, sources, keywords…) reloads it. */
     private val signatures = mutableMapOf<String, String>()
     private val archiveGate = Semaphore(3)
@@ -148,12 +150,17 @@ class HomeViewModel(
         val t = topics.firstOrNull { it.id == id } ?: return
         _topicId.value = t.id
         if (_tab.value != NavTab.AUDIO) _tab.value = NavTab.TODAY
-        load(t)
+        ensureFresh(t)
     }
 
     fun selectTab(tab: NavTab) {
         _tab.value = tab
-        if (tab == NavTab.DISCOVER) topics.forEach { load(it) }
+        // Switching pages quietly brings what's shown up to date.
+        when (tab) {
+            NavTab.DISCOVER -> topics.forEach { ensureFresh(it) }
+            NavTab.TODAY, NavTab.AUDIO -> ensureFresh(currentTopic)
+            NavTab.SAVED -> Unit
+        }
     }
 
     fun retry(topic: Topic) = load(topic, force = true)
@@ -241,18 +248,55 @@ class HomeViewModel(
         s.copy(unfoldedLayout = if (s.unfoldedLayout == news.openwire.domain.model.UnfoldedLayout.FULL) news.openwire.domain.model.UnfoldedLayout.SPLIT else news.openwire.domain.model.UnfoldedLayout.FULL)
     }
 
-    private fun load(topic: Topic, force: Boolean = false) {
+    private fun isStale(id: String) = System.currentTimeMillis() - (freshAt[id] ?: 0L) > STALE_MS
+
+    /**
+     * Quietly brings a topic up to date if it's older than a few minutes: no spinner,
+     * no "Refreshing…", the stories on screen are simply replaced when the new ones land.
+     */
+    private fun ensureFresh(topic: Topic) {
+        if (loadJobs[topic.id]?.isActive == true) return
+        if (_feeds.value[topic.id] !is FeedResult.Success) { load(topic); return }
+        if (isStale(topic.id)) load(topic, force = true, silent = true)
+    }
+
+    /** App came to the foreground: refresh what's on screen (and Discover's topics) in the background. */
+    fun onForeground() {
+        ensureFresh(currentTopic)
+        if (_tab.value == NavTab.DISCOVER) topics.forEach { ensureFresh(it) }
+    }
+
+    /**
+     * The freshest stories for [topic], for an audio briefing: refetched first when they
+     * are more than a few minutes old (waits at most ~8 s, else uses what it has).
+     */
+    suspend fun freshStories(topic: Topic): List<Article> {
+        if (isStale(topic.id) || _feeds.value[topic.id] !is FeedResult.Success) {
+            load(topic, force = true, silent = true)
+            kotlinx.coroutines.withTimeoutOrNull(8_000) { loadJobs[topic.id]?.join() }
+        }
+        val list = (_feeds.value[topic.id] as? FeedResult.Success)?.articles.orEmpty()
+        return news.openwire.domain.engine.FeedOrdering.apply(list, settings.value.sortMode)
+    }
+
+    private fun load(topic: Topic, force: Boolean = false, silent: Boolean = false) {
         if (!force && loadJobs[topic.id]?.isActive == true) return
         if (!force && _feeds.value[topic.id] is FeedResult.Success) return
         loadJobs[topic.id]?.cancel()
         signatures[topic.id] = signature(topic, settings.value)
-        if (force) _refreshing.update { it + topic.id }
+        if (force && !silent) _refreshing.update { it + topic.id }
         loadJobs[topic.id] = viewModelScope.launch {
             try {
-                repository.observeTopic(topic, force).collect { result ->
+                repository.observeTopic(topic, force).collect { raw ->
+                    if (raw is FeedResult.Success && !raw.fromCache) freshAt[topic.id] = System.currentTimeMillis()
+                    // A silent refresh never shows its cache pass or a refreshing indicator.
+                    val result = if (silent && raw is FeedResult.Success) {
+                        if (raw.fromCache && _feeds.value[topic.id] is FeedResult.Success) return@collect
+                        raw.copy(refreshing = false)
+                    } else raw
                     _feeds.update { current ->
-                        // Never replace stories on screen with a spinner during a refresh.
-                        if (result is FeedResult.Loading && current[topic.id] is FeedResult.Success) current
+                        // Never replace stories on screen with a spinner or an error during a refresh.
+                        if ((result is FeedResult.Loading || (silent && result is FeedResult.Error)) && current[topic.id] is FeedResult.Success) current
                         else current + (topic.id to result)
                     }
                     if (result is FeedResult.Success && !result.fromCache) checkArchives(result.articles)
@@ -275,5 +319,10 @@ class HomeViewModel(
                 _archive.update { it + (key to if (url != null) ArchiveState.Available(url) else ArchiveState.Locked) }
             }
         }
+    }
+
+    private companion object {
+        /** Older than this, a topic is quietly refreshed when shown again. */
+        const val STALE_MS = 5 * 60_000L
     }
 }

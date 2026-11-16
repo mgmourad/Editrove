@@ -65,6 +65,7 @@ class BriefingPlayer(
     context: Context,
     private val prefs: () -> news.openwire.domain.model.BriefingPrefs,
     private val extractor: news.openwire.data.remote.ArticleTextExtractor?,
+    private val normalizeDomain: (String) -> String = { it },
 ) {
     private val app = context.applicationContext
     var title by mutableStateOf<String?>(null)
@@ -175,7 +176,8 @@ class BriefingPlayer(
         val p = prefs()
         topic = topicLabel
         detail = p.detail
-        stories = articles.take(p.count)
+        // Every story in a briefing is a different story: no second outlet's take on one already read.
+        stories = news.openwire.domain.engine.StoryIdentity.distinct(articles, p.count, normalizeDomain)
         title = "$topicLabel briefing"
         content.clear()
         val built = mutableListOf<Pair<Seg, Int>>()

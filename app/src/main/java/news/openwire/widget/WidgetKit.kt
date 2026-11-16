@@ -39,16 +39,17 @@ object W {
     val text = pair(0xFF0F172A, 0xFFF8FAFC)
     val textSecondary = pair(0xFF475569, 0xFF94A3B8)
     val textMuted = pair(0xFF64748B, 0xFF64748B)
-    val cyan = pair(0xFF0284C7, 0xFF38BDF8)
-    val amber = pair(0xFFD97706, 0xFFF59E0B)
+    // The app's own language: Rose is the accent, Indigo the secondary (see ui/theme).
+    val indigo = pair(0xFF4F46E5, 0xFF818CF8)
+    val accent = pair(0xFFE11D48, 0xFFFB7185)
     val emerald = pair(0xFF059669, 0xFF34D399)
-    val chip = pair(0x140F172A, 0x1AFFFFFF)
-    val divider = pair(0x170F172A, 0x14FFFFFF)
-    val amberChip = pair(0x24D97706, 0x33F59E0B)
-    val cyanChip = pair(0x240284C7, 0x4D38BDF8)
+    val chip = pair(0x0D0F172A, 0x1AFFFFFF)
+    val divider = pair(0x140F172A, 0x1AFFFFFF)
+    val accentChip = pair(0x1FE11D48, 0x33FB3768)
+    val indigoChip = pair(0x1F4F46E5, 0x336366F1)
     val white: ColorProvider = ColorProvider(Color.White)
-    val onPhoto: ColorProvider = ColorProvider(Color(0xFF7DD3FC))
-    val onPlay: ColorProvider = ColorProvider(Color(0xFF020617))
+    val onPhoto: ColorProvider = ColorProvider(Color(0xFFFB7185))
+    val onPlay: ColorProvider = ColorProvider(Color.White)
     val photoChip: ColorProvider = ColorProvider(Color(0x80000000))
 
     val SHELL = 28.dp
@@ -81,20 +82,20 @@ object Accents {
         ColorProvider(day = Color(day), night = Color(night)),
         ColorProvider(day = Color(day).copy(alpha = 0.14f), night = Color(night).copy(alpha = 0.2f)),
     )
-    val SKY = a(0xFF0284C7, 0xFF38BDF8)
-    val AMBER = a(0xFFD97706, 0xFFF59E0B)
-    val EMERALD = a(0xFF059669, 0xFF34D399)
+    // The app's ticker palette.
     val INDIGO = a(0xFF4F46E5, 0xFF818CF8)
+    val EMERALD = a(0xFF059669, 0xFF34D399)
+    val AMBER = a(0xFFD97706, 0xFFFBBF24)
     val FUCHSIA = a(0xFFC026D3, 0xFFE879F9)
     val ROSE = a(0xFFE11D48, 0xFFFB7185)
-    private val cycle = listOf(SKY, EMERALD, INDIGO, AMBER, FUCHSIA, ROSE)
+    private val cycle = listOf(INDIGO, EMERALD, AMBER, FUCHSIA, ROSE)
 
     fun forTopic(id: String, index: Int): Accent = when (id) {
-        "AI", "TECHNOLOGY" -> SKY
+        "AI", "TECHNOLOGY" -> INDIGO
         "BUSINESS", "FINANCE" -> EMERALD
-        "SCIENCE" -> INDIGO
+        "SCIENCE" -> FUCHSIA
         "SPORTS", "LIFESTYLE" -> AMBER
-        "ENTERTAINMENT" -> FUCHSIA
+        "ENTERTAINMENT" -> ROSE
         "POLITICS", "INTERNATIONAL" -> ROSE
         else -> cycle[index % cycle.size]
     }
@@ -161,7 +162,7 @@ fun BookmarkButton(saved: Boolean, onClick: Action, tint: ColorProvider = W.text
         Image(
             ImageProvider(if (saved) R.drawable.wic_bookmark_filled else R.drawable.wic_bookmark),
             contentDescription = if (saved) "Remove from Saved" else "Save story",
-            colorFilter = ColorFilter.tint(if (saved) W.amber else tint),
+            colorFilter = ColorFilter.tint(if (saved) W.accent else tint),
             modifier = GlanceModifier.size(diameter * 0.55f),
         )
     }

@@ -51,6 +51,14 @@ object WidgetData {
         runCatching { container(context).database.articleDao().getByTopic(topicId).map { it.toArticle() } }.getOrDefault(emptyList())
     }
 
+    /** Refetches a topic when its cache is older than [maxAgeMs] (waits up to ~8 s). */
+    suspend fun refreshIfStale(context: Context, topicId: String, maxAgeMs: Long = 5 * 60_000L) {
+        val c = container(context)
+        if (System.currentTimeMillis() - c.feedState.lastUpdated(topicId) < maxAgeMs) return
+        val topic = topics(context).firstOrNull { it.id == topicId } ?: return
+        withTimeoutOrNull(8_000) { runCatching { c.feedRepository.observeTopic(topic, force = true).collect { } } }
+    }
+
     fun savedIds(context: Context): Set<String> = container(context).libraryStore.saved.value.map { it.id }.toSet()
 
     /** The first [count] stories with photos loaded at roughly [px] on the long side. */
@@ -121,8 +129,9 @@ object WidgetData {
 
 /** Gradient art RemoteViews can't draw itself: the waveform, mini equaliser and scrubber. */
 object WidgetArt {
-    private const val CYAN = 0xFF38BDF8.toInt()
-    private const val AMBER = 0xFFF59E0B.toInt()
+    // App palette: Rose (played / accent) and Indigo (still to come).
+    private const val CYAN = 0xFF818CF8.toInt()
+    private const val AMBER = 0xFFFB3768.toInt()
 
     private val SHAPE = floatArrayOf(
         0.28f, 0.55f, 0.82f, 0.45f, 0.92f, 0.68f, 1f, 0.52f, 0.76f, 0.40f, 0.88f, 0.64f, 0.95f, 0.48f, 0.72f, 0.85f, 0.38f, 0.90f,

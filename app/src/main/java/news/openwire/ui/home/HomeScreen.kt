@@ -164,6 +164,8 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
     // The pager is shared by both postures. The nav highlight follows the pager directly
     // (where the swipe is heading), so it moves with your finger instead of after the page settles.
     val pager = androidx.compose.foundation.pager.rememberPagerState(initialPage = tab.ordinal) { NavTab.entries.size }
+    // Back in the app: quietly bring what's on screen up to date.
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_START) { vm.onForeground() }
     val shownTab = NavTab.entries[if (pager.isScrollInProgress) pager.targetPage else pager.currentPage]
     LaunchedEffect(pager) {
         androidx.compose.runtime.snapshotFlow { pager.settledPage }.collect { page ->
@@ -542,7 +544,7 @@ private fun TabFeed(
                                 )
                             }
                             val ordered = news.openwire.domain.engine.FeedOrdering.apply(r.articles, userSettings.sortMode)
-                            if (t == NavTab.AUDIO) fullRow("briefing-${topic.id}") { HeadlineBriefingCard(topic.label, ordered, userSettings.briefing, onSettings = { vm.openSettingsAt("briefing") }) }
+                            if (t == NavTab.AUDIO) fullRow("briefing-${topic.id}") { HeadlineBriefingCard(topic.label, ordered, userSettings.briefing, onSettings = { vm.openSettingsAt("briefing") }, fresh = { vm.freshStories(topic) }) }
                             feed(ordered, topic.label, ticker = t == NavTab.TODAY, title = if (t == NavTab.AUDIO) "Listen Next" else "Bento Dispatch")
                         }
                         is FeedResult.Error -> fullRow("err-${topic.id}") {
@@ -610,10 +612,18 @@ private fun SearchPill(query: String, onQuery: (String) -> Unit) {
 
 /** Audio tab: an anchor-read briefing of the current edition (shared player keeps playing while you scroll). */
 @Composable
-private fun HeadlineBriefingCard(topicLabel: String, articles: List<Article>, prefs: news.openwire.domain.model.BriefingPrefs, onSettings: () -> Unit) {
+private fun HeadlineBriefingCard(
+    topicLabel: String,
+    articles: List<Article>,
+    prefs: news.openwire.domain.model.BriefingPrefs,
+    onSettings: () -> Unit,
+    fresh: suspend () -> List<Article>,
+) {
     val g = Glass
     val haptics = LocalHapticFeedback.current
     val player = LocalBriefingPlayer.current ?: return
+    val scope = rememberCoroutineScope()
+    var updating by remember { mutableStateOf(false) }
     val mine = player.title == "$topicLabel briefing"
     val playing = mine && player.playing
     val count = minOf(prefs.count, articles.size)
@@ -648,9 +658,16 @@ private fun HeadlineBriefingCard(topicLabel: String, articles: List<Article>, pr
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(
                 Modifier.glowShadow(g.accent).clip(CircleShape).background(g.accent)
-                    .clickable(enabled = player.ready) {
+                    .clickable(enabled = player.ready && !updating) {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (mine) player.toggle() else player.play(topicLabel, articles)
+                        if (mine) player.toggle()
+                        else scope.launch {
+                            // Never brief from stale stories: refetch first if they're more than a few minutes old.
+                            updating = true
+                            val latest = runCatching { fresh() }.getOrNull()?.takeIf { it.isNotEmpty() } ?: articles
+                            updating = false
+                            player.play(topicLabel, latest)
+                        }
                     }
                     .padding(horizontal = 16.dp, vertical = 10.dp)
                     .animateContentSize(springTween(260)),
@@ -658,7 +675,7 @@ private fun HeadlineBriefingCard(topicLabel: String, articles: List<Article>, pr
             ) {
                 Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, null, tint = Color.White, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(if (playing) "Pause" else if (mine) "Resume" else "Play briefing", style = sans(12.sp, FontWeight.SemiBold), color = Color.White)
+                Text(if (updating) "Getting the latest…" else if (playing) "Pause" else if (mine) "Resume" else "Play briefing", style = sans(12.sp, FontWeight.SemiBold), color = Color.White)
             }
             if (mine) {
                 Spacer(Modifier.width(6.dp))

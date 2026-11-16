@@ -155,7 +155,7 @@ private fun WideSplit(list: List<WidgetStory>, width: Dp) {
                     GlanceModifier.fillMaxWidth().defaultWeight().background(ImageProvider(R.drawable.widget_card)).cornerRadius(W.CARD).padding(10.dp)
                         .clickable(actionStartActivity(WidgetData.openIntent(ctx, s.article))),
                 ) {
-                    Text("${s.source} · ${s.age}", style = mono(9.sp, if (i == 0) W.amber else W.cyan, bold = true), maxLines = 1)
+                    Text("${s.source} · ${s.age}", style = mono(9.sp, if (i == 0) W.accent else W.indigo, bold = true), maxLines = 1)
                     Text(s.article.title, style = serif(12.sp), maxLines = 2, modifier = GlanceModifier.padding(top = 2.dp))
                 }
             }
@@ -227,7 +227,7 @@ private fun StoryCard(s: WidgetStory, titleLines: Int, photoHeight: Dp = 0.dp, t
                 Spacer(GlanceModifier.width(8.dp))
             }
             Column(GlanceModifier.defaultWeight()) {
-                Text(s.source, style = mono(9.sp, W.cyan, bold = true), maxLines = 1)
+                Text(s.source, style = mono(9.sp, W.indigo, bold = true), maxLines = 1)
                 Text(s.age, style = mono(9.sp, W.textMuted), maxLines = 1)
             }
             BookmarkButton(s.saved, bookmark(s), diameter = 26.dp)

@@ -31,6 +31,12 @@ data class UserSettings(
     val autoInstallUpdates: Boolean = false,
     /** Nudge Curated order toward outlets the reader saves and likes (computed on-device). */
     val personalize: Boolean = true,
+    /** Minutes between background refreshes (feeds, widgets, alerts): 15, 30, 60, 180 or 360. */
+    val refreshMinutes: Int = 60,
+    /** Breaking-news alerts (separate from topic notifications). */
+    val breakingEnabled: Boolean = false,
+    /** Newsrooms watched for breaking news (keys from BreakingNews.OUTLETS). */
+    val breakingOutlets: Set<String> = news.openwire.domain.engine.BreakingNews.DEFAULT_KEYS,
     /** Audio briefing voice, speed, length, detail and sound design. */
     val briefing: BriefingPrefs = BriefingPrefs(),
 )

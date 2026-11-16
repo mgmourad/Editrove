@@ -1,27 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
-<!-- Black Glass: translucent obsidian with a 1dp top/left specular rim and amber/cyan ambient glow. -->
+<!-- Editrove glass: the app's elevated glass surface, specular top/left rim and its
+     ambient mesh (indigo top-left, rose top-right, emerald at the foot). -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="28dp" />
-            <gradient android:angle="315" android:startColor="#38FFFFFF" android:centerColor="#14FFFFFF" android:endColor="#0AFFFFFF" />
+            <gradient android:angle="315" android:startColor="#3DFFFFFF" android:centerColor="#14FFFFFF" android:endColor="#0AFFFFFF" />
         </shape>
     </item>
     <item android:left="1dp" android:top="1dp" android:right="0.5dp" android:bottom="0.5dp">
         <shape android:shape="rectangle">
             <corners android:radius="27dp" />
-            <solid android:color="#C712141D" />
+            <solid android:color="#C722232E" />
         </shape>
     </item>
-    <item android:gravity="top|end" android:width="190dp" android:height="190dp" android:top="-70dp" android:right="-70dp">
-        <shape android:shape="oval">
-            <gradient android:type="radial" android:gradientRadius="95dp" android:startColor="#29F59E0B" android:endColor="#00F59E0B" />
-        </shape>
+    <item android:gravity="top|start" android:width="200dp" android:height="200dp" android:top="-80dp" android:left="-80dp">
+        <shape android:shape="oval"><gradient android:type="radial" android:gradientRadius="100dp" android:startColor="#336366F1" android:endColor="#006366F1" /></shape>
     </item>
-    <item android:gravity="bottom|start" android:width="190dp" android:height="190dp" android:bottom="-70dp" android:left="-70dp">
-        <shape android:shape="oval">
-            <gradient android:type="radial" android:gradientRadius="95dp" android:startColor="#2938BDF8" android:endColor="#0038BDF8" />
-        </shape>
+    <item android:gravity="top|end" android:width="200dp" android:height="200dp" android:top="-80dp" android:right="-80dp">
+        <shape android:shape="oval"><gradient android:type="radial" android:gradientRadius="100dp" android:startColor="#2EFB3768" android:endColor="#00FB3768" /></shape>
+    </item>
+    <item android:gravity="bottom|center_horizontal" android:width="240dp" android:height="160dp" android:bottom="-90dp">
+        <shape android:shape="oval"><gradient android:type="radial" android:gradientRadius="120dp" android:startColor="#1A34D399" android:endColor="#0034D399" /></shape>
     </item>
 </layer-list>

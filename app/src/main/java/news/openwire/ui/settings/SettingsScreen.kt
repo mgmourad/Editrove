@@ -354,16 +354,55 @@ private fun AddTopicPage(vm: SettingsViewModel, onDone: () -> Unit) {
     val library by vm.library.collectAsState()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Hint("Keywords search Google News and also filter your chosen sources by headline and excerpt. Pick sources only to build a topic from specific publishers.")
+        val ideas by vm.keywordIdeas.collectAsState()
+        // Presets matching what's typed ("Middle E" → Middle East with Iran, Israel, Lebanon, …).
+        val matches = remember(name) { news.openwire.domain.engine.TopicPresets.suggest(name) }
+        val exact = matches.firstOrNull { it.name.equals(name.trim(), ignoreCase = true) }
         Section {
-            Label("Suggestions")
+            Label("Popular topics")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TopicRegistry.PRESET_SUGGESTIONS.forEach { (label, kw) -> Chip(label, selected = name == label) { name = label; keywords = kw } }
+                news.openwire.domain.engine.TopicPresets.POPULAR.forEach { p -> Chip(p.name, selected = name == p.name) { name = p.name; keywords = p.keywordText; vm.clearKeywordIdeas() } }
             }
         }
         Section {
-            Field("Topic name", name, { name = it })
+            Field("Topic name", name, { name = it; vm.clearKeywordIdeas() }, placeholder = "e.g. Middle East")
+            if (matches.isNotEmpty() && exact?.keywordText != keywords) {
+                Spacer(Modifier.height(6.dp))
+                matches.forEach { p ->
+                    Column(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                            .clickable { name = p.name; keywords = p.keywordText; vm.clearKeywordIdeas() }
+                            .padding(horizontal = 6.dp, vertical = 8.dp),
+                    ) {
+                        Text(p.name, style = sans(14.sp, FontWeight.SemiBold), color = Glass.textPrimary)
+                        Text(p.keywordText, style = sans(11.sp, lineHeight = 15.sp), color = Glass.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
             Spacer(Modifier.height(10.dp))
-            Field("Keywords (comma-separated)", keywords, { keywords = it }, placeholder = "e.g. Formula 1, F1, Grand Prix")
+            Field("Keywords (comma-separated)", keywords, { keywords = it }, placeholder = "e.g. Iran, Israel, Lebanon, Yemen")
+            // Not a preset: offer keywords drawn from today's headlines about it.
+            if (name.trim().length >= 3 && exact == null) {
+                Spacer(Modifier.height(10.dp))
+                when (val i = ideas) {
+                    is KeywordIdeas.Loading -> Text("Reading the latest “${i.topic}” headlines…", style = sans(12.sp), color = Glass.textSecondary)
+                    is KeywordIdeas.Ready -> {
+                        Text("From today's “${i.topic}” headlines. Tap to add:", style = sans(11.sp), color = Glass.textSecondary)
+                        Spacer(Modifier.height(6.dp))
+                        val current = TopicRegistry.parseCommaKeywords(keywords).map { it.lowercase() }.toSet()
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            i.keywords.forEach { k ->
+                                val added = k.lowercase() in current
+                                Chip(if (added) "✓ $k" else "+ $k", selected = added) {
+                                    if (!added) keywords = (TopicRegistry.parseCommaKeywords(keywords) + k).joinToString(", ")
+                                }
+                            }
+                        }
+                    }
+                    is KeywordIdeas.Failed -> Text("Couldn't find enough headlines for “${i.topic}”. Add keywords by hand.", style = sans(12.sp), color = Glass.textSecondary)
+                    KeywordIdeas.Idle -> Chip("Suggest keywords from the news", selected = false) { vm.suggestKeywords(name) }
+                }
+            }
         }
         Section {
             Label("Sources (optional) · ${chosen.size} selected")
@@ -615,7 +654,40 @@ private fun NotificationsPage(vm: SettingsViewModel) {
                 ) permission.launch(Manifest.permission.POST_NOTIFICATIONS) else vm.setNotificationsEnabled(on)
             }
             Divider()
-            SwitchRow("Background refresh", "Refresh feeds about once an hour on Wi-Fi or data, so the app opens fresh", s.backgroundRefresh) { vm.setBackgroundRefresh(it) }
+            SwitchRow("Background refresh", "Refresh feeds and home-screen widgets ${refreshLabel(s.refreshMinutes, long = true)}, so the app opens fresh", s.backgroundRefresh) { vm.setBackgroundRefresh(it) }
+        }
+        Section {
+            Label("Refresh every")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                news.openwire.domain.engine.REFRESH_CHOICES.forEach { m -> Chip(refreshLabel(m), selected = m == s.refreshMinutes) { vm.setRefreshMinutes(m) } }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "How often Editrove updates feeds, widgets, topic alerts and breaking news in the background. " +
+                    "More frequent refreshes keep everything newer but use more battery and data. " +
+                    "Android may stretch the interval when battery saver is on or the phone is idle.",
+                style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary,
+            )
+        }
+        Section {
+            Label("Breaking news")
+            SwitchRow(
+                "Breaking news alerts",
+                "Heads-up alerts when a newsroom you follow breaks a story: labelled “Breaking”, or minutes old and already carried by many outlets. Separate from topic alerts.",
+                s.breakingEnabled, enabled = s.notificationsEnabled,
+            ) { vm.setBreakingEnabled(it) }
+            if (s.breakingEnabled) {
+                Spacer(Modifier.height(10.dp))
+                Label("Watch these newsrooms · ${s.breakingOutlets.size}")
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    news.openwire.domain.engine.BreakingNews.OUTLETS.forEach { o -> Chip(o.name, selected = o.key in s.breakingOutlets) { vm.toggleBreakingOutlet(o.key) } }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Checked on every background refresh (${refreshLabel(s.refreshMinutes, long = true)}). For faster alerts, refresh every 15 or 30 minutes.",
+                    style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary,
+                )
+            }
         }
         Section {
             Label("Notify me about")
@@ -625,6 +697,12 @@ private fun NotificationsPage(vm: SettingsViewModel) {
             }
         }
     }
+}
+
+private fun refreshLabel(minutes: Int, long: Boolean = false): String = when {
+    minutes < 60 -> if (long) "every $minutes minutes" else "$minutes min"
+    minutes == 60 -> if (long) "about once an hour" else "1 hour"
+    else -> if (long) "every ${minutes / 60} hours" else "${minutes / 60} hours"
 }
 
 // ---- Appearance --------------------------------------------------------------------------------

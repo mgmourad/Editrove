@@ -7,7 +7,7 @@
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
         <ImageView android:layout_width="24dp" android:layout_height="24dp" android:src="@drawable/ic_brand" android:scaleType="centerCrop" android:importantForAccessibility="no" />
         <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="8dp"
-            android:text="THE EDITROVE DAILY BRIEF" android:fontFamily="monospace" android:textSize="10sp" android:textStyle="bold" android:textColor="#F59E0B" android:maxLines="1" />
+            android:text="THE EDITROVE DAILY BRIEF" android:fontFamily="monospace" android:textSize="10sp" android:textStyle="bold" android:textColor="#FB7185" android:maxLines="1" />
     </LinearLayout>
     <TextView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical"
         android:text="Your news, read like a broadcast" android:fontFamily="serif" android:textSize="17sp" android:textStyle="bold" android:textColor="@color/widget_text" android:maxLines="3" />

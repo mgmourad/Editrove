@@ -80,6 +80,9 @@ object SettingsCodec {
                 put("autoCheckUpdates", settings.autoCheckUpdates)
                 put("autoInstallUpdates", settings.autoInstallUpdates)
                 put("personalize", settings.personalize)
+                put("refreshMinutes", settings.refreshMinutes)
+                put("breakingEnabled", settings.breakingEnabled)
+                put("breakingOutlets", JsonArray(settings.breakingOutlets.map(::JsonPrimitive)))
                 putJsonObject("briefing") {
                     settings.briefing.voice?.let { put("voice", it) }
                     put("speed", settings.briefing.speed); put("count", settings.briefing.count)
@@ -177,6 +180,10 @@ object SettingsCodec {
             autoCheckUpdates = prefs?.get("autoCheckUpdates").bool() ?: defaults.autoCheckUpdates,
             autoInstallUpdates = prefs?.get("autoInstallUpdates").bool() ?: defaults.autoInstallUpdates,
             personalize = prefs?.get("personalize").bool() ?: defaults.personalize,
+            refreshMinutes = (prefs?.get("refreshMinutes") as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()?.toInt()?.let(::validRefresh) ?: defaults.refreshMinutes,
+            breakingEnabled = prefs?.get("breakingEnabled").bool() ?: defaults.breakingEnabled,
+            breakingOutlets = prefs?.get("breakingOutlets").strings().filter { k -> BreakingNews.OUTLETS.any { it.key == k } }.toSet()
+                .takeIf { prefs?.get("breakingOutlets") != null } ?: defaults.breakingOutlets,
             briefing = prefs?.get("briefing").obj()?.let { b ->
                 news.openwire.domain.model.BriefingPrefs(
                     voice = b["voice"].str(),

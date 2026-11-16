@@ -153,16 +153,6 @@ object TopicRegistry {
         )
     }
 
-    val PRESET_SUGGESTIONS: List<Pair<String, String>> = listOf(
-        "Health & Medicine" to "health, medicine, healthcare",
-        "Crypto & Web3" to "cryptocurrency, bitcoin, ethereum",
-        "Space & Astronomy" to "SpaceX, NASA, astronomy",
-        "Gaming & Esports" to "video games, gaming, esports",
-        "Climate & Energy" to "climate change, clean energy, solar",
-        "Electric Vehicles" to "electric vehicles, EV, Tesla",
-        "Economy & Markets" to "economy, stock market, inflation",
-        "AI & Robotics" to "artificial intelligence, machine learning, robotics",
-    )
 }
 
 // Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.

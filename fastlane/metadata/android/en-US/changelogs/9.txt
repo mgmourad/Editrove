@@ -1,0 +1,10 @@
+Editrove 0.7.0 Beta 2 — Widgets that work, smarter alerts
+• Home-screen widget buttons now work: play, pause, ±15 seconds, speed, chapters, bookmarks and topic switching. The release build was stripping the code behind them.
+• The widgets now use Editrove's own design language and colours: Rose accent, Indigo, and the app's glass.
+• Settings › Notifications & refresh: choose how often Editrove refreshes in the background (15 minutes to 6 hours). More often keeps feeds, widgets and alerts newer but uses more battery.
+• Breaking news alerts: heads-up alerts when newsrooms you choose break a story. Separate from topic alerts.
+• Topic notifications now expand to show the lead story in full, and tapping opens it. "See all" opens the topic.
+• New topics: start typing ("Middle East") to pick a ready-made topic with its keywords, or let Editrove suggest keywords from today's headlines.
+• Opening the app or switching pages quietly refreshes anything more than a few minutes old.
+• Audio briefings fetch the latest stories before they play, from the app or the widget.
+• Briefings no longer repeat a story: each one is a different story, not another outlet's take on one already read.

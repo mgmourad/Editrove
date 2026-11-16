@@ -76,6 +76,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -485,8 +486,14 @@ private fun TabFeed(
                     feeds.mapNotNull { (id, r) -> (r as? FeedResult.Success)?.let { id to it.articles } }.toMap()
                 }
                 // Front page across every edition: ranked by placement, coverage, freshness and authority.
-                val top = remember(byTopic) {
-                    news.openwire.domain.engine.FeedRanker.everywhere(byTopic, System.currentTimeMillis(), news.openwire.domain.engine.DomainRegistry()::normalizeDomain)
+                // Computed off the main thread, and only once feeds stop arriving for a moment
+                // (opening Discover loads every topic, each in several steps).
+                val registry = remember { news.openwire.domain.engine.DomainRegistry() }
+                val top by produceState(initialValue = emptyList<Article>(), byTopic) {
+                    if (value.isNotEmpty()) kotlinx.coroutines.delay(300)
+                    value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        news.openwire.domain.engine.FeedRanker.everywhere(byTopic, System.currentTimeMillis(), registry::normalizeDomain)
+                    }
                 }
                 remember(byTopic, top, query) {
                     if (query.isBlank()) top

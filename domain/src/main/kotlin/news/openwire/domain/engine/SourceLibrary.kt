@@ -103,7 +103,7 @@ object SourceLibrary {
                 it[existing] = e.copy(name = cleanName, domain = domainOf(cleanUrl).ifEmpty { e.domain }, topics = (e.topics + upper).distinct(), maxArticles = quota, enabled = true, isCustom = true)
             }
         }
-        val slug = cleanName.lowercase().replace(Regex("[^a-z0-9]"), "_").take(16)
+        val slug = cleanName.lowercase().replace(RX_1, "_").take(16)
         return custom + FeedSource(
             id = "feed_custom_${slug}_${nowMillis.toString(36)}",
             name = cleanName, url = cleanUrl, domain = domainOf(cleanUrl), topics = upper,
@@ -138,3 +138,6 @@ object SourceLibrary {
             .sortedWith(compareBy<SourceGroup> { CATEGORY_ORDER.indexOf(it.category).let { i -> if (i < 0) 100 else i } }.thenBy { it.category })
     }
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("[^a-z0-9]")

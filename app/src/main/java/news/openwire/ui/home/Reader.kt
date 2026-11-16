@@ -574,7 +574,7 @@ internal class Narrator(context: Context) {
         else tts.language = Locale.getDefault().takeIf { tts.isLanguageAvailable(it) >= 0 } ?: Locale.US
         tts.setSpeechRate(prefs?.speed ?: 1f)
         val max = TextToSpeech.getMaxSpeechInputLength() - 100
-        val chunks = text.split(Regex("(?<=[.!?])\\s+")).fold(mutableListOf(StringBuilder())) { acc, s ->
+        val chunks = text.split(RX_1).fold(mutableListOf(StringBuilder())) { acc, s ->
             if (acc.last().length + s.length > max) acc.add(StringBuilder())
             acc.last().append(s).append(' ')
             acc
@@ -596,3 +596,6 @@ internal fun rememberNarrator(context: Context): Narrator {
     DisposableEffect(narrator) { onDispose { narrator.shutdown() } }
     return narrator
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("(?<=[.!?])\\s+")

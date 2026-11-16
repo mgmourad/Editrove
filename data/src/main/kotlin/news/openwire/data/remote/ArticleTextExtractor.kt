@@ -24,7 +24,7 @@ data class ArticleContent(
     val partial: Boolean = false,
 ) {
     val paragraphs: List<String> get() = text.split("\n\n").filter { it.isNotBlank() }
-    val wordCount: Int get() = text.split(Regex("\\s+")).count { it.isNotBlank() }
+    val wordCount: Int get() = text.split(RX_1).count { it.isNotBlank() }
 
     /** Reading time at ~230 wpm, never less than one minute. */
     val readMinutes: Int get() = maxOf(1, (wordCount + 229) / 230)
@@ -110,9 +110,9 @@ class ArticleTextExtractor(
         try {
             val api = "https://archive.org/wayback/available?url=" + java.net.URLEncoder.encode(url, "UTF-8")
             val body = get(api) ?: return@withContext null
-            val snap = Regex("\"closest\"\\s*:\\s*\\{[^}]*\"url\"\\s*:\\s*\"([^\"]+)\"").find(body)?.groupValues?.get(1) ?: return@withContext null
+            val snap = RX_2.find(body)?.groupValues?.get(1) ?: return@withContext null
             val viewer = snap.replaceFirst("http:", "https:")
-            val raw = Regex("/web/(\\d+)/").replace(viewer) { "/web/${it.groupValues[1]}id_/" }
+            val raw = RX_3.replace(viewer) { "/web/${it.groupValues[1]}id_/" }
             viewer to raw
         } catch (e: Exception) {
             null
@@ -166,3 +166,8 @@ class ArticleTextExtractor(
         }
     }
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("\\s+")
+private val RX_2 = Regex("\"closest\"\\s*:\\s*\\{[^}]*\"url\"\\s*:\\s*\"([^\"]+)\"")
+private val RX_3 = Regex("/web/(\\d+)/")

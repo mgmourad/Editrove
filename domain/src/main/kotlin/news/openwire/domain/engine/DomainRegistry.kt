@@ -118,7 +118,7 @@ class DomainRegistry(
         if (input.isBlank()) return ""
         val clean = input.trim().lowercase()
         KNOWN_PUBLISHER_DOMAINS[clean]?.let { return it }
-        val stripped = clean.replace(Regex("[^a-z0-9 ]"), "").replace(Regex("\\s+"), " ").trim()
+        val stripped = clean.replace(RX_1, "").replace(RX_2, " ").trim()
         KNOWN_PUBLISHER_DOMAINS[stripped]?.let { return it }
         if (clean.contains('.') && !clean.contains(' ') && !clean.contains('/')) return clean
         return ""
@@ -326,3 +326,7 @@ class DomainRegistry(
         )
     }
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("[^a-z0-9 ]")
+private val RX_2 = Regex("\\s+")

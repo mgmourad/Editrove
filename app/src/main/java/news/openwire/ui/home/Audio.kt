@@ -274,7 +274,8 @@ class BriefingPlayer(
     }
 
     private fun prefetch(i: Int) {
-        if (detail == news.openwire.domain.model.BriefingDetail.HEADLINES || extractor == null || i !in stories.indices || content.containsKey(i)) return
+        // Every level fetches the article: Headlines reads its subtitle too.
+        if (extractor == null || i !in stories.indices || content.containsKey(i)) return
         val url = stories[i].originalUrl ?: return
         content[i] = scope.async(kotlinx.coroutines.Dispatchers.IO) { runCatching { extractor.extract(url) }.getOrNull() }
     }
@@ -303,8 +304,13 @@ class BriefingPlayer(
                         news.openwire.domain.engine.BriefingScript.Story(
                             title = a.title,
                             source = a.source,
-                            summary = c?.description ?: c?.let { news.openwire.domain.engine.Summarizer.keyPoints(it.text, 2).joinToString(" ") } ?: a.summary,
+                            summary = a.summary,
                             body = c?.takeIf { !it.partial }?.text?.replace("\n\n", " "),
+                            subtitle = c?.description,
+                            // Same key points as the Summary box in the reader.
+                            keyPoints = if (detail == news.openwire.domain.model.BriefingDetail.SUMMARIES) {
+                                c?.let { news.openwire.domain.engine.Summarizer.keyPoints(it.text, 3) }.orEmpty()
+                            } else emptyList(),
                         ),
                         detail,
                     )
@@ -333,7 +339,7 @@ class BriefingPlayer(
         val max = TextToSpeech.getMaxSpeechInputLength() - 200
         if (text.length <= max) return listOf(text)
         val out = mutableListOf(StringBuilder())
-        text.split(Regex("(?<=[.!?])\\s+")).forEach { sentence ->
+        text.split(RX_1).forEach { sentence ->
             if (out.last().length + sentence.length > max) out.add(StringBuilder())
             out.last().append(sentence).append(' ')
         }
@@ -481,3 +487,6 @@ internal fun SkipButton(icon: androidx.compose.ui.graphics.vector.ImageVector, d
         contentAlignment = Alignment.Center,
     ) { Icon(icon, contentDescription = description, tint = Glass.textPrimary, modifier = Modifier.size(20.dp)) }
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("(?<=[.!?])\\s+")

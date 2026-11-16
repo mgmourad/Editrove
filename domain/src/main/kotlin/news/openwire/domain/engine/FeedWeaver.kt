@@ -49,10 +49,20 @@ object FeedWeaver {
     /** Lowercases, drops a trailing " - Publisher" suffix and punctuation. */
     fun normalizeTitleForComparison(rawTitle: String?): String {
         if (rawTitle.isNullOrEmpty()) return ""
+        // Weaving, de-duplication and ranking compare the same headlines many times over.
+        synchronized(titleCache) { titleCache[rawTitle] }?.let { return it }
+        return normalizeTitleUncached(rawTitle).also { synchronized(titleCache) { titleCache[rawTitle] = it } }
+    }
+
+    private val titleCache = object : LinkedHashMap<String, String>(512, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?) = size > 4096
+    }
+
+    private fun normalizeTitleUncached(rawTitle: String): String {
         return rawTitle.lowercase()
-            .replace(Regex("\\s+[-–—|]\\s+[a-z0-9\\s.]+$"), "")
-            .replace(Regex("[^\\w\\s]"), " ")
-            .replace(Regex("\\s+"), " ")
+            .replace(RX_1, "")
+            .replace(RX_2, " ")
+            .replace(RX_3, " ")
             .trim()
     }
 
@@ -191,3 +201,8 @@ object FeedWeaver {
         return result.take(options.maxTotalArticles)
     }
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("\\s+[-–—|]\\s+[a-z0-9\\s.]+$")
+private val RX_2 = Regex("[^\\w\\s]")
+private val RX_3 = Regex("\\s+")

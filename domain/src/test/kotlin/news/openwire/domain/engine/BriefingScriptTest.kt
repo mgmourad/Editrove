@@ -22,11 +22,47 @@ class BriefingScriptTest {
         assertTrue(BriefingScript.lead(4, 5, BriefingDetail.SUMMARIES).contains("inally") || BriefingScript.lead(4, 5, BriefingDetail.SUMMARIES).contains("last"))
     }
 
-    @Test fun summariesAttributeAndHandOffIntoDetails() {
-        val lines = BriefingScript.story(1, 5, story, BriefingDetail.SUMMARIES)
+    private val rich = story.copy(
+        subtitle = "The vote clears the way for the region's biggest transit expansion in decades",
+        keyPoints = listOf(
+            "The council voted 9 to 2 on Tuesday night after six hours of public comment.",
+            "Construction on the first line is expected to begin in 2027.",
+            "Opponents say the sales tax falls hardest on low-income residents.",
+        ),
+    )
+
+    @Test fun headlinesReadTheHeadlineAndSubtitle() {
+        val lines = BriefingScript.story(1, 5, rich, BriefingDetail.HEADLINES)
         assertEquals("Council approves transit plan.", lines[1])
+        assertEquals("The vote clears the way for the region's biggest transit expansion in decades.", lines[2])
+        assertTrue(lines.last().contains("Reuters"))
+        assertTrue(lines.none { it.startsWith("Construction") }) // no key points in Headlines
+    }
+
+    @Test fun summariesReadSubtitleThenTheSummaryKeyPoints() {
+        val lines = BriefingScript.story(1, 5, rich, BriefingDetail.SUMMARIES)
+        assertEquals("Council approves transit plan.", lines[1])
+        assertTrue(lines[2].startsWith("The vote clears the way"))
         assertTrue(lines.any { it.contains("Reuters") })
-        assertTrue(lines.last().startsWith("The plan adds"))
+        assertEquals(rich.keyPoints, lines.takeLast(3))
+    }
+
+    @Test fun summariesWithoutSubtitleFallBackToExcerptAndStillReadKeyPoints() {
+        val lines = BriefingScript.story(1, 5, rich.copy(subtitle = null), BriefingDetail.SUMMARIES)
+        assertTrue(lines[2].startsWith("The plan adds"))
+        assertEquals(rich.keyPoints, lines.takeLast(3))
+    }
+
+    @Test fun keyPointRepeatingTheSubtitleIsSkipped() {
+        val s = rich.copy(keyPoints = listOf("The vote clears the way for the region's biggest transit expansion in decades.") + rich.keyPoints.drop(1))
+        val lines = BriefingScript.story(1, 5, s, BriefingDetail.SUMMARIES)
+        assertEquals(1, lines.count { it.startsWith("The vote clears") })
+        assertEquals(rich.keyPoints.drop(1), lines.takeLast(2))
+    }
+
+    @Test fun longSubtitleIsTrimmedToTwoSentences() {
+        val s = rich.copy(subtitle = "First sentence here today. Second sentence follows it. Third one is too much.")
+        assertEquals("First sentence here today. Second sentence follows it.", BriefingScript.story(0, 3, s, BriefingDetail.HEADLINES)[2])
     }
 
     @Test fun fullFallsBackToSummaryWhenBodyMissing() {

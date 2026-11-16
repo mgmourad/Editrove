@@ -59,18 +59,18 @@ class FeedRepositoryTest {
     }
 
     @Test
-    fun repositoryDedupsAndSortsFetchedArticles() = runTest {
+    fun repositoryDedupsAndKeepsEditorialLeadOverANewerSportsItem() = runTest {
         val remote = FakeNewsRemote(
             listOf(
-                ArticleDto(id = "a", title = "Same story", pubDate = "2026-09-14T10:00:00Z"),
-                ArticleDto(id = "b", title = "Same story!", pubDate = "2026-09-14T10:00:00Z"),
-                ArticleDto(id = "c", title = "Other story", pubDate = "2026-09-14T12:00:00Z"),
+                ArticleDto(id = "a", title = "Senate passes budget bill after overnight vote", domain = "apnews.com", originalUrl = "https://apnews.com/a", pubDate = "2026-09-14T10:00:00Z"),
+                ArticleDto(id = "b", title = "Senate passes budget bill after overnight vote!", domain = "apnews.com", originalUrl = "https://apnews.com/a", pubDate = "2026-09-14T10:00:00Z"),
+                ArticleDto(id = "c", title = "Grey Cup final score", domain = "globalnews.ca", originalUrl = "https://globalnews.ca/sports/cfl", pubDate = "2026-09-14T12:00:00Z"),
             ),
         )
         val results = repo(remote).observeTopic(topic()).toList()
         val last = results.last() as FeedResult.Success
         assertEquals(2, last.articles.size)
-        assertEquals("c", last.articles[0].id)
+        assertEquals("a", last.articles[0].id)
     }
 
     @Test

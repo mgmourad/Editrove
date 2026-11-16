@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import java.util.concurrent.ConcurrentHashMap
 import news.openwire.data.local.ArticleDao
 import news.openwire.data.local.FeedStateStore
 import news.openwire.data.remote.GoogleNewsRssSource
@@ -19,6 +20,7 @@ import news.openwire.data.remote.MetadataProvider
 import news.openwire.data.remote.NewsRemote
 import news.openwire.data.remote.RssNormalizer
 import news.openwire.domain.engine.DomainRegistry
+import news.openwire.domain.engine.FeedRanker
 import news.openwire.domain.engine.FeedWeaver
 import news.openwire.domain.engine.GoogleNewsUrls
 import news.openwire.domain.engine.NewsProcessor
@@ -57,6 +59,26 @@ class FeedRepositoryImpl(
 
     private val norm: (String) -> String = { registry.normalizeDomain(it) }
 
+    /** Latest copy of every topic loaded this session: the pool used to measure cross-outlet coverage. */
+    private val pool = ConcurrentHashMap<String, List<Article>>()
+
+    /**
+     * Curated order: editorial prominence + coverage across every loaded topic + freshness
+     * + source authority + section fit, then diversified. See [FeedRanker].
+     */
+    private fun rank(topic: Topic, articles: List<Article>): List<Article> {
+        pool[topic.id] = articles
+        val categories = catalog().associate { it.url to it.category }
+        val ctx = FeedRanker.Context(
+            topicId = topic.id,
+            nowMillis = clock(),
+            coverageOf = FeedRanker.coverageIndex(pool.values.flatten(), norm),
+            feedCategory = { categories[it] },
+            normalizeDomain = norm,
+        )
+        return FeedRanker.rank(articles, ctx)
+    }
+
     override fun observeTopic(topic: Topic, force: Boolean): Flow<FeedResult> = flow {
         val s = settings()
         val live = topic.liveOnly || topic.snapshotFile == null ||
@@ -75,16 +97,19 @@ class FeedRepositoryImpl(
     private suspend fun FlowCollector<FeedResult>.observeSnapshot(topic: Topic) {
         val file = topic.snapshotFile ?: return emit(FeedResult.Empty(topic.id))
         emit(FeedResult.Loading)
-        val cached = NewsProcessor.deduplicate(NewsProcessor.sortByDate(cached(topic.id), SortDirection.NEWEST))
+        // The cache is stored in curated order already; keep it (re-sorting by date was what
+        // let a minutes-old sports item displace the day's lead story).
+        val cached = NewsProcessor.deduplicate(cached(topic.id)).also { if (it.isNotEmpty()) pool.putIfAbsent(topic.id, it) }
         if (cached.isNotEmpty()) emit(FeedResult.Success(cached, fromCache = true, updatedAt = feedState?.lastUpdated(topic.id) ?: 0L, refreshing = true))
         try {
-            val fresh = NewsProcessor.deduplicate(
-                NewsProcessor.sortByDate(remote.fetchTopic(file).map { it.toArticle() }, SortDirection.NEWEST),
-            )
+            // The snapshot arrives in the pipeline's editorial order; that order is a signal, not noise.
+            val published = NewsProcessor.deduplicate(remote.fetchTopic(file).mapIndexed { i, dto -> dto.toArticle(rank = i) })
+            val fresh = rank(topic, published)
             emit(FeedResult.Success(fresh, fromCache = false, updatedAt = clock(), refreshing = extrasFor(topic).isNotEmpty()))
-            val woven = weaveExtras(topic, fresh)
-            store(topic.id, woven)
-            if (woven !== fresh) emit(FeedResult.Success(woven, fromCache = false, updatedAt = clock()))
+            val woven = weaveExtras(topic, published)
+            val ranked = if (woven === published) fresh else rank(topic, woven)
+            store(topic.id, ranked)
+            if (ranked !== fresh) emit(FeedResult.Success(ranked, fromCache = false, updatedAt = clock()))
         } catch (e: Exception) {
             Log.w(TAG, "Snapshot ${topic.id} failed", e)
             if (cached.isEmpty()) emit(FeedResult.Error(e.message ?: "Network error"))
@@ -199,7 +224,7 @@ class FeedRepositoryImpl(
                 if (resolved.isEmpty()) a else StrategyRouter.applyStrategy(registry, a.copy(originalUrl = resolved, domain = registry.normalizeDomain(resolved)))
             }
         }
-        if (isLatest) woven = NewsProcessor.sortByDate(woven, SortDirection.NEWEST)
+        woven = rank(topic, woven) // LATEST stays chronological inside the ranker
 
         if (woven.isEmpty()) {
             if (cached.isEmpty()) emit(FeedResult.Empty(topic.id))

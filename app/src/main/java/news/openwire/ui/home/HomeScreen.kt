@@ -481,13 +481,16 @@ private fun TabFeed(
             NavTab.TODAY, NavTab.AUDIO -> (feeds[topic.id] as? FeedResult.Success)?.articles.orEmpty()
             NavTab.SAVED -> saved
             NavTab.DISCOVER -> {
-                val all = remember(feeds) {
-                    feeds.values.filterIsInstance<FeedResult.Success>().flatMap { it.articles }
-                        .distinctBy { it.id }.sortedByDescending { it.publishedAt ?: 0L }
+                val byTopic = remember(feeds) {
+                    feeds.mapNotNull { (id, r) -> (r as? FeedResult.Success)?.let { id to it.articles } }.toMap()
                 }
-                remember(all, query) {
-                    if (query.isBlank()) all.take(60)
-                    else all.filter { a ->
+                // Front page across every edition: ranked by placement, coverage, freshness and authority.
+                val top = remember(byTopic) {
+                    news.openwire.domain.engine.FeedRanker.everywhere(byTopic, System.currentTimeMillis(), news.openwire.domain.engine.DomainRegistry()::normalizeDomain)
+                }
+                remember(byTopic, top, query) {
+                    if (query.isBlank()) top
+                    else byTopic.values.flatten().distinctBy { news.openwire.domain.engine.FeedOrdering.storyKey(it) }.filter { a ->
                         a.title.contains(query, ignoreCase = true) || (a.source?.contains(query, ignoreCase = true) == true)
                     }
                 }
@@ -556,7 +559,7 @@ private fun TabFeed(
                             else MessageCard("Nothing matches “$query”", "Try a publisher name or a different keyword.")
                         }
                     } else {
-                        feed(visible, "Discover", ticker = false, title = if (query.isBlank()) "Latest Everywhere" else "Results")
+                        feed(visible, "Discover", ticker = false, title = if (query.isBlank()) "Top Across Editions" else "Results")
                     }
                 }
                 NavTab.SAVED -> {

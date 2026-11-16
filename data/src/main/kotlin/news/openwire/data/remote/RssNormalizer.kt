@@ -46,9 +46,17 @@ class RssNormalizer(private val registry: DomainRegistry) {
             imageUrl = item.imageUrl ?: ImageExtractor.fromDescription(item.description, link),
             summary = summary,
             feedUrl = feedUrl,
+            // Only the topic's primary (editor-ordered) feed carries prominence; a publisher
+            // feed's own first item isn't the day's lead, so it takes its woven position.
+            editorialRank = if (feedUrl == null) index else null,
+            // Google lists the outlets running the story ("full coverage") as <li> items.
+            coverage = if (isGoogle) relatedCoverage(item.description).coerceAtLeast(1) else null,
         )
         return StrategyRouter.applyStrategy(registry, base)
     }
+
+    private fun relatedCoverage(description: String?): Int =
+        description?.let { Regex("<li\\b", RegexOption.IGNORE_CASE).findAll(it).count() } ?: 0
 
     /** Splits "Headline - Publisher" into (title, source). */
     private fun parseTitle(rawTitle: String?): Pair<String, String> {

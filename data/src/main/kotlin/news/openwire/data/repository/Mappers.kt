@@ -6,7 +6,7 @@ import news.openwire.data.remote.ArticleDto
 import news.openwire.domain.engine.NewsProcessor
 import news.openwire.domain.model.Article
 
-fun ArticleDto.toArticle(): Article = Article(
+fun ArticleDto.toArticle(rank: Int? = null): Article = Article(
     id = id,
     title = title,
     source = source,
@@ -18,6 +18,8 @@ fun ArticleDto.toArticle(): Article = Article(
     targetUrl = targetUrl,
     archiveUrl = archiveUrl,
     imageUrl = imageUrl,
+    summary = summary?.takeIf { it.length > 20 },
+    editorialRank = rank,
 )
 
 fun Article.toEntity(topicId: String, position: Int = 0): ArticleEntity = ArticleEntity(

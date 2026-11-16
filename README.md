@@ -47,9 +47,11 @@ open in a reader with the publisher's standfirst, a drop cap, a pull quote and a
 <tr>
 <td valign="top">
 
-### 🎧 Listen while you scroll
-Narrated briefings and articles are spoken on-device. A **floating mini-player** with a
-live waveform follows you down the page, and pause and resume pick up mid-sentence.
+### 🎧 A briefing that sounds like the news
+Audio briefings play like a broadcast: an opening cue that sinks under the anchor, dated
+open, hand-offs and transition stings between stories, and a sign-off. Choose **Headlines,
+Summaries or Full articles**, the number of stories, the voice and the speed. A **floating
+mini-player** follows you down the page.
 
 </td>
 <td valign="top">
@@ -170,7 +172,8 @@ vulnerability.
 
 Editrove began as a fork of the original **OpenWire** web app by **Anson Lai**. Its paywall
 engine, source catalog and feed pipeline are ported from that project and built on here. Typefaces:
-Newsreader, Inter and JetBrains Mono (SIL Open Font License).
+Newsreader, Inter and JetBrains Mono (SIL Open Font License). Briefing opening cues and the
+transition sting are royalty-free music from [Fesliyan Studios](https://www.fesliyanstudios.com/royalty-free-music/downloads-c/breaking-news-intro-music/26).
 
 The legacy web app (`index.html`, `css/`, `js/`) and the scheduled feed pipeline
 (`sync_news.py`, GitHub Actions) remain in this repository. The pipeline publishes the

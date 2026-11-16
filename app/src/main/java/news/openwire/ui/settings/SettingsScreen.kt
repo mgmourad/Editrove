@@ -67,6 +67,7 @@ import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.RssFeed
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material3.CircularProgressIndicator
@@ -119,7 +120,7 @@ import news.openwire.ui.theme.Glass
 private enum class Page(val title: String) {
     HOME("Settings"), EDITION("Edition"), TOPICS("Topics"), ADD_TOPIC("New topic"), SOURCES("Sources"),
     ADD_SOURCE("Add a source"), RULES("Paywall rules"), NOTIFICATIONS("Notifications & refresh"),
-    APPEARANCE("Appearance"), BACKUP("Backup & restore"), UPDATES("Updates & changelog"), ABOUT("About Editrove"),
+    APPEARANCE("Appearance"), BRIEFING("Audio briefing"), BACKUP("Backup & restore"), UPDATES("Updates & changelog"), ABOUT("About Editrove"),
 }
 
 /**
@@ -139,7 +140,15 @@ fun SettingsScreen(
 ) {
     val g = Glass
     val context = LocalContext.current
-    var page by rememberSaveable { mutableStateOf(if (startPage == "updates" && updateManager != null) Page.UPDATES else Page.HOME) }
+    var page by rememberSaveable {
+        mutableStateOf(
+            when {
+                startPage == "updates" && updateManager != null -> Page.UPDATES
+                startPage == "briefing" -> Page.BRIEFING
+                else -> Page.HOME
+            },
+        )
+    }
     val back: () -> Unit = {
         page = when (page) {
             Page.HOME -> { onClose(); Page.HOME }
@@ -195,6 +204,9 @@ fun SettingsScreen(
                         Page.APPEARANCE -> item { AppearancePage(vm, themeMode, onTheme) }
                         Page.BACKUP -> item { BackupPage(vm) }
                         Page.ABOUT -> item { AboutPage() }
+                        Page.BRIEFING -> item {
+                            BriefingSettings(vm, chip = { l, sel, on -> Chip(l, selected = sel, onClick = on) }, switch = { c, f -> GlassSwitch(c, onChange = f) })
+                        }
                         Page.UPDATES -> item {
                             val s by vm.settings.collectAsState()
                             if (updateManager != null && changelog != null) news.openwire.update.UpdatesSettings(
@@ -233,6 +245,8 @@ private fun LazyListScope.homePage(vm: SettingsViewModel, themeMode: ThemeMode, 
         val s by vm.settings.collectAsState()
         Section {
             NavRow(Icons.Outlined.Notifications, "Notifications & refresh", if (s.notificationsEnabled) "On for ${s.notifyTopics.size} topics" else "Off") { go(Page.NOTIFICATIONS) }
+            Divider()
+            NavRow(Icons.Outlined.GraphicEq, "Audio briefing", "${s.briefing.detail.label} · ${s.briefing.count} stories · ${s.briefing.speed}×") { go(Page.BRIEFING) }
             Divider()
             NavRow(Icons.Outlined.Palette, "Appearance", "${themeLabel(themeMode)} · ${s.sortMode.label} order") { go(Page.APPEARANCE) }
         }
@@ -703,7 +717,7 @@ private fun AboutPage() {
                 style = sans(13.sp, lineHeight = 20.sp), color = Glass.textPrimary,
             )
             Spacer(Modifier.height(10.dp))
-            Text("Typefaces: Newsreader, Inter and JetBrains Mono (SIL Open Font License).", style = sans(12.sp, lineHeight = 18.sp), color = Glass.textSecondary)
+            Text("Typefaces: Newsreader, Inter and JetBrains Mono (SIL Open Font License). Briefing music: royalty-free from Fesliyan Studios (fesliyanstudios.com).", style = sans(12.sp, lineHeight = 18.sp), color = Glass.textSecondary)
         }
         Section {
             Label("License")

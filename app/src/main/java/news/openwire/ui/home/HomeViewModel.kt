@@ -197,7 +197,8 @@ class HomeViewModel(
     val settingsTarget: StateFlow<String?> = _settingsTarget.asStateFlow()
 
     fun openSettings(open: Boolean = true) { _settingsTarget.value = null; _settingsOpen.value = open }
-    fun openUpdates() { _settingsTarget.value = "updates"; _settingsOpen.value = true }
+    fun openUpdates() = openSettingsAt("updates")
+    fun openSettingsAt(page: String) { _settingsTarget.value = page; _settingsOpen.value = true }
     fun showLinkDialog(show: Boolean = true) { _linkDialog.value = show }
 
     /**

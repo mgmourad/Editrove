@@ -1,0 +1,6 @@
+Editrove 0.5.0 — A briefing that sounds like the news
+• Audio briefings now play like a broadcast: a dated open, anchor hand-offs between stories, attribution and a sign-off.
+• Choose Headlines, Summaries or Full articles, and how many stories (3 to 20).
+• Pick the voice and the playback speed (your phone's own text-to-speech voices).
+• Four opening cues and a transition sting between stories. The cue starts at full volume, then sits under the narrator and fades away.
+• The tab bar now follows your swipe instantly, and the masthead sits clear of the top fade.

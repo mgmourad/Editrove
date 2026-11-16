@@ -545,6 +545,7 @@ internal fun Waveform(playing: Boolean, modifier: Modifier = Modifier) {
 
 /** Thin wrapper over Android TextToSpeech that chunks long text (engine input is capped). */
 internal class Narrator(context: Context) {
+    private val appContext = context.applicationContext
     var ready by mutableStateOf(false)
         private set
     var onDone: (() -> Unit)? = null
@@ -561,7 +562,11 @@ internal class Narrator(context: Context) {
     }
 
     fun speak(text: String) {
-        tts.language = Locale.getDefault().takeIf { tts.isLanguageAvailable(it) >= 0 } ?: Locale.US
+        val prefs = (appContext as? news.openwire.OpenWireApp)?.container?.settingsRepository?.settings?.value?.briefing
+        val voice = prefs?.voice?.let { name -> runCatching { tts.voices?.firstOrNull { it.name == name } }.getOrNull() }
+        if (voice != null) tts.voice = voice
+        else tts.language = Locale.getDefault().takeIf { tts.isLanguageAvailable(it) >= 0 } ?: Locale.US
+        tts.setSpeechRate(prefs?.speed ?: 1f)
         val max = TextToSpeech.getMaxSpeechInputLength() - 100
         val chunks = text.split(Regex("(?<=[.!?])\\s+")).fold(mutableListOf(StringBuilder())) { acc, s ->
             if (acc.last().length + s.length > max) acc.add(StringBuilder())

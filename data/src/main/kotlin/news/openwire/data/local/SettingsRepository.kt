@@ -75,6 +75,12 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         val unfoldedLayout: String = "SPLIT",
         val autoCheckUpdates: Boolean = true,
         val autoInstallUpdates: Boolean = false,
+        val briefingVoice: String? = null,
+        val briefingSpeed: Float = 1.0f,
+        val briefingCount: Int = 8,
+        val briefingDetail: String = "HEADLINES",
+        val briefingCue: Int = 1,
+        val briefingStings: Boolean = true,
     ) {
         fun toSettings() = UserSettings(
             edition = LocalEdition(city, region, country),
@@ -91,6 +97,11 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
             unfoldedLayout = news.openwire.domain.model.UnfoldedLayout.entries.firstOrNull { it.name == unfoldedLayout } ?: news.openwire.domain.model.UnfoldedLayout.SPLIT,
             autoCheckUpdates = autoCheckUpdates,
             autoInstallUpdates = autoInstallUpdates,
+            briefing = news.openwire.domain.model.BriefingPrefs(
+                voice = briefingVoice, speed = briefingSpeed.coerceIn(0.5f, 2.5f), count = briefingCount.coerceIn(1, 30),
+                detail = news.openwire.domain.model.BriefingDetail.entries.firstOrNull { it.name == briefingDetail } ?: news.openwire.domain.model.BriefingDetail.HEADLINES,
+                openingCue = briefingCue.coerceIn(0, 4), stings = briefingStings,
+            ),
         )
 
         companion object {
@@ -102,6 +113,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 s.disabledSources, s.sortMode.name, s.notificationsEnabled, s.notifyTopics, s.backgroundRefresh,
                 s.disabledServices.map { it.wireValue }.toSet(),
                 s.unfoldedLayout.name, s.autoCheckUpdates, s.autoInstallUpdates,
+                s.briefing.voice, s.briefing.speed, s.briefing.count, s.briefing.detail.name, s.briefing.openingCue, s.briefing.stings,
             )
         }
     }

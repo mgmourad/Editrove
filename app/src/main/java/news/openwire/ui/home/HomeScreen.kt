@@ -48,6 +48,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.VerticalSplit
 import androidx.compose.material.icons.outlined.ViewDay
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -58,6 +59,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
@@ -93,6 +96,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
@@ -156,9 +160,26 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
     val gridStates = remember { mutableMapOf<String, LazyGridState>() }
     val stateFor: (NavTab) -> LazyGridState = { t -> gridStates.getOrPut("$t-$topicIndex") { LazyGridState() } }
 
+    // The pager is shared by both postures. The nav highlight follows the pager directly
+    // (where the swipe is heading), so it moves with your finger instead of after the page settles.
+    val pager = androidx.compose.foundation.pager.rememberPagerState(initialPage = tab.ordinal) { NavTab.entries.size }
+    val shownTab = NavTab.entries[if (pager.isScrollInProgress) pager.targetPage else pager.currentPage]
+    LaunchedEffect(pager) {
+        androidx.compose.runtime.snapshotFlow { pager.settledPage }.collect { page ->
+            if (page != vm.tab.value.ordinal) vm.selectTab(NavTab.entries[page])
+        }
+    }
+    // Tab changes from elsewhere (notifications, shared links) move the pager too.
+    LaunchedEffect(tab) {
+        if (!pager.isScrollInProgress && pager.currentPage != tab.ordinal) pager.animateScrollToPage(tab.ordinal, animationSpec = springTween(420))
+    }
     val onSelectTab: (NavTab) -> Unit = {
         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        if (it == tab) scope.launch { stateFor(it).animateScrollToItem(0) } else vm.selectTab(it)
+        if (it == shownTab) scope.launch { stateFor(it).animateScrollToItem(0) }
+        else {
+            vm.selectTab(it)
+            scope.launch { pager.animateScrollToPage(it.ordinal, animationSpec = springTween(420)) }
+        }
     }
 
     val settingsOpen by vm.settingsOpen.collectAsState()
@@ -187,13 +208,13 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                     AmbientBackdrop()
                     Row(Modifier.fillMaxSize()) {
                         SideRail(
-                            tab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) }, onSettings = { vm.openSettings() },
+                            shownTab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) }, onSettings = { vm.openSettings() },
                             layout = userSettings.unfoldedLayout, onToggleLayout = { vm.toggleUnfoldedLayout() },
                         )
                         Box(Modifier.weight(1f).fillMaxHeight()) {
                             CompositionLocalProvider(LocalImageTransition provides ImageTransition(this@SharedTransitionLayout, null, openId)) {
                                 TabFeed(
-                                    vm = vm, tab = tab, compact = false, stateFor = stateFor,
+                                    pager = pager, vm = vm, tab = tab, compact = false, stateFor = stateFor,
                                     ui = FeedUi(savedIds, liked, null),
                                     onOpen = { vm.openArticle(it) },
                                     bottomPadding = 40.dp,
@@ -222,12 +243,12 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                 AmbientBackdrop()
                 Row(Modifier.fillMaxSize()) {
                     SideRail(
-                        tab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) }, onSettings = { vm.openSettings() },
+                        shownTab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) }, onSettings = { vm.openSettings() },
                         layout = userSettings.unfoldedLayout, onToggleLayout = { vm.toggleUnfoldedLayout() },
                     )
                     Box(Modifier.fillMaxHeight().width(feedWidth)) {
                         TabFeed(
-                            vm = vm, tab = tab, compact = false, stateFor = stateFor,
+                            pager = pager, vm = vm, tab = tab, compact = false, stateFor = stateFor,
                             ui = FeedUi(savedIds, liked, selected?.id),
                             onOpen = { vm.showInPane(it) },
                             bottomPadding = 32.dp,
@@ -251,7 +272,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
             } else {
                 val openId = if (sheetOpen) selected?.id else null
                 CompositionLocalProvider(LocalImageTransition provides ImageTransition(this@SharedTransitionLayout, null, openId)) {
-                    CompactLayout(vm, tab, stateFor, FeedUi(savedIds, liked, null), onSelectTab)
+                    CompactLayout(vm, tab, shownTab, pager, stateFor, FeedUi(savedIds, liked, null), onSelectTab)
                 }
                 ReaderSheetHost(
                     visible = sheetOpen && selected != null,
@@ -362,6 +383,8 @@ private fun categoryLabel(vm: HomeViewModel, tab: NavTab, topicIndex: Int): Stri
 private fun CompactLayout(
     vm: HomeViewModel,
     tab: NavTab,
+    shownTab: NavTab,
+    pager: androidx.compose.foundation.pager.PagerState,
     stateFor: (NavTab) -> LazyGridState,
     ui: FeedUi,
     onSelectTab: (NavTab) -> Unit,
@@ -389,7 +412,7 @@ private fun CompactLayout(
         Box(Modifier.fillMaxSize().hazeSource(haze)) {
             AmbientBackdrop()
             TabFeed(
-                vm = vm, tab = tab, compact = true, stateFor = stateFor, ui = ui,
+                pager = pager, vm = vm, tab = tab, compact = true, stateFor = stateFor, ui = ui,
                 onOpen = { vm.openArticle(it) },
                 bottomPadding = if (showPlayer) 200.dp else 128.dp,
             )
@@ -405,7 +428,7 @@ private fun CompactLayout(
             FloatingPlayerPill(player, haze, Modifier.navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 100.dp))
         }
         BottomNavPill(
-            selectedTab = tab,
+            selectedTab = shownTab,
             onSelectTab = onSelectTab,
             compact = navCompact,
             haze = haze,
@@ -417,6 +440,7 @@ private fun CompactLayout(
 /** The scrolling feed for the active tab, cross-fading between tabs. */
 @Composable
 private fun TabFeed(
+    pager: androidx.compose.foundation.pager.PagerState,
     vm: HomeViewModel,
     tab: NavTab,
     compact: Boolean,
@@ -441,18 +465,12 @@ private fun TabFeed(
 
     val padding = PaddingValues(
         start = horizontalPadding, end = horizontalPadding,
-        top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp,
+        // Clear of the top glass fade (status bar + 28dp) so the date sits in front of it.
+        top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 38.dp,
         bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + bottomPadding,
     )
 
-    // Swipe left/right between the bottom-bar pages; the pager and the nav stay in sync.
-    val pager = androidx.compose.foundation.pager.rememberPagerState(initialPage = tab.ordinal) { NavTab.entries.size }
-    LaunchedEffect(tab) { if (pager.currentPage != tab.ordinal) pager.animateScrollToPage(tab.ordinal, animationSpec = springTween(420)) }
-    LaunchedEffect(pager) {
-        androidx.compose.runtime.snapshotFlow { pager.settledPage }.collect { page ->
-            if (page != vm.tab.value.ordinal) vm.selectTab(NavTab.entries[page])
-        }
-    }
+    // Swipe left/right between the bottom-bar pages (pager hoisted so the nav can follow it).
     androidx.compose.foundation.pager.HorizontalPager(
         state = pager,
         modifier = Modifier.fillMaxSize(),
@@ -514,7 +532,7 @@ private fun TabFeed(
                                 )
                             }
                             val ordered = news.openwire.domain.engine.FeedOrdering.apply(r.articles, userSettings.sortMode)
-                            if (t == NavTab.AUDIO) fullRow("briefing-${topic.id}") { HeadlineBriefingCard(topic.label, ordered) }
+                            if (t == NavTab.AUDIO) fullRow("briefing-${topic.id}") { HeadlineBriefingCard(topic.label, ordered, userSettings.briefing, onSettings = { vm.openSettingsAt("briefing") }) }
                             feed(ordered, topic.label, ticker = t == NavTab.TODAY, title = if (t == NavTab.AUDIO) "Listen Next" else "Bento Dispatch")
                         }
                         is FeedResult.Error -> fullRow("err-${topic.id}") {
@@ -580,23 +598,40 @@ private fun SearchPill(query: String, onQuery: (String) -> Unit) {
     }
 }
 
-/** Audio tab: narrate the current edition's top headlines back-to-back (shared player keeps playing while you scroll). */
+/** Audio tab: an anchor-read briefing of the current edition (shared player keeps playing while you scroll). */
 @Composable
-private fun HeadlineBriefingCard(topicLabel: String, articles: List<Article>) {
+private fun HeadlineBriefingCard(topicLabel: String, articles: List<Article>, prefs: news.openwire.domain.model.BriefingPrefs, onSettings: () -> Unit) {
     val g = Glass
     val haptics = LocalHapticFeedback.current
     val player = LocalBriefingPlayer.current ?: return
-    val title = "$topicLabel briefing"
-    val mine = player.title == title
+    val mine = player.title == "$topicLabel briefing"
     val playing = mine && player.playing
-    val count = minOf(8, articles.size)
+    val count = minOf(prefs.count, articles.size)
     GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), contentPadding = PaddingValues(18.dp)) {
-        Text("AUDIO BRIEFING", style = mono(10.sp, FontWeight.SemiBold, 0.16.sp), color = g.accentSoft)
-        Spacer(Modifier.height(4.dp))
-        Text("$topicLabel in $count headlines", style = serif(22.sp, FontWeight.Bold, lineHeight = 26.sp), color = g.textPrimary)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("AUDIO BRIEFING", style = mono(10.sp, FontWeight.SemiBold, 0.16.sp), color = g.accentSoft, modifier = Modifier.weight(1f))
+            Row(
+                Modifier.clip(CircleShape).background(g.chipFill).clickable(onClick = onSettings).padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(androidx.compose.material.icons.Icons.Outlined.Tune, null, tint = g.textSecondary, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("${prefs.detail.label} · ${"%.2g".format(prefs.speed).trimEnd('0').trimEnd('.')}×", style = sans(11.sp, FontWeight.Medium), color = g.textSecondary)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            when (prefs.detail) {
+                news.openwire.domain.model.BriefingDetail.HEADLINES -> "$topicLabel in $count headlines"
+                news.openwire.domain.model.BriefingDetail.SUMMARIES -> "$topicLabel: $count stories, summarised"
+                news.openwire.domain.model.BriefingDetail.FULL -> "$topicLabel: $count stories in full"
+            },
+            style = serif(22.sp, FontWeight.Bold, lineHeight = 26.sp), color = g.textPrimary,
+        )
         Spacer(Modifier.height(4.dp))
         Text(
-            "Narrated on-device — nothing leaves your phone. Keep scrolling while it plays; open any story for its full narrated read.",
+            if (mine && player.progress.isNotBlank()) player.progress + " · keep scrolling while it plays"
+            else "Read by your on-device voice like a news broadcast — nothing leaves your phone.",
             style = sans(12.sp, lineHeight = 18.sp), color = g.textPrimary.copy(alpha = 0.6f),
         )
         Spacer(Modifier.height(14.dp))
@@ -605,14 +640,7 @@ private fun HeadlineBriefingCard(topicLabel: String, articles: List<Article>) {
                 Modifier.glowShadow(g.accent).clip(CircleShape).background(g.accent)
                     .clickable(enabled = player.ready) {
                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        when {
-                            mine -> player.toggle()
-                            else -> player.play(
-                                title,
-                                "Your $topicLabel briefing from Editrove. " +
-                                    articles.take(count).joinToString(" ") { a -> "${a.title}. ${a.source?.let { "From $it." } ?: ""}" },
-                            )
-                        }
+                        if (mine) player.toggle() else player.play(topicLabel, articles)
                     }
                     .padding(horizontal = 16.dp, vertical = 10.dp)
                     .animateContentSize(springTween(260)),
@@ -622,8 +650,17 @@ private fun HeadlineBriefingCard(topicLabel: String, articles: List<Article>) {
                 Spacer(Modifier.width(6.dp))
                 Text(if (playing) "Pause" else if (mine) "Resume" else "Play briefing", style = sans(12.sp, FontWeight.SemiBold), color = Color.White)
             }
-            Spacer(Modifier.width(14.dp))
+            if (mine) {
+                Spacer(Modifier.width(6.dp))
+                SkipButton(Icons.Filled.SkipPrevious, "Previous story") { player.skipPrevious() }
+                SkipButton(Icons.Filled.SkipNext, "Next story") { player.skipNext() }
+            }
+            Spacer(Modifier.width(10.dp))
             Box(Modifier.weight(1f).height(16.dp)) { Waveform(playing) }
+        }
+        if (mine && player.storyTitle != null) {
+            Spacer(Modifier.height(10.dp))
+            Text("Now: " + player.storyTitle, style = sans(12.sp, FontWeight.Medium), color = g.textPrimary.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

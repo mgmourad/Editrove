@@ -105,6 +105,7 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_PROCESS_TEXT -> vm.openLink(intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString())
             Intent.ACTION_VIEW -> intent.dataString?.let { vm.openLink(it) }
             else -> {
+                intent.getStringExtra(EXTRA_TAB)?.let { t -> news.openwire.ui.home.NavTab.entries.firstOrNull { it.name == t }?.let(vm::selectTab) }
                 intent.getStringExtra(EXTRA_TOPIC)?.let { vm.selectTopicId(it) }
                 intent.getStringExtra(EXTRA_URL)?.let { vm.openLink(it, title = intent.getStringExtra(EXTRA_TITLE)) }
             }
@@ -113,6 +114,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_TOPIC = "news.openwire.extra.TOPIC"
+        const val EXTRA_TAB = "news.openwire.extra.TAB"
         const val EXTRA_URL = "news.openwire.extra.URL"
         const val EXTRA_TITLE = "news.openwire.extra.TITLE"
     }

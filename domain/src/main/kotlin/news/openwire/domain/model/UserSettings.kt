@@ -29,6 +29,8 @@ data class UserSettings(
     val autoCheckUpdates: Boolean = true,
     /** Download and install updates without asking (where Android allows it). */
     val autoInstallUpdates: Boolean = false,
+    /** Audio briefing voice, speed, length, detail and sound design. */
+    val briefing: BriefingPrefs = BriefingPrefs(),
 )
 
 enum class UnfoldedLayout(val label: String) { SPLIT("Split view"), FULL("Full view") }

@@ -79,6 +79,11 @@ object SettingsCodec {
                 put("unfoldedLayout", settings.unfoldedLayout.name)
                 put("autoCheckUpdates", settings.autoCheckUpdates)
                 put("autoInstallUpdates", settings.autoInstallUpdates)
+                putJsonObject("briefing") {
+                    settings.briefing.voice?.let { put("voice", it) }
+                    put("speed", settings.briefing.speed); put("count", settings.briefing.count)
+                    put("detail", settings.briefing.detail.name); put("openingCue", settings.briefing.openingCue); put("stings", settings.briefing.stings)
+                }
             }
         }
         return json.encodeToString(JsonObject.serializer(), root)
@@ -170,6 +175,16 @@ object SettingsCodec {
             unfoldedLayout = prefs?.get("unfoldedLayout").str()?.let { v -> news.openwire.domain.model.UnfoldedLayout.entries.firstOrNull { it.name == v } } ?: defaults.unfoldedLayout,
             autoCheckUpdates = prefs?.get("autoCheckUpdates").bool() ?: defaults.autoCheckUpdates,
             autoInstallUpdates = prefs?.get("autoInstallUpdates").bool() ?: defaults.autoInstallUpdates,
+            briefing = prefs?.get("briefing").obj()?.let { b ->
+                news.openwire.domain.model.BriefingPrefs(
+                    voice = b["voice"].str(),
+                    speed = ((b["speed"] as? JsonPrimitive)?.contentOrNull?.toFloatOrNull() ?: 1f).coerceIn(0.5f, 2.5f),
+                    count = ((b["count"] as? JsonPrimitive)?.intOrNull ?: 8).coerceIn(1, 30),
+                    detail = news.openwire.domain.model.BriefingDetail.entries.firstOrNull { it.name == b["detail"].str() } ?: news.openwire.domain.model.BriefingDetail.HEADLINES,
+                    openingCue = ((b["openingCue"] as? JsonPrimitive)?.intOrNull ?: 1).coerceIn(0, 4),
+                    stings = b["stings"].bool() ?: true,
+                )
+            } ?: defaults.briefing,
         )
         return Imported(settings, rules, notes)
     }

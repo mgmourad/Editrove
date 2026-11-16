@@ -70,6 +70,8 @@ class ArticleTextExtractor(
         .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
         .callTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
         .build(),
+    /** Turns a news.google.com wrapper into the publisher's own URL (null if it can't). */
+    private val resolveLink: suspend (String) -> String? = { null },
 ) {
     private companion object {
         /** Site chrome that leaks into `<p>` tags (comment prompts, newsletter and cookie banners…). */
@@ -88,7 +90,9 @@ class ArticleTextExtractor(
         c != null && c.text.length >= 900 && c.paragraphs.size >= 4 &&
             PAYWALL_HINTS.none { c.text.lowercase().contains(it) }
 
-    suspend fun extract(url: String): ArticleContent? {
+    suspend fun extract(link: String): ArticleContent? {
+        // Google News wrappers carry no article: read the publisher's page instead.
+        val url = if (news.openwire.domain.engine.GoogleNewsUrls.isGoogleNewsUrl(link)) resolveLink(link) ?: return null else link
         val direct = extractFrom(url)?.copy(via = TextSource.PUBLISHER, viaUrl = url)
         if (complete(direct)) return direct
         val wayback = waybackSnapshot(url)?.let { snap -> extractFrom(snap.second)?.copy(via = TextSource.WAYBACK, viaUrl = snap.first) }

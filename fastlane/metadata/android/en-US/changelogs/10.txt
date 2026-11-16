@@ -1,0 +1,8 @@
+Editrove 0.7.0 Beta 3 — The briefing card, on your home screen
+• The Daily Brief widget is now the app's Audio Briefing card, in the app's own fonts (Newsreader, Inter, JetBrains Mono) and colours. Play / pause, previous and next story, ±15 seconds, and the speed pill. The waveform animates as smoothly as in the app.
+• Topic of Choice: pick one topic when you add the widget. It shows that topic's briefing in the same card, with a refresh button in the corner. Long-press the widget to change the topic.
+• At 4×4, both widgets list the stories in the briefing. Tap one to hear it now.
+• Playing from a widget always fetches the latest stories first.
+• Stories from Google News now open with their full text, summary and photo. Editrove follows the link to the publisher's own page.
+• Stories without a photo (or whose photo won't load) show the publisher's high-resolution logo filling the frame, instead of a tiny icon.
+• You can add RSS feeds that use http://. Editrove tries https:// first.

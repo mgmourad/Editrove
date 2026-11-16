@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- The in-app waveform animation (each bar 35%↔100% over 450 ms, staggered), run by the
+     launcher itself so it stays smooth on the home screen. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:drawable="@drawable/brief_wave_40">
+    <target android:name="b0">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="0" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b1">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="70" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b2">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="140" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b3">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="210" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b4">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="280" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b5">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="350" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b6">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="420" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b7">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="490" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b8">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="560" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b9">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="630" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b10">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="700" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b11">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="770" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b12">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="840" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b13">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="10" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b14">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="80" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b15">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="150" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b16">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="220" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b17">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="290" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b18">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="360" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b19">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="430" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b20">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="500" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b21">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="570" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b22">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="640" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b23">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="710" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b24">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="780" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b25">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="850" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b26">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="20" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b27">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="90" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b28">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="160" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b29">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="230" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b30">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="300" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b31">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="370" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b32">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="440" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b33">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="510" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b34">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="580" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b35">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="650" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b36">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="720" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b37">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="790" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b38">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="860" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+    <target android:name="b39">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="scaleY" android:valueFrom="0.35" android:valueTo="1" android:duration="450"
+                android:startOffset="30" android:repeatCount="infinite" android:repeatMode="reverse" android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </aapt:attr>
+    </target>
+</animated-vector>

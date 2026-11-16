@@ -12,7 +12,6 @@
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:updatePeriodMillis="0"
-    android:initialLayout="@layout/glance_default_loading_layout"
-    android:previewLayout="@layout/widget_preview_audio"
-    android:previewImage="@drawable/ic_brand"
+    android:initialLayout="@layout/widget_brief"
+    android:previewImage="@drawable/widget_preview_brief"
     android:description="@string/widget_audio_desc" />

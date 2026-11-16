@@ -107,13 +107,16 @@ class PublishedMetadata(
  */
 class ImageResolver(
     private val client: OkHttpClient = OkHttpClient.Builder().connectTimeout(4, TimeUnit.SECONDS).readTimeout(6, TimeUnit.SECONDS).build(),
+    /** Turns a news.google.com wrapper into the publisher's own URL (null if it can't). */
+    private val resolveLink: suspend (String) -> String? = { null },
 ) {
     private val cache = ConcurrentHashMap<String, String>()
     private val misses = ConcurrentHashMap<String, Long>()
     private val permits = Semaphore(3)
 
-    suspend fun resolve(articleUrl: String?): String? {
-        if (articleUrl.isNullOrBlank() || articleUrl.contains("news.google.com")) return null
+    suspend fun resolve(link: String?): String? {
+        if (link.isNullOrBlank()) return null
+        val articleUrl = if (link.contains("news.google.com")) resolveLink(link) ?: return null else link
         cache[articleUrl]?.let { return it }
         misses[articleUrl]?.let { if (System.currentTimeMillis() - it < 10 * 60_000L) return null }
         return permits.withPermit {
@@ -129,4 +132,50 @@ class ImageResolver(
             }
         }.also { if (it != null) cache[articleUrl] = it else misses[articleUrl] = System.currentTimeMillis() }
     }
+}
+
+/**
+ * High-resolution publisher logos (manifest / apple-touch icons from the home page) for
+ * stories without a photo. Cached per domain; misses fall back to the favicon.
+ */
+class PublisherLogoResolver(
+    private val client: OkHttpClient = OkHttpClient.Builder().connectTimeout(4, TimeUnit.SECONDS).readTimeout(6, TimeUnit.SECONDS).build(),
+) {
+    private val cache = ConcurrentHashMap<String, String>()
+    private val misses = ConcurrentHashMap<String, Long>()
+    private val permits = Semaphore(2)
+
+    suspend fun logo(domain: String?): String? {
+        val d = domain?.lowercase()?.removePrefix("www.")?.takeIf { it.contains('.') } ?: return null
+        cache[d]?.let { return it }
+        misses[d]?.let { if (System.currentTimeMillis() - it < 60 * 60_000L) return null }
+        return permits.withPermit {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val home = "https://$d/"
+                    val html = runCatching { text(home, 300_000) }.getOrNull() ?: runCatching { text("https://www.$d/", 300_000) }.getOrNull()
+                    val found = html?.let { page ->
+                        val fromPage = news.openwire.domain.engine.PublisherLogos.fromHtml(page, home)
+                        val manifest = news.openwire.domain.engine.PublisherLogos.manifestUrl(page, home)
+                        val fromManifest = manifest?.let { m -> runCatching { text(m, 100_000) }.getOrNull()?.let { news.openwire.domain.engine.PublisherLogos.fromManifest(it, m) } }.orEmpty()
+                        news.openwire.domain.engine.PublisherLogos.best(fromManifest + fromPage)
+                    }
+                    // Sites that block the home page usually still serve the standard 180px touch icon.
+                    found ?: listOf("https://www.$d/apple-touch-icon.png", "https://$d/apple-touch-icon.png").firstOrNull { isImage(it) }
+                }.getOrNull()
+            }
+        }.also { if (it != null) cache[d] = it else misses[d] = System.currentTimeMillis() }
+    }
+
+    private fun isImage(url: String): Boolean = runCatching {
+        client.newCall(Request.Builder().url(url).header("User-Agent", UA).build()).execute().use { r ->
+            r.isSuccessful && (r.body?.contentType()?.type == "image") && (r.body?.contentLength() ?: 0L) != 0L
+        }
+    }.getOrDefault(false)
+
+    private val UA = "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36"
+
+    private fun text(url: String, max: Long): String? = client.newCall(
+        Request.Builder().url(url).header("User-Agent", "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36").build(),
+    ).execute().use { r -> if (r.isSuccessful) r.body?.source()?.let { s -> s.request(max); s.buffer.readUtf8(minOf(s.buffer.size, max)) } else null }
 }

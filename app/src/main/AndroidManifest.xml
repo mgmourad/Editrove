@@ -12,6 +12,7 @@
 
     <application
         android:name=".OpenWireApp"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -46,7 +47,17 @@
         </activity>
         <receiver android:name="news.openwire.update.InstallResultReceiver" android:exported="false" />
 
-        <!-- Home-screen widgets (Jetpack Glance). -->
+        <!-- Home-screen widgets: Top Stories (Jetpack Glance); Daily Brief and Topic of Choice (RemoteViews). -->
+        <activity
+            android:name="news.openwire.widget.TopicWidgetConfigureActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.OpenWire"
+            android:label="@string/widget_topic_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
         <receiver
             android:name="news.openwire.widget.AudioBriefWidgetReceiver"
             android:exported="true"

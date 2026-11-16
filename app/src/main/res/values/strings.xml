@@ -7,5 +7,5 @@
     <string name="widget_top_label">Top Stories</string>
     <string name="widget_top_desc">Editrove\'s curated front page, with bookmarks.</string>
     <string name="widget_topic_label">Topic of Choice</string>
-    <string name="widget_topic_desc">A feed for the topic you follow. Switch topics right in the widget.</string>
+    <string name="widget_topic_desc">Pick one topic when you add it: its stories and audio briefing, with a refresh button.</string>
 </resources>

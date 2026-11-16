@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!--
+  Many publisher RSS feeds are still served over plain http://. Editrove first tries
+  https:// for every http:// feed and only falls back to http when the site has no
+  https, so cleartext is allowed for reading public feeds and pages. Nothing private
+  is ever sent: Editrove has no accounts and no server.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

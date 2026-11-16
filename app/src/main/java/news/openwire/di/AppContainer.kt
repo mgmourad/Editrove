@@ -39,8 +39,11 @@ class AppContainer(context: Context) {
     val domainRegistry = DomainRegistry(PrefsDomainRuleStore(context))
 
     val archiveChecker: ArchiveChecker by lazy { ArchiveChecker() }
-    val articleTextExtractor: ArticleTextExtractor by lazy { ArticleTextExtractor() }
-    val imageResolver: ImageResolver by lazy { ImageResolver() }
+    /** Publisher URLs behind news.google.com links (reader text, photos, briefings). */
+    val googleLinks: news.openwire.data.GoogleLinkResolver by lazy { news.openwire.data.GoogleLinkResolver(context) }
+    val articleTextExtractor: ArticleTextExtractor by lazy { ArticleTextExtractor(resolveLink = { googleLinks.resolve(it) }) }
+    val logoResolver: news.openwire.data.remote.PublisherLogoResolver by lazy { news.openwire.data.remote.PublisherLogoResolver() }
+    val imageResolver: ImageResolver by lazy { ImageResolver(resolveLink = { googleLinks.resolve(it) }) }
     val serviceHealth: ServiceHealth by lazy { ServiceHealth() }
 
     val updateManager: news.openwire.update.UpdateManager by lazy {

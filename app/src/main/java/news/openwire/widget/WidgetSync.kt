@@ -45,27 +45,21 @@ object WidgetSync {
     private suspend fun has(context: Context, widget: Class<out GlanceAppWidget>) =
         runCatching { GlanceAppWidgetManager(context).getGlanceIds(widget).isNotEmpty() }.getOrDefault(false)
 
-    /** Player state changed: redraw now (coalesced), and keep the clock moving while it plays. */
+    /** Player state changed: redraw the briefing widgets (coalesced). */
     fun audioChanged(context: Context) {
         val app = context.applicationContext
         audioPending?.cancel()
         audioPending = scope.launch {
             delay(120)
-            if (!has(app, AudioBriefWidget::class.java)) return@launch
             WidgetSignals.audioTick++
-            AudioBriefWidget().updateAll(app)
-            val player = (app as news.openwire.OpenWireApp).container.briefingPlayer
-            if (player.playing && ticker?.isActive != true) {
-                ticker = scope.launch {
-                    // Elapsed/remaining and the waveform frame advance every couple of seconds.
-                    while (isActive && player.playing) {
-                        delay(2_000)
-                        WidgetSignals.audioTick++
-                        AudioBriefWidget().updateAll(app)
-                    }
-                }
-            }
+            BriefWidgets.updateAll(app)
         }
+    }
+
+    /** Fetches a topic in the background if its cache is stale (e.g. a widget was just set to it). */
+    fun refreshTopic(context: Context, topicId: String) {
+        val app = context.applicationContext
+        scope.launch { WidgetData.refreshIfStale(app, topicId); BriefWidgets.updateAll(app) }
     }
 
     /** A topic's cached stories changed (refresh, background refresh, bookmarks). */
@@ -76,8 +70,7 @@ object WidgetSync {
             delay(delayMs)
             WidgetSignals.feedVersion++
             if (has(app, TopStoriesWidget::class.java)) TopStoriesWidget().updateAll(app)
-            if (has(app, TopicWidget::class.java)) TopicWidget().updateAll(app)
-            if (has(app, AudioBriefWidget::class.java)) AudioBriefWidget().updateAll(app)
+            BriefWidgets.updateAll(app)
         }
     }
 }

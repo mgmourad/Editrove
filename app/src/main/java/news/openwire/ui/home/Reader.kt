@@ -332,7 +332,7 @@ internal fun ArticleBody(
                     .sharedArticleImage(article.id, hasImage = true, cornerRadius = 24.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
-            ) { AsyncImage(img, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+            ) { ArticleImage(article.copy(imageUrl = img), Modifier.fillMaxSize(), logoSize = 72.dp) }
             Text(
                 "PHOTOGRAPHY // ${article.publication()}",
                 style = mono(10.sp, tracking = 0.05.em),

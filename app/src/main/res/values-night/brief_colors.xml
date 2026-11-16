@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Widget colours: the app's Black Glass tokens (ui/theme/Theme.kt). -->
+<resources>
+    <color name="brief_accent">#FB3768</color>
+    <color name="brief_accent_soft">#FB7185</color>
+    <color name="brief_text">#F8FAFC</color>
+    <color name="brief_text_60">#99F8FAFC</color>
+    <color name="brief_text_80">#CCF8FAFC</color>
+    <color name="brief_text_secondary">#94A3B8</color>
+    <color name="brief_text_muted">#64748B</color>
+    <color name="brief_chip">#1AFFFFFF</color>
+    <color name="brief_wave">#D9FB3768</color>
+</resources>

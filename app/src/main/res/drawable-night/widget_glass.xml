@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Black Glass: translucent obsidian with a 1dp top/left specular rim and amber/cyan ambient glow. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="28dp" />
+            <gradient android:angle="315" android:startColor="#38FFFFFF" android:centerColor="#14FFFFFF" android:endColor="#0AFFFFFF" />
+        </shape>
+    </item>
+    <item android:left="1dp" android:top="1dp" android:right="0.5dp" android:bottom="0.5dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="27dp" />
+            <solid android:color="#C712141D" />
+        </shape>
+    </item>
+    <item android:gravity="top|end" android:width="190dp" android:height="190dp" android:top="-70dp" android:right="-70dp">
+        <shape android:shape="oval">
+            <gradient android:type="radial" android:gradientRadius="95dp" android:startColor="#29F59E0B" android:endColor="#00F59E0B" />
+        </shape>
+    </item>
+    <item android:gravity="bottom|start" android:width="190dp" android:height="190dp" android:bottom="-70dp" android:left="-70dp">
+        <shape android:shape="oval">
+            <gradient android:type="radial" android:gradientRadius="95dp" android:startColor="#2938BDF8" android:endColor="#0038BDF8" />
+        </shape>
+    </item>
+</layer-list>

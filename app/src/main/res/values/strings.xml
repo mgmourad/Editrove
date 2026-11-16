@@ -2,4 +2,10 @@
 <resources>
     <string name="app_name">Editrove</string>
     <string name="share_label">Open in Editrove</string>
+    <string name="widget_audio_label">Daily Brief</string>
+    <string name="widget_audio_desc">The Editrove Daily Brief: play, skip and jump between stories of your audio briefing.</string>
+    <string name="widget_top_label">Top Stories</string>
+    <string name="widget_top_desc">Editrove\'s curated front page, with bookmarks.</string>
+    <string name="widget_topic_label">Topic of Choice</string>
+    <string name="widget_topic_desc">A feed for the topic you follow. Switch topics right in the widget.</string>
 </resources>

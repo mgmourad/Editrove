@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Editorial Paper: warm alabaster frosted glass with a crisp white specular rim. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="28dp" />
+            <gradient android:angle="315" android:startColor="#FFFFFFFF" android:centerColor="#26FFFFFF" android:endColor="#170F172A" />
+        </shape>
+    </item>
+    <item android:left="1dp" android:top="1dp" android:right="0.5dp" android:bottom="0.5dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="27dp" />
+            <solid android:color="#D9FBFAF7" />
+        </shape>
+    </item>
+    <item android:gravity="top|end" android:width="190dp" android:height="190dp" android:top="-70dp" android:right="-70dp">
+        <shape android:shape="oval">
+            <gradient android:type="radial" android:gradientRadius="95dp" android:startColor="#22D97706" android:endColor="#00D97706" />
+        </shape>
+    </item>
+    <item android:gravity="bottom|start" android:width="190dp" android:height="190dp" android:bottom="-70dp" android:left="-70dp">
+        <shape android:shape="oval">
+            <gradient android:type="radial" android:gradientRadius="95dp" android:startColor="#1C0284C7" android:endColor="#000284C7" />
+        </shape>
+    </item>
+</layer-list>

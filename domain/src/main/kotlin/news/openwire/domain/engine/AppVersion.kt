@@ -1,23 +1,41 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.domain.engine
 
-/** Semantic-ish version ("v0.4.0", "0.4", "1.2.3-beta") comparable numerically. */
-data class AppVersion(val parts: List<Int>) : Comparable<AppVersion> {
+/**
+ * Semantic version ("v0.4.0", "0.4", "0.7.0-beta.1"), ordered like SemVer: numbers first,
+ * then a pre-release sorts *before* its release (0.7.0-beta.1 < 0.7.0-beta.2 < 0.7.0).
+ */
+data class AppVersion(val parts: List<Int>, val pre: List<String> = emptyList()) : Comparable<AppVersion> {
     override fun compareTo(other: AppVersion): Int {
         for (i in 0 until maxOf(parts.size, other.parts.size)) {
             val c = (parts.getOrNull(i) ?: 0).compareTo(other.parts.getOrNull(i) ?: 0)
             if (c != 0) return c
         }
-        return 0
+        if (pre.isEmpty() || other.pre.isEmpty()) return other.pre.size.coerceAtMost(1) - pre.size.coerceAtMost(1)
+        for (i in 0 until minOf(pre.size, other.pre.size)) {
+            val a = pre[i]; val b = other.pre[i]
+            val an = a.toIntOrNull(); val bn = b.toIntOrNull()
+            val c = when {
+                an != null && bn != null -> an.compareTo(bn)
+                an != null -> -1 // numeric identifiers sort before alphanumeric ones
+                bn != null -> 1
+                else -> a.compareTo(b)
+            }
+            if (c != 0) return c
+        }
+        return pre.size.compareTo(other.pre.size)
     }
 
-    override fun toString() = parts.joinToString(".")
+    val isPrerelease: Boolean get() = pre.isNotEmpty()
+
+    override fun toString() = parts.joinToString(".") + if (pre.isEmpty()) "" else "-" + pre.joinToString(".")
 
     companion object {
         fun parse(raw: String?): AppVersion? {
-            val core = raw?.trim()?.removePrefix("v")?.removePrefix("V")?.substringBefore('-')?.substringBefore('+') ?: return null
-            val nums = core.split('.').map { it.toIntOrNull() ?: return null }
-            return if (nums.isEmpty()) null else AppVersion(nums)
+            val clean = raw?.trim()?.removePrefix("v")?.removePrefix("V")?.substringBefore('+') ?: return null
+            val nums = clean.substringBefore('-').split('.').map { it.toIntOrNull() ?: return null }
+            val pre = clean.substringAfter('-', "").split('.').filter { it.isNotEmpty() }
+            return if (nums.isEmpty()) null else AppVersion(nums, pre)
         }
     }
 }

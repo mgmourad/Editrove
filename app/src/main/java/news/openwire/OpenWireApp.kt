@@ -29,6 +29,10 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // Home-screen widgets follow the briefing player and saved stories.
+        appScope.launch(Dispatchers.Main) {
+            container.libraryStore.saved.collect { news.openwire.widget.WidgetSync.feedsChanged(this@OpenWireApp, delayMs = 300) }
+        }
         // Keep the periodic refresh in step with the user's preferences.
         appScope.launch {
             container.settingsRepository.settings

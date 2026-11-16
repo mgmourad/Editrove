@@ -70,6 +70,8 @@ class ArticleTextExtractor(
         .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
         .callTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
         .build(),
+    /** Turns a news.google.com wrapper into the publisher's own URL (null if it can't). */
+    private val resolveLink: suspend (String) -> String? = { null },
 ) {
     private companion object {
         /** Site chrome that leaks into `<p>` tags (comment prompts, newsletter and cookie banners…). */
@@ -77,6 +79,9 @@ class ArticleTextExtractor(
             "commenting policy", "sign up for", "newsletter", "subscribe to", "all rights reserved",
             "cookie", "click here", "advertisement", "follow us on", "download our app",
             "javascript", "your browser", "copyright ©", "terms of use", "privacy policy",
+            // "About us" blurbs from site footers and sidebars.
+            "is provided by", "launched in 20", "launched in 19", "media company", "sign-in, which works",
+            "download the app", "watch live", "all rights", "is a leading", "our journalists", "send us a tip",
         )
         val PAYWALL_HINTS = listOf(
             "subscribe to continue", "to continue reading", "already a subscriber", "subscribers only",
@@ -88,7 +93,9 @@ class ArticleTextExtractor(
         c != null && c.text.length >= 900 && c.paragraphs.size >= 4 &&
             PAYWALL_HINTS.none { c.text.lowercase().contains(it) }
 
-    suspend fun extract(url: String): ArticleContent? {
+    suspend fun extract(link: String): ArticleContent? {
+        // Google News wrappers carry no article: read the publisher's page instead.
+        val url = if (news.openwire.domain.engine.GoogleNewsUrls.isGoogleNewsUrl(link)) resolveLink(link) ?: return null else link
         val direct = extractFrom(url)?.copy(via = TextSource.PUBLISHER, viaUrl = url)
         if (complete(direct)) return direct
         val wayback = waybackSnapshot(url)?.let { snap -> extractFrom(snap.second)?.copy(via = TextSource.WAYBACK, viaUrl = snap.first) }
@@ -129,11 +136,7 @@ class ArticleTextExtractor(
             val html = get(url) ?: return@withContext null
             val doc = Jsoup.parse(html)
             val title = doc.selectFirst("h1")?.text().orEmpty().ifEmpty { doc.title() }
-            val paragraphs = doc.select("article p, main p, .article-body p, p")
-                .map { it.text().trim() }
-                .filter { it.length > 40 && !isBoilerplate(it) }
-                .distinct()
-                .take(30)
+            val paragraphs = articleParagraphs(doc)
             val text = paragraphs.joinToString("\n\n")
             if (text.isBlank()) return@withContext null
             val imageUrl = doc.meta("og:image") ?: doc.selectFirst("article img")?.attr("src")
@@ -149,6 +152,34 @@ class ArticleTextExtractor(
         } catch (e: Exception) {
             null
         }
+    }
+
+    /**
+     * The story's own paragraphs, the way a reading mode finds them: page chrome
+     * (navigation, headers, footers, sidebars, related links, share bars) is dropped,
+     * then the container holding the most paragraph text is taken as the article.
+     */
+    internal fun articleParagraphs(doc: Document): List<String> {
+        doc.select(CHROME).remove()
+        val candidates = doc.select("article, [itemprop=articleBody], main, section, div")
+        val best = candidates.maxByOrNull { el ->
+            el.children().filter { it.tagName() == "p" }.sumOf { p -> p.text().length.takeIf { it > 40 } ?: 0 }
+        }?.takeIf { el -> el.children().count { it.tagName() == "p" } >= 2 }
+        val source = best?.select("p")?.takeIf { it.size >= 2 } ?: doc.select("p")
+        val siteName = doc.meta("og:site_name")
+        return source.map { it.text().trim() }
+            .map { stripBanner(it, siteName) }
+            .filter { it.length > 40 && !isBoilerplate(it) }
+            .distinct()
+            .take(30)
+    }
+
+    /** "DC News Now | DC, Virginia… Live WASHINGTON (DC News Now) — Service…" → from the dateline on. */
+    private fun stripBanner(p: String, siteName: String?): String {
+        val head = p.take(220)
+        if (!head.contains(" | ") && (siteName == null || !head.startsWith(siteName))) return p
+        val m = DATELINE.find(p) ?: return p
+        return if (m.range.first in 1..220) p.substring(m.range.first) else p
     }
 
     private fun Document.meta(key: String): String? =
@@ -171,3 +202,8 @@ class ArticleTextExtractor(
 private val RX_1 = Regex("\\s+")
 private val RX_2 = Regex("\"closest\"\\s*:\\s*\\{[^}]*\"url\"\\s*:\\s*\"([^\"]+)\"")
 private val RX_3 = Regex("/web/(\\d+)/")
+private const val CHROME = "nav, header, footer, aside, form, script, style, noscript, figcaption, [role=navigation], [role=banner], " +
+    "[role=contentinfo], [class*=related], [class*=newsletter], [class*=promo], [class*=share], [class*=social], " +
+    "[class*=footer], [id*=footer], [class*=sidebar], [class*=breadcrumb], [class*=cookie], [class*=subscribe], [aria-hidden=true]"
+/** A wire-style dateline: "WASHINGTON (DC News Now) —" or "LONDON (Reuters) -". */
+private val DATELINE = Regex("\\b[A-Z][A-Z .,'’-]{2,40}\\s*\\([^)]{2,40}\\)\\s*[—–-]")

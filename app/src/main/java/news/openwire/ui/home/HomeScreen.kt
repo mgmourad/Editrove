@@ -194,7 +194,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
     val briefing = rememberBriefingPlayer()
     val userSettings by vm.settings.collectAsState()
 
-    CompositionLocalProvider(LocalImageResolver provides app.container.imageResolver, LocalBriefingPlayer provides briefing) {
+    CompositionLocalProvider(LocalImageResolver provides app.container.imageResolver, LocalLogoResolver provides app.container.logoResolver, LocalBriefingPlayer provides briefing) {
     SharedTransitionLayout {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= ExpandedBreakpoint

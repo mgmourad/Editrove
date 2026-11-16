@@ -73,9 +73,17 @@ object WidgetData {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
 
-    /** Lead photo, scaled down for RemoteViews (whose bitmap budget is small). */
+    /**
+     * Lead photo, scaled down for RemoteViews (whose bitmap budget is small). With no photo
+     * (or one that won't load), the publisher's high-res logo fills the frame instead.
+     */
     suspend fun photo(context: Context, a: Article, px: Int): Bitmap? {
-        val url = a.imageUrl ?: withTimeoutOrNull(5_000) { container(context).imageResolver.resolve(a.originalUrl) } ?: return null
+        val url = a.imageUrl ?: withTimeoutOrNull(5_000) { container(context).imageResolver.resolve(a.originalUrl) }
+        url?.let { load(context, it, px) }?.let { return it }
+        return logoCanvas(context, a.domain, px)
+    }
+
+    private suspend fun load(context: Context, url: String, px: Int): Bitmap? {
         val key = "$url@$px"
         bitmaps.get(key)?.let { return it }
         return withTimeoutOrNull(8_000) {
@@ -85,6 +93,33 @@ object WidgetData {
             val scale = px.toFloat() / maxOf(b.width, b.height)
             (if (scale < 1f) Bitmap.createScaledBitmap(b, (b.width * scale).toInt().coerceAtLeast(1), (b.height * scale).toInt().coerceAtLeast(1), true) else b)
         }?.also { bitmaps.put(key, it) }
+    }
+
+    /**
+     * The app's no-photo canvas, pre-rendered (widgets can't blur): the logo shrunk to a
+     * few pixels and stretched back up as a soft wash of its own colours, a light shade,
+     * and the crisp logo centred on top.
+     */
+    private suspend fun logoCanvas(context: Context, domain: String?, px: Int): Bitmap? {
+        val d = domain?.takeIf { it.isNotBlank() } ?: return null
+        val key = "logo:$d@$px"
+        bitmaps.get(key)?.let { return it }
+        val logoUrl = withTimeoutOrNull(10_000) { container(context).logoResolver.logo(d) }
+        val logo = (logoUrl?.let { load(context, it, 256) }) ?: load(context, "https://www.google.com/s2/favicons?domain=$d&sz=256", 256) ?: return null
+        val w = px; val h = (px * 0.62f).toInt()
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(out)
+        val tiny = Bitmap.createScaledBitmap(logo, 6, 6, true)
+        c.drawBitmap(Bitmap.createScaledBitmap(tiny, w, h, true), 0f, 0f, Paint(Paint.FILTER_BITMAP_FLAG))
+        c.drawColor(0x59000000)
+        val side = (h * 0.46f)
+        val left = (w - side) / 2f; val top = (h - side) / 2f
+        val rect = RectF(left, top, left + side, top + side)
+        val clip = android.graphics.Path().apply { addRoundRect(rect, side * 0.22f, side * 0.22f, android.graphics.Path.Direction.CW) }
+        c.save(); c.clipPath(clip)
+        c.drawBitmap(logo, null, rect, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
+        c.restore()
+        return out.also { bitmaps.put(key, it) }
     }
 
     fun findArticle(context: Context, id: String, candidates: List<Article>): Article? =

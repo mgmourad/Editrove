@@ -47,6 +47,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -716,19 +717,57 @@ fun ArticleImage(article: Article, modifier: Modifier, logoSize: Dp, grayscale: 
         value = if (article.imageUrl == null && resolver != null) resolver.resolve(article.originalUrl) else null
     }
     val url = article.imageUrl ?: found
-    if (url != null) {
+    // A photo that won't load (blocked or gone) gets the publisher canvas, not a blank frame.
+    var broken by remember(url) { mutableStateOf(false) }
+    if (url != null && !broken) {
         AsyncImage(
             model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier,
             colorFilter = if (grayscale) GrayscaleFilter else null,
+            onError = { broken = true },
         )
     } else {
-        Box(
-            modifier = modifier.background(
-                Brush.linearGradient(listOf(g.indigo.copy(alpha = 0.35f), g.accent.copy(alpha = 0.25f))),
-            ),
-            contentAlignment = Alignment.Center,
-        ) {
+        PublisherCanvas(article, modifier, logoSize, grayscale)
+    }
+}
+
+/** High-res publisher logos for stories without a photo. */
+val LocalLogoResolver = androidx.compose.runtime.staticCompositionLocalOf<news.openwire.data.remote.PublisherLogoResolver?> { null }
+
+/**
+ * No photo: the publisher's high-resolution logo fills the canvas — a blurred, enlarged
+ * copy as a brand-coloured backdrop with the crisp logo on top. Falls back to the favicon.
+ */
+@Composable
+private fun PublisherCanvas(article: Article, modifier: Modifier, logoSize: Dp, grayscale: Boolean) {
+    val g = Glass
+    val logos = LocalLogoResolver.current
+    // The publisher's own high-res icon, else the largest favicon (256px) — both fill the canvas.
+    val logo by androidx.compose.runtime.produceState<String?>(null, article.domain) {
+        value = logos?.logo(article.domain) ?: faviconUrl(article.domain, 256)
+    }
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        modifier = modifier.background(Brush.linearGradient(listOf(g.indigo.copy(alpha = 0.35f), g.accent.copy(alpha = 0.25f)))),
+        contentAlignment = Alignment.Center,
+    ) {
+        // If the publisher's icon won't load (some sites refuse image requests), use the favicon.
+        val fallback = faviconUrl(article.domain, 256)
+        var src by remember(logo) { mutableStateOf(logo) }
+        val l = src
+        if (l == null) {
             SourceLogo(article.domain, article.source, size = logoSize)
+        } else {
+            val filter = if (grayscale) GrayscaleFilter else null
+            val onError: (coil.compose.AsyncImagePainter.State.Error) -> Unit = { if (src != fallback) src = fallback else src = null }
+            AsyncImage(
+                model = l, contentDescription = null, contentScale = ContentScale.Crop, colorFilter = filter, onError = onError,
+                modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = 1.6f; scaleY = 1.6f; alpha = 0.75f }.then(androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded.let { Modifier.blur(42.dp, it) }),
+            )
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.10f), Color.Black.copy(alpha = 0.35f)))))
+            val side = (minOf(maxWidth, maxHeight) * 0.46f).coerceIn(48.dp, 200.dp)
+            AsyncImage(
+                model = l, contentDescription = article.source, contentScale = ContentScale.Fit, colorFilter = filter, onError = onError,
+                modifier = Modifier.size(side).clip(RoundedCornerShape(side * 0.22f)),
+            )
         }
     }
 }

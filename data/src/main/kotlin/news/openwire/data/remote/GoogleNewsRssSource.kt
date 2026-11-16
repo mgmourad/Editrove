@@ -26,7 +26,19 @@ class GoogleNewsRssSource(
 
     suspend fun fetch(url: String): List<RssItem> = fetchFeed(url).items
 
-    suspend fun fetchFeed(url: String): ParsedFeed = withContext(Dispatchers.IO) {
+    /**
+     * Fetches a feed. Plain http:// feeds are tried over https:// first (most hosts serve
+     * both); only if that fails is the original http URL used.
+     */
+    suspend fun fetchFeed(url: String): ParsedFeed {
+        val u = url.trim()
+        if (u.startsWith("http://", ignoreCase = true)) {
+            runCatching { return fetchOnce("https://" + u.substring(7)) }
+        }
+        return fetchOnce(u)
+    }
+
+    private suspend fun fetchOnce(url: String): ParsedFeed = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(url)
             .header("User-Agent", "Mozilla/5.0 (Linux; Android 15) Editrove/0.3 (+https://github.com/mgmourad/Editrove)")

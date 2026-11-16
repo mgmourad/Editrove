@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Daily Brief / Topic widget, 2x2 compact.
+     Text is drawn by the app in its own fonts (launchers can't load app fonts) as glyph
+     masks, tinted here so light and dark themes follow the system. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/brief_root"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="@drawable/widget_glass" android:padding="14dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                <ImageView android:id="@+id/brief_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:scaleType="center" android:tint="@color/brief_accent_soft" />
+            </FrameLayout>
+            <ProgressBar android:id="@+id/brief_refreshing" android:layout_width="18dp" android:layout_height="18dp" android:layout_marginEnd="8dp"
+                android:indeterminate="true" android:indeterminateTint="@color/brief_text_secondary" android:visibility="gone" />
+            <ImageView android:id="@+id/brief_refresh" android:layout_width="30dp" android:layout_height="30dp" android:layout_marginEnd="6dp"
+                android:background="@drawable/brief_round_chip" android:padding="6dp" android:src="@drawable/bic_refresh"
+                android:contentDescription="Refresh" android:visibility="gone" />
+            <LinearLayout android:id="@+id/brief_speed" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:background="@drawable/brief_pill_chip" android:gravity="center_vertical" android:orientation="horizontal"
+                android:paddingStart="10dp" android:paddingTop="5dp" android:paddingEnd="10dp" android:paddingBottom="5dp">
+                <ImageView android:layout_width="14dp" android:layout_height="14dp" android:src="@drawable/bic_tune" android:importantForAccessibility="no" />
+                <ImageView android:id="@+id/brief_speed_text" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="4dp"
+                    android:scaleType="center" android:tint="@color/brief_text_secondary" />
+            </LinearLayout>
+        </LinearLayout>
+        <ImageView android:id="@+id/brief_title" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp"
+            android:scaleType="center" android:tint="@color/brief_text" />
+        <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
+        <ImageView android:id="@+id/brief_sub" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:scaleType="center" android:tint="@color/brief_text_60" android:visibility="gone" />
+        <FrameLayout android:layout_width="match_parent" android:layout_height="16dp" android:layout_marginTop="0dp">
+            <ProgressBar android:id="@+id/brief_wave_live" android:layout_width="match_parent" android:layout_height="16dp"
+                android:minHeight="16dp" android:maxHeight="16dp" android:indeterminate="true" android:indeterminateOnly="true"
+                android:indeterminateDrawable="@drawable/brief_wave_live_28" android:visibility="gone" />
+            <ImageView android:id="@+id/brief_wave_rest" android:layout_width="match_parent" android:layout_height="16dp"
+                android:scaleType="fitXY" android:src="@drawable/brief_wave_28" android:visibility="gone" android:importantForAccessibility="no" />
+            <ImageView android:id="@+id/brief_wave_idle" android:layout_width="match_parent" android:layout_height="16dp"
+                android:scaleType="fitXY" android:src="@drawable/brief_wave_28" android:importantForAccessibility="no" />
+        </FrameLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center_vertical" android:orientation="horizontal">
+            <FrameLayout android:id="@+id/brief_play" android:layout_width="42dp" android:layout_height="42dp" android:background="@drawable/brief_pill_accent">
+                <ImageView android:id="@+id/brief_play_icon" android:layout_width="22dp" android:layout_height="22dp" android:layout_gravity="center" android:src="@drawable/bic_play_white" android:contentDescription="Play briefing" />
+            </FrameLayout>
+            <FrameLayout android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+            <ImageView android:id="@+id/brief_prev" android:layout_width="40dp" android:layout_height="40dp"
+                android:background="@drawable/brief_round_chip" android:padding="10dp" android:src="@drawable/bic_skip_prev" android:contentDescription="Previous story" android:visibility="gone" />
+            <FrameLayout android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+            <ImageView android:id="@+id/brief_next" android:layout_width="40dp" android:layout_height="40dp"
+                android:background="@drawable/brief_round_chip" android:padding="10dp" android:src="@drawable/bic_skip_next" android:contentDescription="Next story" android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

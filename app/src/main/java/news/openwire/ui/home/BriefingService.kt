@@ -24,6 +24,8 @@ import android.os.PowerManager
 import news.openwire.MainActivity
 import news.openwire.OpenWireApp
 import news.openwire.R
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Keeps the audio briefing playing in the background and on the lock screen.
@@ -39,6 +41,9 @@ class BriefingService : Service() {
     private lateinit var session: MediaSession
     private var wake: PowerManager.WakeLock? = null
     private var foreground = false
+    /** A widget asked for a briefing that is still being fetched. */
+    private var preparing = false
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
     private val art: Bitmap? by lazy { BitmapFactory.decodeResource(resources, R.drawable.briefing_art) }
 
     private val noisy = object : BroadcastReceiver() {
@@ -68,22 +73,71 @@ class BriefingService : Service() {
         }
         player.onChange = { update() }
         registerReceiver(noisy, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), RECEIVER_NOT_EXPORTED)
-        update()
+        // Every start is a startForegroundService(): go foreground first, then decide.
+        goForeground()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Widget buttons start this as a foreground service: go foreground straight away.
+        goForeground()
         when (intent?.action) {
             ACTION_TOGGLE -> player.toggle()
             ACTION_NEXT -> player.skipNext()
             ACTION_PREV -> player.skipPrevious()
             ACTION_STOP -> player.stop()
+            ACTION_SEEK -> player.seekBy(intent.getFloatExtra(EXTRA_SECONDS, 0f))
+            ACTION_PLAY_TOPIC -> playTopic(intent, index = -1)
+            ACTION_PLAY_AT -> playTopic(intent, index = intent.getIntExtra(EXTRA_INDEX, 0))
         }
         update()
         return START_NOT_STICKY
     }
 
+    /**
+     * Play / pause a topic's briefing from a widget. A new briefing always starts from the
+     * latest stories: the topic is refetched first if its cache is more than a few minutes old.
+     */
+    private fun playTopic(intent: Intent, index: Int) {
+        val topicId = intent.getStringExtra(EXTRA_TOPIC) ?: "TOP"
+        val label = intent.getStringExtra(EXTRA_LABEL) ?: "Top Stories"
+        val p = player
+        if (p.active && p.topicLabel == label) {
+            if (index >= 0) p.jumpToStory(index) else p.toggle()
+            return
+        }
+        preparing = true
+        scope.launch {
+            news.openwire.widget.WidgetData.refreshIfStale(this@BriefingService, topicId)
+            val stories = news.openwire.widget.WidgetData.articles(this@BriefingService, topicId)
+            preparing = false
+            if (stories.isNotEmpty()) {
+                p.play(label, stories)
+                if (index >= 0) p.jumpToStory(index)
+            }
+            update()
+        }
+    }
+
+    private fun goForeground() {
+        val n = if (player.active) notification(player) else preparingNotification()
+        runCatching {
+            if (Build.VERSION.SDK_INT >= 29) startForeground(ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK) else startForeground(ID, n)
+            foreground = true
+        }
+    }
+
+    private fun preparingNotification(): Notification = Notification.Builder(this, CHANNEL)
+        .setSmallIcon(news.openwire.notifications.R.drawable.ic_stat_openwire)
+        .setLargeIcon(art)
+        .setContentTitle("Getting the latest stories…")
+        .setContentText("Editrove audio briefing")
+        .setContentIntent(openApp())
+        .setOngoing(true)
+        .build()
+
     private fun update() {
         val p = player
+        if (!p.active && preparing) return
         if (!p.active) {
             releaseWake()
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -171,6 +225,7 @@ class BriefingService : Service() {
     }
 
     override fun onDestroy() {
+        scope.cancel()
         running = false
         player.onChange = null
         runCatching { unregisterReceiver(noisy) }
@@ -185,9 +240,16 @@ class BriefingService : Service() {
         private const val CHANNEL = "briefing"
         private const val ID = 4201
         private const val ACTION_TOGGLE = "news.editrove.briefing.TOGGLE"
-        private const val ACTION_NEXT = "news.editrove.briefing.NEXT"
-        private const val ACTION_PREV = "news.editrove.briefing.PREV"
+        const val ACTION_NEXT = "news.editrove.briefing.NEXT"
+        const val ACTION_PREV = "news.editrove.briefing.PREV"
         private const val ACTION_STOP = "news.editrove.briefing.STOP"
+        const val ACTION_SEEK = "news.editrove.briefing.SEEK"
+        const val ACTION_PLAY_TOPIC = "news.editrove.briefing.PLAY_TOPIC"
+        const val ACTION_PLAY_AT = "news.editrove.briefing.PLAY_AT"
+        const val EXTRA_TOPIC = "topic"
+        const val EXTRA_LABEL = "label"
+        const val EXTRA_SECONDS = "seconds"
+        const val EXTRA_INDEX = "index"
 
         @Volatile private var running = false
 

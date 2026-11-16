@@ -260,6 +260,12 @@ internal fun ArticleBody(
         Text(article.title.ifBlank { content?.title?.takeIf { it.isNotBlank() } ?: article.source ?: article.domain ?: "Article" }, style = serif(28.sp, FontWeight.Bold, lineHeight = 32.sp, tracking = (-0.01).em), color = g.textPrimary)
         Spacer(Modifier.height(12.dp))
 
+        // Story grouping: who else is running this story
+        article.coverageLine(4)?.let {
+            Text(it, style = sans(12.sp, FontWeight.Medium), color = g.accentSoft)
+            Spacer(Modifier.height(12.dp))
+        }
+
         // Deck / standfirst — the publisher's own description, when we have it
         content?.description?.let {
             Text(it, style = sans(15.sp, lineHeight = 24.sp), color = g.textPrimary.copy(alpha = 0.75f))

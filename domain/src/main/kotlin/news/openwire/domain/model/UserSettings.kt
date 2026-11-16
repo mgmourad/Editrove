@@ -29,6 +29,8 @@ data class UserSettings(
     val autoCheckUpdates: Boolean = true,
     /** Download and install updates without asking (where Android allows it). */
     val autoInstallUpdates: Boolean = false,
+    /** Nudge Curated order toward outlets the reader saves and likes (computed on-device). */
+    val personalize: Boolean = true,
     /** Audio briefing voice, speed, length, detail and sound design. */
     val briefing: BriefingPrefs = BriefingPrefs(),
 )

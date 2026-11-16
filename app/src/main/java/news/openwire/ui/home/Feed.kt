@@ -102,6 +102,14 @@ fun serif(size: TextUnit, weight: FontWeight = FontWeight.Bold, lineHeight: Text
 
 fun Article.publication(): String = (source ?: domain ?: "").uppercase()
 
+/** "Also covered by NYT, BBC +3", or null when only one outlet has the story. */
+fun Article.coverageLine(names: Int = 2): String? {
+    if (alsoCoveredBy.isEmpty()) return null
+    val shown = alsoCoveredBy.take(names).joinToString(", ")
+    val more = alsoCoveredBy.size - names
+    return "Also covered by $shown" + if (more > 0) " +$more" else ""
+}
+
 /** Paywall badge from the routing engine, shown where the mock shows read time. */
 fun Article.badgeLabel(): String? = badge?.takeIf { it.isNotBlank() } ?: status?.replaceFirstChar { it.uppercase() }
 
@@ -522,6 +530,10 @@ fun HeroCard(
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
                 )
+                article.coverageLine()?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(it, style = sans(11.sp, FontWeight.Medium), color = Color.White.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }
@@ -573,6 +585,10 @@ fun LeadStoryCard(
                 article.summary?.takeIf { it.isNotBlank() }?.let {
                     Spacer(Modifier.height(10.dp))
                     Text(it, style = sans(14.sp, lineHeight = 21.sp), color = g.textSecondary, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                }
+                article.coverageLine(3)?.let {
+                    Spacer(Modifier.height(10.dp))
+                    Text(it, style = sans(12.sp, FontWeight.Medium), color = g.accentSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.CenterVertically) {

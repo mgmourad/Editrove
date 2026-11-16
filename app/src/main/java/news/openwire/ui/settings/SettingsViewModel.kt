@@ -214,6 +214,7 @@ class SettingsViewModel(
         settingsRepo.update { it.copy(briefing = transform(it.briefing)) }
     fun setAutoCheckUpdates(on: Boolean) = settingsRepo.update { it.copy(autoCheckUpdates = on) }
     fun setAutoInstallUpdates(on: Boolean) = settingsRepo.update { it.copy(autoInstallUpdates = on) }
+    fun setPersonalize(on: Boolean) = settingsRepo.update { it.copy(personalize = on) }
     fun setBackgroundRefresh(on: Boolean) = settingsRepo.update { it.copy(backgroundRefresh = on) }
 
     // ---- Backup ----

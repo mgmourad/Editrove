@@ -124,6 +124,7 @@ and notifications all live on your device. Updates arrive straight from GitHub R
 | **Paywall engine** | Per-publisher strategies with an editable rules list; archive checks with grey-out; a reader-service health check and fallback chain |
 | **Reading** | In-app reader with on-device summary, narration, pull quotes and drop caps; text from the publisher, then Wayback, then archive.today |
 | **Open anything** | Share a link from any app, select a URL and pick *Open in Editrove*, or paste one. It's routed and opened in the reader |
+| **Smart curation** | An on-device editorial ranker: where editors placed a story, how many outlets cover it, freshness, source authority and section fit (hard news leads the front page), then de-duplicated and diversified. "Also covered by" shows who else is running a story, and an optional, local-only tuning favours outlets you save and like. Applies to every topic, Discover and the audio briefing |
 | **Stay current** | Pull to refresh; curated, newest or oldest order; background refresh; opt-in local notifications per topic |
 | **Updates** | Checks GitHub Releases on launch, shows an in-app banner, optional automatic install, a "What's new" note and a full changelog in Settings |
 | **Portability** | Export and import every setting as one JSON file, including backups from the original OpenWire web app |
@@ -143,7 +144,7 @@ check manually or turn on automatic installs.
 
 ```bash
 ./gradlew assembleDebug        # debug APK
-./gradlew test                 # 86 JVM unit tests (domain, data, ViewModels)
+./gradlew test                 # 101 JVM unit tests (domain, data, ViewModels)
 ./gradlew lintDebug            # Android lint
 ./gradlew assembleRelease      # signed release (see below)
 ```

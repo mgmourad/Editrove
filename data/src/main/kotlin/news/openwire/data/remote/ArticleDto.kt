@@ -17,4 +17,5 @@ data class ArticleDto(
     val targetUrl: String? = null,
     val archiveUrl: String? = null,
     val imageUrl: String? = null,
+    val summary: String? = null,
 )

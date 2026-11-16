@@ -1,0 +1,8 @@
+Editrove 0.6.0 — A front page with editorial judgment
+• Curated feeds now lead with the day's biggest stories instead of whatever was published last. A minutes-old sports item no longer becomes the cover story.
+• Stories are ranked by where editors placed them, how many outlets are covering them, freshness and source quality. Hard news leads Top Stories, US, local, International and Politics.
+• Near-duplicates and runs from one outlet are spread apart, and the cover story always has a photo.
+• "Also covered by" shows which other outlets are running the cover story and the story you're reading.
+• Discover opens on Top Across Editions, one front page drawn from every topic.
+• Audio briefings follow the new order.
+• New in Settings › Appearance: Tune to my reading gently favours outlets you save and like. Worked out on your phone; nothing is sent anywhere.

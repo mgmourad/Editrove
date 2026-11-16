@@ -79,6 +79,7 @@ object SettingsCodec {
                 put("unfoldedLayout", settings.unfoldedLayout.name)
                 put("autoCheckUpdates", settings.autoCheckUpdates)
                 put("autoInstallUpdates", settings.autoInstallUpdates)
+                put("personalize", settings.personalize)
                 putJsonObject("briefing") {
                     settings.briefing.voice?.let { put("voice", it) }
                     put("speed", settings.briefing.speed); put("count", settings.briefing.count)
@@ -175,6 +176,7 @@ object SettingsCodec {
             unfoldedLayout = prefs?.get("unfoldedLayout").str()?.let { v -> news.openwire.domain.model.UnfoldedLayout.entries.firstOrNull { it.name == v } } ?: defaults.unfoldedLayout,
             autoCheckUpdates = prefs?.get("autoCheckUpdates").bool() ?: defaults.autoCheckUpdates,
             autoInstallUpdates = prefs?.get("autoInstallUpdates").bool() ?: defaults.autoInstallUpdates,
+            personalize = prefs?.get("personalize").bool() ?: defaults.personalize,
             briefing = prefs?.get("briefing").obj()?.let { b ->
                 news.openwire.domain.model.BriefingPrefs(
                     voice = b["voice"].str(),

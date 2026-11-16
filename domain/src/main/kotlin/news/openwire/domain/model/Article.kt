@@ -21,6 +21,12 @@ data class Article(
     val summary: String? = null,
     /** The direct feed this story came from, when woven from a publisher feed. */
     val feedUrl: String? = null,
+    /** Position an editor (Google News / the published snapshot) gave this story; 0 = lead. */
+    val editorialRank: Int? = null,
+    /** Outlets known to be covering this story (e.g. Google's related-coverage list + 1). */
+    val coverage: Int? = null,
+    /** Other outlets running the same story (display names), for "Also covered by". */
+    val alsoCoveredBy: List<String> = emptyList(),
 ) {
     /** True when the routing engine needs an archive snapshot to open this story. */
     val needsArchive: Boolean get() = badge == "Archive.is" || badge == "Wayback"

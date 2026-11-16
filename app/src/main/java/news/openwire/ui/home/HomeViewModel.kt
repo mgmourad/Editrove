@@ -188,7 +188,7 @@ class HomeViewModel(
     fun closeSheet() { _sheetOpen.value = false }
 
     fun toggleSaved(article: Article) = library.toggleSaved(article)
-    fun toggleLiked(article: Article) = library.toggleLiked(article.id)
+    fun toggleLiked(article: Article) = library.toggleLiked(article)
 
     fun setQuery(q: String) { _query.value = q }
 

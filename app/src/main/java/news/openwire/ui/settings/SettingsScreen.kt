@@ -655,7 +655,22 @@ private fun AppearancePage(vm: SettingsViewModel, themeMode: ThemeMode, onTheme:
                 SortMode.entries.forEach { m -> Chip(m.label, selected = m == s.sortMode) { vm.setSortMode(m) } }
             }
             Spacer(Modifier.height(8.dp))
-            Text("Curated weaves aggregator and publisher feeds fairly; Newest and Oldest sort by time.", style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary)
+            Text(
+                "Curated leads with the stories editors placed highest and the most outlets are covering, weighted for freshness and source quality. Newest and Oldest sort by time.",
+                style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Tune to my reading", style = sans(14.sp, FontWeight.SemiBold), color = Glass.textPrimary)
+                    Text(
+                        "Gently favour outlets you save and like. Worked out on this device; nothing is sent anywhere.",
+                        style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                GlassSwitch(s.personalize) { vm.setPersonalize(it) }
+            }
         }
     }
 }

@@ -210,28 +210,54 @@ object FeedRanker {
      * carry a similar story. Cheap token-signature pre-grouping keeps this near-linear.
      */
     fun coverageIndex(all: List<Article>, normalizeDomain: (String) -> String): (Article) -> Int {
+        val related = relatedCoverage(all, normalizeDomain)
+        return { a -> (related(a).size + 1).coerceAtLeast(1) }
+    }
+
+    /** One other outlet's take on the same story. */
+    data class Related(val domain: String, val source: String)
+
+    /**
+     * Story clusters across a set of feeds: for each article, the *other* outlets carrying
+     * a similar story (one entry per outlet). Distinctive-token pre-grouping keeps this
+     * near-linear; words that appear in many headlines don't count as evidence.
+     */
+    fun relatedCoverage(all: List<Article>, normalizeDomain: (String) -> String): (Article) -> List<Related> {
         fun tokens(title: String) = FeedWeaver.normalizeTitleForComparison(title).split(' ').filter { it.length > 3 }.toSet()
         val sig = all.map { it to tokens(it.title) }
         val byToken = HashMap<String, MutableList<Int>>()
         sig.forEachIndexed { i, (_, toks) -> toks.forEach { byToken.getOrPut(it) { mutableListOf() }.add(i) } }
-        // Words in a large share of headlines ("says", "after", "trump") don't identify a story.
         val common = maxOf(8, all.size / 20)
-        val cache = HashMap<String, Int>()
+        val cache = HashMap<String, List<Related>>()
         return { a ->
             cache.getOrPut(a.id + "|" + a.title) {
+                val own = normalizeDomain(a.domain ?: a.source ?: "")
                 val toks = tokens(a.title).filter { (byToken[it]?.size ?: 0) <= common }
                 val shared = toks.flatMap { byToken[it].orEmpty() }.groupingBy { it }.eachCount()
-                val outlets = HashSet<String>()
-                outlets += normalizeDomain(a.domain ?: a.source ?: "")
-                shared.forEach { (j, n) ->
+                val out = LinkedHashMap<String, Related>()
+                shared.entries.sortedByDescending { it.value }.forEach { (j, n) ->
                     if (n < 2) return@forEach
                     val other = sig[j].first
+                    val d = normalizeDomain(other.domain ?: other.source ?: "")
+                    if (d.isEmpty() || d == own || d in out) return@forEach
                     if (n >= 3 || FeedWeaver.calculateTitleSimilarity(a.title, other.title) >= 0.25) {
-                        outlets += normalizeDomain(other.domain ?: other.source ?: "")
+                        out[d] = Related(d, other.source?.takeIf { it.isNotBlank() } ?: d)
                     }
                 }
-                outlets.count { it.isNotEmpty() }.coerceAtLeast(1)
+                out.values.toList()
             }
         }
+    }
+
+    /**
+     * On-device interest: how much the reader favours an outlet, from the outlets of the
+     * stories they saved and liked. Needs at least two signals for an outlet to count, and
+     * saturates so a single favourite can't take over the front page.
+     */
+    fun affinityFrom(interestDomains: List<String>, normalizeDomain: (String) -> String): (String) -> Double {
+        if (interestDomains.size < 2) return { 0.0 }
+        val counts = interestDomains.map(normalizeDomain).filter { it.isNotEmpty() }.groupingBy { it }.eachCount()
+        val top = counts.values.maxOrNull() ?: return { 0.0 }
+        return { d -> counts[d]?.takeIf { it >= 2 }?.let { (it.toDouble() / top).coerceIn(0.0, 1.0) } ?: 0.0 }
     }
 }

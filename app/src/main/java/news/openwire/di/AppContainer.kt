@@ -79,6 +79,7 @@ class AppContainer(context: Context) {
             catalog = { feedCatalog.catalog },
             metadata = publishedMetadata,
             feedState = feedState,
+            interests = { libraryStore.interestDomains() },
         )
     }
 

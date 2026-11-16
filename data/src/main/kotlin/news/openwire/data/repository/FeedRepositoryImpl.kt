@@ -55,6 +55,8 @@ class FeedRepositoryImpl(
     private val metadata: MetadataProvider? = null,
     private val feedState: FeedStateStore? = null,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** Outlets of the reader's saved/liked stories (local only), for Curated tuning. */
+    private val interests: () -> List<String> = { emptyList() },
 ) : FeedRepository {
 
     private val norm: (String) -> String = { registry.normalizeDomain(it) }
@@ -69,14 +71,16 @@ class FeedRepositoryImpl(
     private fun rank(topic: Topic, articles: List<Article>): List<Article> {
         pool[topic.id] = articles
         val categories = catalog().associate { it.url to it.category }
+        val related = FeedRanker.relatedCoverage(pool.values.flatten(), norm)
         val ctx = FeedRanker.Context(
             topicId = topic.id,
             nowMillis = clock(),
-            coverageOf = FeedRanker.coverageIndex(pool.values.flatten(), norm),
+            coverageOf = { related(it).size + 1 },
             feedCategory = { categories[it] },
+            affinity = if (settings().personalize) FeedRanker.affinityFrom(interests(), norm) else { _ -> 0.0 },
             normalizeDomain = norm,
         )
-        return FeedRanker.rank(articles, ctx)
+        return FeedRanker.rank(articles, ctx).map { a -> a.copy(alsoCoveredBy = related(a).map { it.source }) }
     }
 
     override fun observeTopic(topic: Topic, force: Boolean): Flow<FeedResult> = flow {

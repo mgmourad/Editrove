@@ -16,7 +16,9 @@ interface Library {
     val saved: StateFlow<List<Article>>
     val liked: StateFlow<Set<String>>
     fun toggleSaved(article: Article): Boolean
-    fun toggleLiked(articleId: String): Boolean
+    fun toggleLiked(article: Article): Boolean
+    /** Outlets of liked and saved stories, one entry per story: the on-device interest signal. */
+    fun interestDomains(): List<String>
 }
 
 /** In-memory library for tests. */
@@ -30,11 +32,14 @@ class InMemoryLibrary : Library {
         _saved.value = if (now) listOf(article) + _saved.value else _saved.value.filterNot { it.id == article.id }
         return now
     }
-    override fun toggleLiked(articleId: String): Boolean {
-        val now = articleId !in _liked.value
-        _liked.value = if (now) _liked.value + articleId else _liked.value - articleId
+    private val likedDomains = mutableListOf<String>()
+    override fun toggleLiked(article: Article): Boolean {
+        val now = article.id !in _liked.value
+        _liked.value = if (now) _liked.value + article.id else _liked.value - article.id
+        article.domain?.let { if (now) likedDomains += it else likedDomains.remove(it) }
         return now
     }
+    override fun interestDomains(): List<String> = likedDomains + _saved.value.mapNotNull { it.domain }
 }
 
 /**
@@ -68,14 +73,21 @@ class LibraryStore(context: Context) : Library {
         return nowSaved
     }
 
-    override fun toggleLiked(articleId: String): Boolean {
+    override fun toggleLiked(article: Article): Boolean {
         var nowLiked = false
         _liked.update { current ->
-            if (articleId in current) current - articleId else { nowLiked = true; current + articleId }
+            if (article.id in current) current - article.id else { nowLiked = true; current + article.id }
         }
-        prefs.edit().putStringSet(KEY_LIKED, _liked.value).apply()
+        // Remember the outlet of each like (most recent 200) for Curated tuning.
+        val domains = likedDomains().toMutableList()
+        article.domain?.takeIf { it.isNotEmpty() }?.let { d -> if (nowLiked) domains += d else domains.remove(d) }
+        prefs.edit().putStringSet(KEY_LIKED, _liked.value).putString(KEY_LIKED_DOMAINS, domains.takeLast(200).joinToString("\n")).apply()
         return nowLiked
     }
+
+    private fun likedDomains(): List<String> = prefs.getString(KEY_LIKED_DOMAINS, null)?.split('\n')?.filter { it.isNotEmpty() }.orEmpty()
+
+    override fun interestDomains(): List<String> = likedDomains() + _saved.value.mapNotNull { it.domain }
 
     private fun loadSaved(): List<Article> = try {
         prefs.getString(KEY_SAVED, null)
@@ -121,5 +133,6 @@ class LibraryStore(context: Context) : Library {
     private companion object {
         const val KEY_SAVED = "saved_articles"
         const val KEY_LIKED = "liked_ids"
+        const val KEY_LIKED_DOMAINS = "liked_domains"
     }
 }

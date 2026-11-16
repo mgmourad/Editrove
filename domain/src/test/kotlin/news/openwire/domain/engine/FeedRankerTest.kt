@@ -107,4 +107,30 @@ class FeedRankerTest {
         assertEquals("Iran vows retaliation after strike", out.first().title)
         assertTrue(out.any { it.id == "s0" })
     }
+
+    @Test
+    fun relatedCoverageListsOtherOutletsOnce() {
+        val x = a("x1", "Earthquake strikes northern Japan coast", "reuters.com", 1.0)
+        val all = listOf(
+            x,
+            a("x2", "Powerful earthquake strikes northern Japan coast", "bbc.com", 1.0),
+            a("x3", "Earthquake strikes northern Japan coast, tsunami warning", "bbc.com", 1.0),
+            a("x4", "Earthquake strikes Japan's northern coast", "nytimes.com", 1.0),
+        )
+        val related = FeedRanker.relatedCoverage(all, norm)(x).map { it.domain }.sorted()
+        assertEquals(listOf("bbc.com", "nytimes.com"), related)
+    }
+
+    @Test
+    fun affinityNeedsRepeatedSignalAndNudgesTies() {
+        val aff = FeedRanker.affinityFrom(listOf("theverge.com", "theverge.com", "wired.com"), norm)
+        assertEquals(1.0, aff("theverge.com"), 0.0)
+        assertEquals(0.0, aff("wired.com"), 0.0) // a single like isn't a preference
+        val feed = listOf(
+            a("w", "New phone launches with longer battery", "wired.com", 2.0, rank = 0),
+            a("v", "New phone launches with a bigger battery", "theverge.com", 2.0, rank = 1),
+        )
+        val tuned = FeedRanker.rank(feed, FeedRanker.Context("TECHNOLOGY", now, affinity = aff, normalizeDomain = norm))
+        assertEquals("v", tuned.first().id)
+    }
 }

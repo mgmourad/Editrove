@@ -42,7 +42,15 @@ object Releases {
 
     /** Release notes as plain text: drops Markdown markers, keeps bullets. */
     fun plainNotes(markdown: String): String = markdown.lines().joinToString("\n") { line ->
-        line.replace(Regex("^#{1,6}\\s*"), "").replace(Regex("\\*\\*(.+?)\\*\\*"), "$1").replace(Regex("`([^`]+)`"), "$1")
-            .replace(Regex("\\[(.+?)]\\((.+?)\\)"), "$1").replace(Regex("^\\s*[-*]\\s+"), "• ")
-    }.replace(Regex("\n{3,}"), "\n\n").trim()
+        line.replace(RX_1, "").replace(RX_2, "$1").replace(RX_3, "$1")
+            .replace(RX_4, "$1").replace(RX_5, "• ")
+    }.replace(RX_6, "\n\n").trim()
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("^#{1,6}\\s*")
+private val RX_2 = Regex("\\*\\*(.+?)\\*\\*")
+private val RX_3 = Regex("`([^`]+)`")
+private val RX_4 = Regex("\\[(.+?)]\\((.+?)\\)")
+private val RX_5 = Regex("^\\s*[-*]\\s+")
+private val RX_6 = Regex("\n{3,}")

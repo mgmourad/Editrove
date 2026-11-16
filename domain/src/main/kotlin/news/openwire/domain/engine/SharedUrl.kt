@@ -12,30 +12,30 @@ object SharedUrl {
 
     private fun clean(candidate: String): String {
         var c = candidate.trim()
-        if (Regex("^https?%3A%2F%2F", RegexOption.IGNORE_CASE).containsMatchIn(c)) {
+        if (RX_1.containsMatchIn(c)) {
             c = try { URLDecoder.decode(c, "UTF-8") } catch (e: Exception) { c }
         }
-        return c.replace(Regex("^[<\"'(]+|[>\"',;:!?).]+$"), "")
+        return c.replace(RX_2, "")
     }
 
     fun extract(text: String?, subject: String? = null): String {
         val raw = text?.trim().orEmpty()
         var target = ""
-        if (raw.isNotEmpty() && !raw.contains(Regex("\\s"))) {
+        if (raw.isNotEmpty() && !raw.contains(RX_3)) {
             val c = clean(raw)
             target = when {
-                Regex("^https?://", RegexOption.IGNORE_CASE).containsMatchIn(c) -> c
+                RX_6.containsMatchIn(c) -> c
                 c.contains('.') -> "https://$c"
                 else -> ""
             }
         }
         if (target.isEmpty() && raw.isNotEmpty()) {
-            target = Regex("https?://[^\\s<>\"')]+", RegexOption.IGNORE_CASE).find(raw)?.value?.let(::clean)
-                ?: Regex("(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}/[^\\s<>\"')]*").find(raw)?.value?.let { "https://" + clean(it) }
+            target = RX_4.find(raw)?.value?.let(::clean)
+                ?: RX_5.find(raw)?.value?.let { "https://" + clean(it) }
                 ?: ""
         }
         if (target.isEmpty() && !subject.isNullOrEmpty()) {
-            target = Regex("https?://[^\\s<>\"')]+", RegexOption.IGNORE_CASE).find(subject)?.value?.let(::clean) ?: ""
+            target = RX_4.find(subject)?.value?.let(::clean) ?: ""
         }
         if (target.isEmpty()) return ""
         return try {
@@ -46,3 +46,11 @@ object SharedUrl {
         }
     }
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("^https?%3A%2F%2F", RegexOption.IGNORE_CASE)
+private val RX_2 = Regex("^[<\"'(]+|[>\"',;:!?).]+$")
+private val RX_3 = Regex("\\s")
+private val RX_4 = Regex("https?://[^\\s<>\"')]+", RegexOption.IGNORE_CASE)
+private val RX_5 = Regex("(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}/[^\\s<>\"')]*")
+private val RX_6 = Regex("^https?://", RegexOption.IGNORE_CASE)

@@ -36,8 +36,8 @@ object NewsProcessor {
         if (lastDash > 0) clean = clean.substring(0, lastDash).trim()
         return clean
             .lowercase()
-            .replace(Regex("[^a-z0-9]"), " ")
-            .replace(Regex("\\s+"), " ")
+            .replace(RX_1, " ")
+            .replace(RX_2, " ")
             .trim()
     }
 
@@ -118,3 +118,7 @@ object NewsProcessor {
         return MONTH_DAY.withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(epochMillis))
     }
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("[^a-z0-9]")
+private val RX_2 = Regex("\\s+")

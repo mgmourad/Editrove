@@ -38,7 +38,24 @@ object FeedRanker {
 
     enum class Kind { HARD, SPORTS, ENTERTAINMENT, LIFESTYLE, SHOPPING, OTHER }
 
-    data class Scored(val article: Article, val score: Double, val kind: Kind, val coverage: Int)
+    data class Scored(val article: Article, val score: Double, val kind: Kind, val coverage: Int) {
+        // Computed once per story: diversification compares every pair, so these must not be re-derived.
+        internal val outlet: String get() = outletOf ?: ""
+        internal var outletOf: String? = null
+        internal val words: Set<String> by lazy { similarityWords(article.title) }
+    }
+
+    /** The words [FeedWeaver.calculateTitleSimilarity] compares (longer than two letters). */
+    internal fun similarityWords(title: String): Set<String> =
+        FeedWeaver.normalizeTitleForComparison(title).split(' ').filter { it.length > 2 }.toSet()
+
+    /** Jaccard similarity on precomputed word sets; same result as [FeedWeaver.calculateTitleSimilarity]. */
+    internal fun jaccard(a: Set<String>, b: Set<String>): Double {
+        if (a.isEmpty() || b.isEmpty()) return 0.0
+        val (small, big) = if (a.size <= b.size) a to b else b to a
+        val inter = small.count { it in big }
+        return inter.toDouble() / (a.size + b.size - inter)
+    }
 
     // ---- Authority -------------------------------------------------------------------
 
@@ -142,7 +159,7 @@ object FeedRanker {
                 0.06 * ctx.affinity(domain).coerceIn(0.0, 1.0) +
                 sectionFit(ctx.topicId, kind, coverage) -
                 (if (a.status == "locked") 0.1 else 0.0)
-            Scored(a, s, kind, coverage)
+            Scored(a, s, kind, coverage).also { it.outletOf = domain }
         }
     }
 
@@ -177,7 +194,14 @@ object FeedRanker {
         }
         // Collapse the same story told by different topics under different URLs.
         val unique = ArrayList<Article>()
-        best.values.sortedBy { it.editorialRank }.take(limit * 4).forEach { a -> if (unique.none { FeedWeaver.isDuplicate(it, a, normalizeDomain) }) unique += a }
+        val seen = ArrayList<Pair<Set<String>, String>>()
+        best.values.sortedBy { it.editorialRank }.take(limit * 4).forEach { a ->
+            val w = similarityWords(a.title)
+            val d = normalizeDomain(a.domain ?: a.source ?: "")
+            // Same rule as FeedWeaver.isDuplicate (URLs were already merged via storyKey).
+            val dup = seen.any { (ow, od) -> val sim = jaccard(w, ow); sim >= 0.75 || (d.isNotEmpty() && d == od && sim >= 0.25) }
+            if (!dup) { unique += a; seen += w to d }
+        }
         val ctx = Context(EVERYWHERE, nowMillis, coverageOf = coverage, normalizeDomain = normalizeDomain)
         // Score everything, keep the strongest, then diversify that slate.
         val top = score(unique, ctx).sortedByDescending { it.score }.take(limit)
@@ -193,11 +217,11 @@ object FeedRanker {
         out += lead; pool.remove(lead)
         while (pool.isNotEmpty()) {
             val recent = out.takeLast(6)
+            val lastTwo = out.takeLast(2)
             val next = pool.maxBy { c ->
-                val sim = recent.maxOf { FeedWeaver.calculateTitleSimilarity(it.article.title, c.article.title) }
-                val d = ctx.normalizeDomain(c.article.domain ?: c.article.source ?: "")
-                val sameOutlet = out.takeLast(2).count { ctx.normalizeDomain(it.article.domain ?: it.article.source ?: "") == d }
-                val sameKind = if (c.kind != Kind.HARD && out.takeLast(2).all { it.kind == c.kind }) 0.06 else 0.0
+                val sim = recent.maxOf { jaccard(it.words, c.words) }
+                val sameOutlet = lastTwo.count { it.outlet == c.outlet }
+                val sameKind = if (c.kind != Kind.HARD && lastTwo.all { it.kind == c.kind }) 0.06 else 0.0
                 c.score - lambda * sim - 0.08 * sameOutlet - sameKind
             }
             out += next; pool.remove(next)
@@ -225,6 +249,8 @@ object FeedRanker {
     fun relatedCoverage(all: List<Article>, normalizeDomain: (String) -> String): (Article) -> List<Related> {
         fun tokens(title: String) = FeedWeaver.normalizeTitleForComparison(title).split(' ').filter { it.length > 3 }.toSet()
         val sig = all.map { it to tokens(it.title) }
+        val words = all.map { similarityWords(it.title) }
+        val domains = all.map { normalizeDomain(it.domain ?: it.source ?: "") }
         val byToken = HashMap<String, MutableList<Int>>()
         sig.forEachIndexed { i, (_, toks) -> toks.forEach { byToken.getOrPut(it) { mutableListOf() }.add(i) } }
         val common = maxOf(8, all.size / 20)
@@ -232,15 +258,16 @@ object FeedRanker {
         return { a ->
             cache.getOrPut(a.id + "|" + a.title) {
                 val own = normalizeDomain(a.domain ?: a.source ?: "")
+                val mine = similarityWords(a.title)
                 val toks = tokens(a.title).filter { (byToken[it]?.size ?: 0) <= common }
                 val shared = toks.flatMap { byToken[it].orEmpty() }.groupingBy { it }.eachCount()
                 val out = LinkedHashMap<String, Related>()
                 shared.entries.sortedByDescending { it.value }.forEach { (j, n) ->
                     if (n < 2) return@forEach
                     val other = sig[j].first
-                    val d = normalizeDomain(other.domain ?: other.source ?: "")
+                    val d = domains[j]
                     if (d.isEmpty() || d == own || d in out) return@forEach
-                    if (n >= 3 || FeedWeaver.calculateTitleSimilarity(a.title, other.title) >= 0.25) {
+                    if (n >= 3 || jaccard(mine, words[j]) >= 0.25) {
                         out[d] = Related(d, other.source?.takeIf { it.isNotBlank() } ?: d)
                     }
                 }

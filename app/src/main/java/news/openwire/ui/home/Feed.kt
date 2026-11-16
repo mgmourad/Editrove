@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -381,8 +384,15 @@ fun LiveTicker(articles: List<Article>, onOpen: (Article) -> Unit) {
     val g = Glass
     val items = remember(articles) { articles.drop(1).take(10) }
     val listState = rememberLazyListState()
-    LaunchedEffect(items) {
-        while (isActive) {
+    // The strip drifts for half a minute, then rests: an endless marquee keeps the whole glass
+    // UI redrawing even when nobody is reading it. New headlines or a swipe start it again.
+    var moving by remember(items) { mutableStateOf(true) }
+    val dragged by listState.interactionSource.collectIsDraggedAsState()
+    LaunchedEffect(dragged) { if (dragged) moving = true }
+    LaunchedEffect(items, moving) {
+        if (!moving) return@LaunchedEffect
+        val until = System.currentTimeMillis() + 30_000
+        while (isActive && System.currentTimeMillis() < until) {
             delay(32)
             try {
                 if (listState.canScrollForward) listState.scrollBy(1.2f) else { delay(1500); listState.scrollToItem(0) }
@@ -391,10 +401,11 @@ fun LiveTicker(articles: List<Article>, onOpen: (Article) -> Unit) {
                 delay(2500)
             }
         }
+        moving = false
     }
     GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            LivePill()
+            LivePill(pulsing = moving)
             Spacer(Modifier.width(10.dp))
             LazyRow(state = listState, modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 itemsIndexed(items, key = { _, a -> a.id }) { index, article ->
@@ -428,10 +439,17 @@ private fun shortSource(a: Article): String {
 }
 
 @Composable
-private fun LivePill() {
+private fun LivePill(pulsing: Boolean) {
     val g = Glass
-    val t = rememberInfiniteTransition(label = "ping")
-    val ping by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Restart), label = "p")
+    // The ping ring animates only while the strip is moving (an idle screen should draw nothing).
+    val ping = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(pulsing) {
+        while (pulsing && isActive) {
+            ping.snapTo(0f)
+            ping.animateTo(1f, tween(1000, easing = LinearEasing))
+        }
+        ping.snapTo(1f) // ring hidden (alpha 0)
+    }
     Row(
         modifier = Modifier
             .clip(CircleShape)
@@ -444,7 +462,7 @@ private fun LivePill() {
             // animate-ping: an expanding, fading ring around the dot
             Box(
                 Modifier.size(6.dp)
-                    .graphicsLayer { scaleX = 1f + ping; scaleY = 1f + ping; alpha = 1f - ping }
+                    .graphicsLayer { val p = ping.value; scaleX = 1f + p; scaleY = 1f + p; alpha = 1f - p }
                     .clip(CircleShape).background(g.accent),
             )
             Box(Modifier.size(6.dp).clip(CircleShape).background(g.accent))

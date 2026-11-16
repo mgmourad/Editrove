@@ -19,24 +19,24 @@ object PreviewMatcher {
     /** Strips markup (and scripts/menus/lists), decodes entities, caps at 800 chars. */
     fun cleanPreviewText(markup: String?): String {
         if (markup.isNullOrEmpty()) return ""
-        val filtered = markup.replace(DROP_BLOCKS, " ").replace(Regex("<!--[\\s\\S]*?-->"), " ").replace(Regex("<[^>]*>"), " ")
+        val filtered = markup.replace(DROP_BLOCKS, " ").replace(RX_1, " ").replace(RX_2, " ")
         val decoded = filtered
-            .replace(Regex("&#(x[\\da-fA-F]+|\\d+);")) { m ->
+            .replace(RX_3) { m ->
                 val v = m.groupValues[1]
                 val code = if (v.startsWith("x", true)) v.drop(1).toIntOrNull(16) else v.toIntOrNull()
                 if (code != null && code in 1..0x10FFFF) String(Character.toChars(code)) else m.value
             }
-            .replace(Regex("&(amp|quot|apos|lt|gt|nbsp);")) { NAMED[it.groupValues[1]] ?: it.value }
-        return decoded.replace(Regex("\\s+"), " ").trim().take(800)
+            .replace(RX_4) { NAMED[it.groupValues[1]] ?: it.value }
+        return decoded.replace(RX_5, " ").trim().take(800)
     }
 
     private fun normalize(text: String): String =
-        Normalizer.normalize(text, Normalizer.Form.NFKC).lowercase().replace(Regex("[^\\p{L}\\p{M}\\p{N}]+"), " ").trim()
+        Normalizer.normalize(text, Normalizer.Form.NFKC).lowercase().replace(RX_6, " ").trim()
 
     /** Plain words/phrases (and `a OR b`); advanced Google operators are left to Google. */
     fun literalKeywords(keywords: List<String>): List<String> = keywords.flatMap { term ->
-        if (Regex("\\b(?:AND|NOT)\\b|\\w+:|^-").containsMatchIn(term)) emptyList()
-        else term.split(Regex("\\s+OR\\s+")).map { it.trim().removePrefix("\"").removePrefix("“").removeSuffix("\"").removeSuffix("”").trim() }
+        if (RX_7.containsMatchIn(term)) emptyList()
+        else term.split(RX_8).map { it.trim().removePrefix("\"").removePrefix("“").removeSuffix("\"").removeSuffix("”").trim() }
     }.filter { it.isNotEmpty() }
 
     /** First keyword found as a whole word/phrase in the title or summary. */
@@ -65,3 +65,13 @@ object PreviewMatcher {
         }
     }
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("<!--[\\s\\S]*?-->")
+private val RX_2 = Regex("<[^>]*>")
+private val RX_3 = Regex("&#(x[\\da-fA-F]+|\\d+);")
+private val RX_4 = Regex("&(amp|quot|apos|lt|gt|nbsp);")
+private val RX_5 = Regex("\\s+")
+private val RX_6 = Regex("[^\\p{L}\\p{M}\\p{N}]+")
+private val RX_7 = Regex("\\b(?:AND|NOT)\\b|\\w+:|^-")
+private val RX_8 = Regex("\\s+OR\\s+")

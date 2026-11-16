@@ -38,7 +38,7 @@ object ImageExtractor {
     }
 
     private fun decode(s: String) = s.trim().replace("&amp;", "&", ignoreCase = true)
-        .replace(Regex("&#(x[0-9a-fA-F]+|\\d+);")) { m ->
+        .replace(RX_1) { m ->
             val v = m.groupValues[1]
             val c = if (v.startsWith("x", true)) v.drop(1).toIntOrNull(16) else v.toIntOrNull()
             if (c != null && c <= 0x10FFFF) String(Character.toChars(c)) else ""
@@ -60,32 +60,27 @@ object ImageExtractor {
             val r = c?.let { resolve(it, baseUrl) } ?: return
             if (isEditorialImage(r, w, h)) out.add(r)
         }
-        val og = "(?:og:image|og:image:url|og:image:secure_url)"
-        val tw = "(?:twitter:image|twitter:image:src)"
-        for (key in listOf(og, tw)) {
-            Regex("<meta[^>]+(?:property|name)=[\"']$key[\"'][^>]+content=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE).findAll(html).forEach { test(it.groupValues[1]) }
-            Regex("<meta[^>]+content=[\"']([^\"']+)[\"'][^>]+(?:property|name)=[\"']$key[\"']", RegexOption.IGNORE_CASE).findAll(html).forEach { test(it.groupValues[1]) }
-        }
-        Regex("<script[^>]+type=[\"']application/ld\\+json[\"'][^>]*>([\\s\\S]*?)</script>", RegexOption.IGNORE_CASE).findAll(html).forEach { s ->
+        for (rx in META_IMAGE) rx.findAll(html).forEach { test(it.groupValues[1]) }
+        RX_5.findAll(html).forEach { s ->
             val body = s.groupValues[1]
-            Regex("\"(?:image|thumbnailUrl)\"\\s*:\\s*\"([^\"]+)\"").findAll(body).forEach { test(it.groupValues[1].replace("\\/", "/")) }
-            Regex("\"image\"\\s*:\\s*\\{[^}]*?\"url\"\\s*:\\s*\"([^\"]+)\"").findAll(body).forEach { test(it.groupValues[1].replace("\\/", "/")) }
-            Regex("\"image\"\\s*:\\s*\\[\\s*\"([^\"]+)\"").findAll(body).forEach { test(it.groupValues[1].replace("\\/", "/")) }
+            RX_6.findAll(body).forEach { test(it.groupValues[1].replace("\\/", "/")) }
+            RX_7.findAll(body).forEach { test(it.groupValues[1].replace("\\/", "/")) }
+            RX_8.findAll(body).forEach { test(it.groupValues[1].replace("\\/", "/")) }
         }
-        Regex("<link[^>]+rel=[\"']image_src[\"'][^>]+href=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE).findAll(html).forEach { test(it.groupValues[1]) }
-        Regex("<meta[^>]+itemprop=[\"']image[\"'][^>]+content=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE).findAll(html).forEach { test(it.groupValues[1]) }
-        Regex("<(?:article|figure|main)[^>]*>([\\s\\S]*?)</(?:article|figure|main)>", RegexOption.IGNORE_CASE).findAll(html).forEach { block ->
-            Regex("<img[^>]+>", RegexOption.IGNORE_CASE).findAll(block.value).forEach { tag ->
+        RX_9.findAll(html).forEach { test(it.groupValues[1]) }
+        RX_10.findAll(html).forEach { test(it.groupValues[1]) }
+        RX_11.findAll(html).forEach { block ->
+            RX_12.findAll(block.value).forEach { tag ->
                 val t = tag.value
-                val w = Regex("\\swidth=[\"'](\\d+)[\"']", RegexOption.IGNORE_CASE).find(t)?.groupValues?.get(1)?.toIntOrNull()
-                val h = Regex("\\sheight=[\"'](\\d+)[\"']", RegexOption.IGNORE_CASE).find(t)?.groupValues?.get(1)?.toIntOrNull()
-                Regex("\\ssrcset=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE).find(t)?.groupValues?.get(1)?.let { srcset ->
-                    srcset.split(',').map { it.trim().split(Regex("\\s+")) }.filter { it.isNotEmpty() && it[0].isNotEmpty() }
+                val w = RX_13.find(t)?.groupValues?.get(1)?.toIntOrNull()
+                val h = RX_14.find(t)?.groupValues?.get(1)?.toIntOrNull()
+                RX_15.find(t)?.groupValues?.get(1)?.let { srcset ->
+                    srcset.split(',').map { it.trim().split(RX_2) }.filter { it.isNotEmpty() && it[0].isNotEmpty() }
                         .sortedByDescending { p -> p.getOrNull(1)?.removeSuffix("w")?.toIntOrNull() ?: 0 }
                         .forEach { p -> test(p[0], w, h) }
                 }
-                val src = Regex("\\sdata-src=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE).find(t)?.groupValues?.get(1)
-                    ?: Regex("\\ssrc=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE).find(t)?.groupValues?.get(1)
+                val src = RX_16.find(t)?.groupValues?.get(1)
+                    ?: RX_3.find(t)?.groupValues?.get(1)
                 test(src, w, h)
             }
         }
@@ -97,7 +92,32 @@ object ImageExtractor {
     /** First editorial `<img src>` inside RSS description markup. */
     fun fromDescription(markup: String?, baseUrl: String?): String? {
         if (markup.isNullOrEmpty()) return null
-        return Regex("<img[^>]+src=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE).findAll(markup)
+        return RX_4.findAll(markup)
             .mapNotNull { resolve(it.groupValues[1], baseUrl) }.firstOrNull { isEditorialImage(it) }
     }
+}
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("&#(x[0-9a-fA-F]+|\\d+);")
+private val RX_2 = Regex("\\s+")
+private val RX_3 = Regex("\\ssrc=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
+private val RX_4 = Regex("<img[^>]+src=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
+private val RX_5 = Regex("<script[^>]+type=[\"']application/ld\\+json[\"'][^>]*>([\\s\\S]*?)</script>", RegexOption.IGNORE_CASE)
+private val RX_6 = Regex("\"(?:image|thumbnailUrl)\"\\s*:\\s*\"([^\"]+)\"")
+private val RX_7 = Regex("\"image\"\\s*:\\s*\\{[^}]*?\"url\"\\s*:\\s*\"([^\"]+)\"")
+private val RX_8 = Regex("\"image\"\\s*:\\s*\\[\\s*\"([^\"]+)\"")
+private val RX_9 = Regex("<link[^>]+rel=[\"']image_src[\"'][^>]+href=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
+private val RX_10 = Regex("<meta[^>]+itemprop=[\"']image[\"'][^>]+content=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
+private val RX_11 = Regex("<(?:article|figure|main)[^>]*>([\\s\\S]*?)</(?:article|figure|main)>", RegexOption.IGNORE_CASE)
+private val RX_12 = Regex("<img[^>]+>", RegexOption.IGNORE_CASE)
+private val RX_13 = Regex("\\swidth=[\"'](\\d+)[\"']", RegexOption.IGNORE_CASE)
+private val RX_14 = Regex("\\sheight=[\"'](\\d+)[\"']", RegexOption.IGNORE_CASE)
+private val RX_15 = Regex("\\ssrcset=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
+private val RX_16 = Regex("\\sdata-src=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
+
+private val META_IMAGE: List<Regex> = listOf("(?:og:image|og:image:url|og:image:secure_url)", "(?:twitter:image|twitter:image:src)").flatMap { key ->
+    listOf(
+        Regex("<meta[^>]+(?:property|name)=[\"']$key[\"'][^>]+content=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE),
+        Regex("<meta[^>]+content=[\"']([^\"']+)[\"'][^>]+(?:property|name)=[\"']$key[\"']", RegexOption.IGNORE_CASE),
+    )
 }

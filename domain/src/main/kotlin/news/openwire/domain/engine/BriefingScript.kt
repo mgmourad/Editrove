@@ -75,9 +75,15 @@ object BriefingScript {
 
     /** Strips leftovers that read badly aloud (URLs, bracketed credits, repeated whitespace). */
     fun clean(text: String): String = text
-        .replace(Regex("https?://\\S+"), "")
-        .replace(Regex("\\[[^]]{0,60}]"), "")
-        .replace(Regex("\\s*[|•]\\s*"), ". ")
-        .replace(Regex("\\s+"), " ")
+        .replace(RX_1, "")
+        .replace(RX_2, "")
+        .replace(RX_3, ". ")
+        .replace(RX_4, " ")
         .trim()
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("https?://\\S+")
+private val RX_2 = Regex("\\[[^]]{0,60}]")
+private val RX_3 = Regex("\\s*[|•]\\s*")
+private val RX_4 = Regex("\\s+")

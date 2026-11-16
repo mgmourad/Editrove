@@ -17,12 +17,12 @@ object Summarizer {
     )
 
     fun sentences(text: String): List<String> = text
-        .replace(Regex("\\s+"), " ")
-        .split(Regex("(?<=[.!?][\"”’)]?)\\s+(?=[\"“‘(]?[A-Z0-9])"))
+        .replace(RX_1, " ")
+        .split(RX_2)
         .map { it.trim() }
         .filter { it.length in 40..400 }
 
-    private fun words(s: String) = s.lowercase().split(Regex("[^\\p{L}\\p{N}]+")).filter { it.length > 2 && it !in STOP }
+    private fun words(s: String) = s.lowercase().split(RX_3).filter { it.length > 2 && it !in STOP }
 
     /** Up to [count] key sentences, or empty when the text is too short to summarize. */
     fun keyPoints(text: String, count: Int = 3): List<String> {
@@ -47,3 +47,8 @@ object Summarizer {
         return picked.sortedBy { it.first }.map { it.second }
     }
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("\\s+")
+private val RX_2 = Regex("(?<=[.!?][\"”’)]?)\\s+(?=[\"“‘(]?[A-Z0-9])")
+private val RX_3 = Regex("[^\\p{L}\\p{N}]+")

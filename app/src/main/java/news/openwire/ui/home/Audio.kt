@@ -333,7 +333,7 @@ class BriefingPlayer(
         val max = TextToSpeech.getMaxSpeechInputLength() - 200
         if (text.length <= max) return listOf(text)
         val out = mutableListOf(StringBuilder())
-        text.split(Regex("(?<=[.!?])\\s+")).forEach { sentence ->
+        text.split(RX_1).forEach { sentence ->
             if (out.last().length + sentence.length > max) out.add(StringBuilder())
             out.last().append(sentence).append(' ')
         }
@@ -481,3 +481,6 @@ internal fun SkipButton(icon: androidx.compose.ui.graphics.vector.ImageVector, d
         contentAlignment = Alignment.Center,
     ) { Icon(icon, contentDescription = description, tint = Glass.textPrimary, modifier = Modifier.size(20.dp)) }
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("(?<=[.!?])\\s+")

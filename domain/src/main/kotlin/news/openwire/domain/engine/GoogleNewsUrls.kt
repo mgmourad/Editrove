@@ -23,7 +23,7 @@ object GoogleNewsUrls {
             val url = java.net.URI(value)
             if (url.host != "news.google.com") return ""
             val path = url.path ?: ""
-            Regex("^/(?:rss/)?(?:articles|read)/([^/]+)/?$").find(path)?.groupValues?.get(1) ?: ""
+            RX_1.find(path)?.groupValues?.get(1) ?: ""
         } catch (e: Exception) {
             ""
         }
@@ -68,3 +68,6 @@ object GoogleNewsUrls {
         }
     }
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("^/(?:rss/)?(?:articles|read)/([^/]+)/?$")

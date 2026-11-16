@@ -56,7 +56,7 @@ class RssNormalizer(private val registry: DomainRegistry) {
     }
 
     private fun relatedCoverage(description: String?): Int =
-        description?.let { Regex("<li\\b", RegexOption.IGNORE_CASE).findAll(it).count() } ?: 0
+        description?.let { RX_1.findAll(it).count() } ?: 0
 
     /** Splits "Headline - Publisher" into (title, source). */
     private fun parseTitle(rawTitle: String?): Pair<String, String> {
@@ -79,3 +79,6 @@ class RssNormalizer(private val registry: DomainRegistry) {
         return registry.normalizeDomain(source)
     }
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("<li\\b", RegexOption.IGNORE_CASE)

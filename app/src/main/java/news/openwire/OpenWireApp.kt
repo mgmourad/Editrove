@@ -45,7 +45,11 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
                 val topics = TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder)
                     .filter { it.isVisible && (s.backgroundRefresh || it.id in s.notifyTopics) }
                 val updates = mutableListOf<TopicUpdate>()
+                val now = System.currentTimeMillis()
                 for (topic in topics) {
+                    // Already fresh from a recent visit (e.g. the app is open): only notify topics
+                    // need checking again.
+                    if (topic.id !in s.notifyTopics && now - container.feedState.lastUpdated(topic.id) < 20 * 60_000L) continue
                     val result = runCatching { container.feedRepository.observeTopic(topic, force = true).last() }.getOrNull()
                     val articles = (result as? FeedResult.Success)?.takeIf { !it.fromCache }?.articles ?: continue
                     val seen = container.feedState.seen(topic.id)

@@ -111,9 +111,9 @@ object TopicRegistry {
     /** Phrases are quoted, operators grouped, terms OR-ed — a Google News query. */
     fun formatKeywordsQuery(keywords: List<String>): String = keywords.filter { it.isNotBlank() }.joinToString(" OR ") { term ->
         when {
-            Regex("^[\"'].*[\"']$").matches(term) -> term
-            Regex("\\b(OR|AND|NOT)\\b").containsMatchIn(term) -> "($term)"
-            Regex("\\s+").containsMatchIn(term) -> "\"$term\""
+            RX_2.matches(term) -> term
+            RX_3.containsMatchIn(term) -> "($term)"
+            RX_4.containsMatchIn(term) -> "\"$term\""
             else -> term
         }
     }
@@ -135,7 +135,7 @@ object TopicRegistry {
     ): Topic {
         val clean = label.trim()
         require(clean.isNotEmpty()) { "Topic name is required." }
-        val slug = clean.uppercase().replace(Regex("[^A-Z0-9]"), "_").take(16)
+        val slug = clean.uppercase().replace(RX_1, "_").take(16)
         val country = country(edition.country)
         val liveUrl = when {
             keywords.isNotEmpty() -> googleNewsSearchUrl(formatKeywordsQuery(keywords), country)
@@ -164,3 +164,9 @@ object TopicRegistry {
         "AI & Robotics" to "artificial intelligence, machine learning, robotics",
     )
 }
+
+// Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
+private val RX_1 = Regex("[^A-Z0-9]")
+private val RX_2 = Regex("^[\"'].*[\"']$")
+private val RX_3 = Regex("\\b(OR|AND|NOT)\\b")
+private val RX_4 = Regex("\\s+")

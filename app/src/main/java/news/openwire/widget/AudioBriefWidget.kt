@@ -129,7 +129,7 @@ private fun Compact(ui: BriefUi) {
         Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Monogram(24.dp)
             Spacer(GlanceModifier.defaultWeight())
-            Pill("BRIEF", W.amber, W.amberChip)
+            Pill("BRIEF", W.accent, W.accentChip)
         }
         Spacer(GlanceModifier.defaultWeight())
         Text(if (ui.active && ui.current >= 0) "CHAPTER ${chapterNumber(ui.current)}" else if (ui.active) "THE OPEN" else "READY · ${ui.chapters.size} STORIES", style = mono(10.sp, W.textSecondary))
@@ -157,7 +157,7 @@ private fun Wide(ui: BriefUi, width: Dp) {
             Column(GlanceModifier.defaultWeight()) {
                 Text(
                     if (ui.active && ui.current >= 0) "NOW PLAYING · ${chapterNumber(ui.current)} OF ${"%02d".format(ui.chapters.size)}" else if (ui.active) "NOW PLAYING · THE OPEN" else "${ui.topic.uppercase()} · ${ui.chapters.size} STORIES",
-                    style = mono(10.sp, W.amber, bold = true), maxLines = 1,
+                    style = mono(10.sp, W.accent, bold = true), maxLines = 1,
                 )
                 Text(ui.title(), style = serif(17.sp), maxLines = 2, modifier = GlanceModifier.padding(top = 2.dp, bottom = 8.dp))
                 Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -215,7 +215,7 @@ private fun Console(ui: BriefUi, width: Dp, compactWave: Boolean) {
         Row(GlanceModifier.fillMaxWidth()) {
             Text(
                 if (ui.active && ui.current >= 0) "CHAPTER ${chapterNumber(ui.current)} · ${"%02d".format(ui.chapters.size)}" else if (ui.active) "THE OPEN" else "READY TO PLAY",
-                style = mono(10.sp, W.amber, bold = true), modifier = GlanceModifier.defaultWeight(), maxLines = 1,
+                style = mono(10.sp, W.accent, bold = true), modifier = GlanceModifier.defaultWeight(), maxLines = 1,
             )
             val head0 = ui.chapters.getOrNull(ui.current.coerceAtLeast(0))
             Text(
@@ -275,13 +275,13 @@ private fun Queue(ui: BriefUi) {
                             .clickable(actionRunCallback<ChapterAction>(actionParametersOf(ChapterAction.INDEX to i))),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(chapterNumber(i), style = mono(11.sp, if (current) W.amber else W.textMuted, bold = true))
+                        Text(chapterNumber(i), style = mono(11.sp, if (current) W.accent else W.textMuted, bold = true))
                         Spacer(GlanceModifier.width(10.dp))
                         Column(GlanceModifier.defaultWeight()) {
                             Text(a.title, style = serif(13.sp, bold = current), maxLines = 1)
                             Text((a.source ?: a.domain ?: "").uppercase(), style = mono(9.sp, W.textMuted), maxLines = 1)
                         }
-                        if (current) Text(if (ui.playing) "  ▶" else "  ❚❚", style = mono(10.sp, W.amber, bold = true))
+                        if (current) Text(if (ui.playing) "  ▶" else "  ❚❚", style = mono(10.sp, W.accent, bold = true))
                     }
                 }
             }
@@ -321,6 +321,8 @@ private fun player(context: Context) = (context.applicationContext as OpenWireAp
 private suspend fun ensureLoaded(context: Context): Boolean {
     val p = player(context)
     if (p.active) return true
+    // Brief from fresh stories: refetch Top Stories first if the cache is more than a few minutes old.
+    WidgetData.refreshIfStale(context, "TOP")
     val stories = WidgetData.articles(context, "TOP")
     if (stories.isEmpty()) return false
     withContext(Dispatchers.Main) { p.play("Top Stories", stories) }

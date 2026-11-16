@@ -48,7 +48,7 @@ class AppContainer(context: Context) {
     }
     /** Audio briefing engine — app-scoped so playback survives leaving the app and locking the phone. */
     val briefingPlayer: news.openwire.ui.home.BriefingPlayer by lazy {
-        news.openwire.ui.home.BriefingPlayer(context, prefs = { settingsRepository.settings.value.briefing }, extractor = articleTextExtractor)
+        news.openwire.ui.home.BriefingPlayer(context, prefs = { settingsRepository.settings.value.briefing }, extractor = articleTextExtractor, normalizeDomain = { domainRegistry.normalizeDomain(it) })
             .also { news.openwire.widget.WidgetSync.attach(context, it) }
     }
     val changelog: news.openwire.update.Changelog by lazy { news.openwire.update.Changelog(context) }

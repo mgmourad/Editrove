@@ -15,7 +15,9 @@ import news.openwire.data.repository.FeedResult
 import news.openwire.di.AppContainer
 import news.openwire.domain.engine.FeedOrdering
 import news.openwire.domain.engine.TopicRegistry
+import news.openwire.domain.engine.BreakingNews
 import news.openwire.notifications.BackgroundRefresher
+import news.openwire.notifications.BreakingAlert
 import news.openwire.notifications.NewHeadline
 import news.openwire.notifications.RefreshScheduler
 import news.openwire.notifications.TopicUpdate
@@ -29,6 +31,8 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // Scheduling and widget sync belong to the main process only (WorkManager lives there).
+        if (!isMainProcess()) return
         // Home-screen widgets follow the briefing player and saved stories.
         appScope.launch(Dispatchers.Main) {
             container.libraryStore.saved.collect { news.openwire.widget.WidgetSync.feedsChanged(this@OpenWireApp, delayMs = 300) }
@@ -36,10 +40,16 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
         // Keep the periodic refresh in step with the user's preferences.
         appScope.launch {
             container.settingsRepository.settings
-                .map { it.backgroundRefresh || (it.notificationsEnabled && it.notifyTopics.isNotEmpty()) }
+                .map { (it.backgroundRefresh || (it.notificationsEnabled && (it.notifyTopics.isNotEmpty() || it.breakingEnabled))) to it.refreshMinutes }
                 .distinctUntilChanged()
-                .collect { RefreshScheduler.schedule(this@OpenWireApp, it) }
+                .collect { (on, minutes) -> RefreshScheduler.schedule(this@OpenWireApp, on, minutes.toLong()) }
         }
+    }
+
+    private fun isMainProcess(): Boolean {
+        val name = if (android.os.Build.VERSION.SDK_INT >= 28) getProcessName()
+        else getSystemService(android.app.ActivityManager::class.java)?.runningAppProcesses?.firstOrNull { it.pid == android.os.Process.myPid() }?.processName
+        return name == null || name == packageName
     }
 
     override val backgroundRefresher: BackgroundRefresher by lazy {
@@ -68,15 +78,37 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
 
             override fun notificationsEnabled(): Boolean = container.settingsRepository.settings.value.notificationsEnabled
 
+            override suspend fun breaking(): List<BreakingAlert> {
+                val s = container.settingsRepository.settings.value
+                if (!s.breakingEnabled || !s.notificationsEnabled) return emptyList()
+                val country = TopicRegistry.country(s.edition.country)
+                val url = BreakingNews.queryUrl(s.breakingOutlets, hours = 2, country = country.code, language = country.hl.substringBefore('-')) ?: return emptyList()
+                val feed = news.openwire.data.remote.GoogleNewsRssSource().fetchFeed(url)
+                val normalizer = news.openwire.data.remote.RssNormalizer(container.domainRegistry)
+                val items = feed.items.mapIndexed { i, item -> normalizer.normalize(item, "BREAKING", i) }
+                val norm: (String) -> String = { container.domainRegistry.normalizeDomain(it) }
+                val hits = BreakingNews.detect(items, System.currentTimeMillis(), norm)
+                val seen = container.feedState.seen(BREAKING_ID).orEmpty()
+                val fresh = hits.filter { FeedOrdering.storyKey(it) !in seen }
+                container.feedState.setSeen(BREAKING_ID, (hits.map(FeedOrdering::storyKey) + seen).toSet())
+                return fresh.map { BreakingAlert(FeedOrdering.storyKey(it), NewHeadline(BreakingNews.cleanTitle(it.title), it.source, it.originalUrl)) }
+            }
+
+            override fun storyIntent(context: Context, headline: NewHeadline, topicId: String?): Intent =
+                Intent(context, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    topicId?.let { putExtra(MainActivity.EXTRA_TOPIC, it) }
+                    putExtra(MainActivity.EXTRA_URL, headline.url)
+                    putExtra(MainActivity.EXTRA_TITLE, headline.title)
+                }
+
             override fun launchIntent(context: Context, update: TopicUpdate): Intent =
                 Intent(context, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     putExtra(MainActivity.EXTRA_TOPIC, update.topicId)
-                    if (update.headlines.size == 1) {
-                        putExtra(MainActivity.EXTRA_URL, update.headlines.first().url)
-                        putExtra(MainActivity.EXTRA_TITLE, update.headlines.first().title)
-                    }
                 }
         }
     }
+
+    private companion object { const val BREAKING_ID = "BREAKING" }
 }

@@ -3,6 +3,6 @@
 <!-- Debug builds only: hosts the home-screen widgets at fixed sizes for testing. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
-        <activity android:name="news.openwire.debug.WidgetStudioActivity" android:exported="true" android:label="Widget Studio" />
+        <activity android:name="news.openwire.debug.WidgetStudioActivity" android:exported="true" android:process=":studio" android:label="Widget Studio" />
     </application>
 </manifest>

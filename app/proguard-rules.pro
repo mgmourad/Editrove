@@ -15,3 +15,10 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 -keep class news.openwire.**$$serializer { *; }
+
+# Home-screen widget buttons: Glance instantiates ActionCallbacks by class name
+# (reflection), so R8 must keep their no-arg constructors and onAction.
+-keep class * implements androidx.glance.appwidget.action.ActionCallback {
+    <init>();
+    *;
+}

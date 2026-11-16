@@ -133,7 +133,8 @@ and notifications all live on your device. Updates arrive straight from GitHub R
 | **Widgets** | Three Liquid Glass home-screen widgets that change layout as you resize them (2×2, 4×2, 4×4 and an unfolded 6×3): **The Editrove Daily Brief** (play/pause, ±15 s, speed, tap-to-seek, tap a chapter to jump), **Top Stories** (photos, sections, bookmarks) and **Topic of Choice** (switch topics in the widget) |
 | **Open anything** | Share a link from any app, select a URL and pick *Open in Editrove*, or paste one. It's routed and opened in the reader |
 | **Smart curation** | An on-device editorial ranker: where editors placed a story, how many outlets cover it, freshness, source authority and section fit (hard news leads the front page), then de-duplicated and diversified. "Also covered by" shows who else is running a story, and an optional, local-only tuning favours outlets you save and like. Applies to every topic, Discover and the audio briefing |
-| **Stay current** | Pull to refresh; curated, newest or oldest order; background refresh; opt-in local notifications per topic |
+| **Breaking news** | Optional heads-up alerts when newsrooms you pick (AP, Reuters, BBC, CNN and more) break a story, separate from topic alerts |
+| **Stay current** | Opening the app or switching pages quietly refreshes anything older than a few minutes; background refresh every 15 minutes to 6 hours (your choice); pull to refresh; background refresh; opt-in local notifications per topic |
 | **Updates** | Checks GitHub Releases on launch, shows an in-app banner, optional automatic install, a "What's new" note and a full changelog in Settings |
 | **Portability** | Export and import every setting as one JSON file, including backups from the original OpenWire web app |
 

@@ -82,6 +82,9 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         val briefingCue: Int = 1,
         val briefingStings: Boolean = true,
         val personalize: Boolean = true,
+        val refreshMinutes: Int = 60,
+        val breakingEnabled: Boolean = false,
+        val breakingOutlets: Set<String>? = null,
     ) {
         fun toSettings() = UserSettings(
             edition = LocalEdition(city, region, country),
@@ -99,6 +102,9 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
             autoCheckUpdates = autoCheckUpdates,
             autoInstallUpdates = autoInstallUpdates,
             personalize = personalize,
+            refreshMinutes = news.openwire.domain.engine.validRefresh(refreshMinutes),
+            breakingEnabled = breakingEnabled,
+            breakingOutlets = breakingOutlets ?: news.openwire.domain.engine.BreakingNews.DEFAULT_KEYS,
             briefing = news.openwire.domain.model.BriefingPrefs(
                 voice = briefingVoice, speed = briefingSpeed.coerceIn(0.5f, 2.5f), count = briefingCount.coerceIn(1, 30),
                 detail = news.openwire.domain.model.BriefingDetail.entries.firstOrNull { it.name == briefingDetail } ?: news.openwire.domain.model.BriefingDetail.HEADLINES,
@@ -116,7 +122,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 s.disabledServices.map { it.wireValue }.toSet(),
                 s.unfoldedLayout.name, s.autoCheckUpdates, s.autoInstallUpdates,
                 s.briefing.voice, s.briefing.speed, s.briefing.count, s.briefing.detail.name, s.briefing.openingCue, s.briefing.stings,
-                s.personalize,
+                s.personalize, s.refreshMinutes, s.breakingEnabled, s.breakingOutlets,
             )
         }
     }

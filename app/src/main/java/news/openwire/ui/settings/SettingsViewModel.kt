@@ -91,6 +91,27 @@ class SettingsViewModel(
         } else s.copy(hiddenTopics = if (visible) s.hiddenTopics - id else s.hiddenTopics + id)
     }
 
+    private val _keywordIdeas = MutableStateFlow<KeywordIdeas>(KeywordIdeas.Idle)
+    /** Keywords suggested from live headlines for a topic that isn't a preset. */
+    val keywordIdeas: StateFlow<KeywordIdeas> = _keywordIdeas
+
+    /** Reads the latest Google News headlines for [topic] and suggests the names that recur. */
+    fun suggestKeywords(topic: String) {
+        val q = topic.trim()
+        if (q.length < 2) return
+        _keywordIdeas.value = KeywordIdeas.Loading(q)
+        viewModelScope.launch {
+            val ideas = runCatching {
+                val url = TopicRegistry.googleNewsSearchUrl(q, TopicRegistry.country(settings.value.edition.country))
+                val feed = news.openwire.data.remote.GoogleNewsRssSource().fetchFeed(url)
+                news.openwire.domain.engine.KeywordMiner.fromHeadlines(q, feed.items.map { it.title })
+            }.getOrNull()
+            _keywordIdeas.value = if (ideas.isNullOrEmpty()) KeywordIdeas.Failed(q) else KeywordIdeas.Ready(q, ideas)
+        }
+    }
+
+    fun clearKeywordIdeas() { _keywordIdeas.value = KeywordIdeas.Idle }
+
     fun addTopic(label: String, keywords: String, sources: List<String>): Boolean = try {
         val topic = TopicRegistry.newCustomTopic(label, TopicRegistry.parseCommaKeywords(keywords), sources, settings.value.edition, clock())
         settingsRepo.update { s -> s.copy(customTopics = s.customTopics + topic, topicOrder = s.topicOrder?.plus(topic.id)) }
@@ -215,6 +236,11 @@ class SettingsViewModel(
     fun setAutoCheckUpdates(on: Boolean) = settingsRepo.update { it.copy(autoCheckUpdates = on) }
     fun setAutoInstallUpdates(on: Boolean) = settingsRepo.update { it.copy(autoInstallUpdates = on) }
     fun setPersonalize(on: Boolean) = settingsRepo.update { it.copy(personalize = on) }
+    fun setRefreshMinutes(m: Int) = settingsRepo.update { it.copy(refreshMinutes = news.openwire.domain.engine.validRefresh(m)) }
+    fun setBreakingEnabled(on: Boolean) = settingsRepo.update { it.copy(breakingEnabled = on) }
+    fun toggleBreakingOutlet(key: String) = settingsRepo.update { s ->
+        s.copy(breakingOutlets = if (key in s.breakingOutlets) s.breakingOutlets - key else s.breakingOutlets + key)
+    }
     fun setBackgroundRefresh(on: Boolean) = settingsRepo.update { it.copy(backgroundRefresh = on) }
 
     // ---- Backup ----
@@ -243,4 +269,11 @@ class SettingsViewModel(
         resetAllRules()
         _message.value = "Everything is back to the defaults."
     }
+}
+
+sealed interface KeywordIdeas {
+    data object Idle : KeywordIdeas
+    data class Loading(val topic: String) : KeywordIdeas
+    data class Ready(val topic: String, val keywords: List<String>) : KeywordIdeas
+    data class Failed(val topic: String) : KeywordIdeas
 }

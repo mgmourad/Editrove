@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
-<!-- Tactile gradient transport button: cyan thread into warm amber. -->
+<!-- Transport button in the app's Rose accent. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
-    <gradient android:angle="45" android:startColor="#38BDF8" android:endColor="#F59E0B" />
+    <solid android:color="#E11D48" />
 </shape>

@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+package news.openwire.domain.engine
+
+import java.net.URLEncoder
+import news.openwire.domain.model.Article
+
+/**
+ * Breaking-news alerts, separate from topic notifications. Editrove watches the newsrooms
+ * the reader picks and flags a story as breaking when the outlet labels it so ("BREAKING:",
+ * "Breaking news") or when it is minutes old and already being carried by many outlets.
+ */
+object BreakingNews {
+
+    data class Outlet(val key: String, val name: String, val domain: String)
+
+    val OUTLETS: List<Outlet> = listOf(
+        Outlet("ap", "Associated Press", "apnews.com"),
+        Outlet("reuters", "Reuters", "reuters.com"),
+        Outlet("bbc", "BBC News", "bbc.com"),
+        Outlet("cnn", "CNN", "cnn.com"),
+        Outlet("nbc", "NBC News", "nbcnews.com"),
+        Outlet("abc", "ABC News", "abcnews.go.com"),
+        Outlet("cbs", "CBS News", "cbsnews.com"),
+        Outlet("fox", "Fox News", "foxnews.com"),
+        Outlet("npr", "NPR", "npr.org"),
+        Outlet("nyt", "The New York Times", "nytimes.com"),
+        Outlet("wapo", "The Washington Post", "washingtonpost.com"),
+        Outlet("wsj", "The Wall Street Journal", "wsj.com"),
+        Outlet("bloomberg", "Bloomberg", "bloomberg.com"),
+        Outlet("aljazeera", "Al Jazeera", "aljazeera.com"),
+        Outlet("guardian", "The Guardian", "theguardian.com"),
+        Outlet("politico", "Politico", "politico.com"),
+    )
+
+    /** On by default when the reader turns Breaking News on. */
+    val DEFAULT_KEYS: Set<String> = setOf("ap", "reuters", "bbc", "cnn", "nbc", "abc", "cbs", "npr")
+
+    /** One Google News query covering every chosen outlet for the last [hours]. */
+    fun queryUrl(keys: Set<String>, hours: Int = 2, country: String = "US", language: String = "en"): String? {
+        val domains = OUTLETS.filter { it.key in keys }.map { it.domain }
+        if (domains.isEmpty()) return null
+        val q = "(" + domains.joinToString(" OR ") { "site:$it" } + ") when:${hours}h"
+        return "https://news.google.com/rss/search?q=${URLEncoder.encode(q, "UTF-8")}&hl=$language-$country&gl=$country&ceid=$country:$language"
+    }
+
+    private val LABEL = Regex("^\\s*(BREAKING( NEWS)?|Breaking( news)?|Developing( story)?|JUST IN|Just in)\\s*[:\\-–—|]", RegexOption.IGNORE_CASE)
+    private val WORD = Regex("\\b(breaking news|breaking story|breaking:)\\b", RegexOption.IGNORE_CASE)
+
+    /** Why a story counts as breaking, or null. */
+    fun reason(a: Article, nowMillis: Long): String? {
+        val age = a.publishedAt?.let { (nowMillis - it) / 60_000 } ?: return null
+        if (age > 120 || age < -10) return null
+        if (LABEL.containsMatchIn(a.title) || WORD.containsMatchIn(a.title)) return "labelled breaking"
+        // Minutes old and already everywhere: Google's full-coverage cluster is large.
+        if (age <= 45 && (a.coverage ?: 0) >= 5) return "widely reported"
+        return null
+    }
+
+    /** The breaking stories in [articles], newest first, one per story. */
+    fun detect(articles: List<Article>, nowMillis: Long, normalizeDomain: (String) -> String): List<Article> {
+        val hits = articles.filter { reason(it, nowMillis) != null }.sortedByDescending { it.publishedAt ?: 0L }
+        val out = ArrayList<Article>()
+        for (a in hits) if (out.none { StoryIdentity.sameStory(it, a, normalizeDomain) }) out += a
+        return out
+    }
+
+    /** Headline without the "BREAKING:" label (the notification says it already). */
+    fun cleanTitle(title: String): String = title.replace(LABEL, "").trim().replaceFirstChar { it.uppercase() }
+}
+
+/** Background refresh intervals offered in Settings (minutes); WorkManager's floor is 15. */
+val REFRESH_CHOICES = listOf(15, 30, 60, 180, 360)
+
+fun validRefresh(minutes: Int): Int = REFRESH_CHOICES.minByOrNull { kotlin.math.abs(it - minutes) } ?: 60

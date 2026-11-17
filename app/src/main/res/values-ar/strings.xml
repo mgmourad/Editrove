@@ -430,4 +430,12 @@
     <string name="op_new_topic_hint">اكتب موضوعاً واضغط إدخال</string>
     <string name="op_social_note">تأتي المقالات من أقسام الرأي والتحليل في كل صحيفة. المنشورات عامة من Bluesky وMastodon؛ ولا يرسل Editrove سوى الحسابات التي تتابعها والمواضيع التي تفتحها.</string>
     <string name="reader_posts">منشورات في هذا الخبر</string>
+    <string name="op_search_hint">ابحث عن كتّاب وصحف ومواضيع</string>
+    <string name="op_add_as_tab">إضافة ”%1$s“ تبويباً</string>
+    <string name="op_results_writers">الكتّاب</string>
+    <string name="op_results_columns">المقالات</string>
+    <string name="op_columnists">كتّاب الرأي · %1$s</string>
+    <string name="op_on_bluesky">على Bluesky</string>
+    <string name="op_pieces">%1$d مقالات حديثة</string>
+    <string name="op_searching">جارٍ البحث…</string>
 </resources>

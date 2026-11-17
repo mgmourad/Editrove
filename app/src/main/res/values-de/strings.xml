@@ -430,4 +430,12 @@
     <string name="op_new_topic_hint">Thema eingeben und Enter drücken</string>
     <string name="op_social_note">Kommentare stammen aus den Meinungs- und Analyseressorts der Medien. Beiträge sind öffentlich, von Bluesky und Mastodon; Editrove sendet nur die Konten, denen du folgst, und die Themen, die du öffnest.</string>
     <string name="reader_posts">Beiträge in dieser Meldung</string>
+    <string name="op_search_hint">Autoren, Medien und Themen suchen</string>
+    <string name="op_add_as_tab">„%1$s“ als Tab hinzufügen</string>
+    <string name="op_results_writers">Autorinnen und Autoren</string>
+    <string name="op_results_columns">Kommentare</string>
+    <string name="op_columnists">Kolumnisten · %1$s</string>
+    <string name="op_on_bluesky">Auf Bluesky</string>
+    <string name="op_pieces">%1$d neue Texte</string>
+    <string name="op_searching">Suche…</string>
 </resources>

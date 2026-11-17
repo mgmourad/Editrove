@@ -430,4 +430,12 @@
     <string name="op_new_topic_hint">Tapez un sujet puis Entrée</string>
     <string name="op_social_note">Les tribunes viennent des rubriques opinion et analyse de chaque titre. Les messages sont publics, de Bluesky et Mastodon ; Editrove n’envoie que les comptes suivis et les sujets ouverts.</string>
     <string name="reader_posts">Publications citées dans l’article</string>
+    <string name="op_search_hint">Chercher des auteurs, titres et sujets</string>
+    <string name="op_add_as_tab">Ajouter « %1$s » en onglet</string>
+    <string name="op_results_writers">Auteurs</string>
+    <string name="op_results_columns">Tribunes</string>
+    <string name="op_columnists">Chroniqueurs · %1$s</string>
+    <string name="op_on_bluesky">Sur Bluesky</string>
+    <string name="op_pieces">%1$d textes récents</string>
+    <string name="op_searching">Recherche…</string>
 </resources>

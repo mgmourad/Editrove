@@ -430,4 +430,12 @@
     <string name="op_new_topic_hint">Escribe un tema y pulsa Intro</string>
     <string name="op_social_note">Las columnas vienen de las secciones de opinión y análisis de cada medio. Las publicaciones son públicas, de Bluesky y Mastodon; Editrove solo envía las cuentas que sigues y los temas que abres.</string>
     <string name="reader_posts">Publicaciones en esta noticia</string>
+    <string name="op_search_hint">Buscar autores, medios y temas</string>
+    <string name="op_add_as_tab">Añadir “%1$s” como pestaña</string>
+    <string name="op_results_writers">Autores</string>
+    <string name="op_results_columns">Columnas</string>
+    <string name="op_columnists">Columnistas · %1$s</string>
+    <string name="op_on_bluesky">En Bluesky</string>
+    <string name="op_pieces">%1$d textos recientes</string>
+    <string name="op_searching">Buscando…</string>
 </resources>

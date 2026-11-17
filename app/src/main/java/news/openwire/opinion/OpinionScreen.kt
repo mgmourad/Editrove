@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -121,7 +122,7 @@ fun OpinionScreen(
     val c = if (Glass.isDark) Night else Day
     var tab by rememberSaveable { mutableStateOf(if (followedAuthors.isEmpty() && followedAccounts.isEmpty()) ALL else FOLLOWING) }
     var refresh by remember { mutableIntStateOf(0) }
-    var adding by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
 
     val columns by produceState<List<OpinionSource.Column>?>(null, appLanguage, refresh) { value = source.columns(appLanguage, force = refresh > 0) }
     // Suggestions in the page's own script (an English headline doesn't suggest a tab on an Arabic page).
@@ -140,14 +141,18 @@ fun OpinionScreen(
                         TabChip(c, tr(R.string.op_all), tab == ALL) { tab = ALL }
                         TabChip(c, tr(R.string.op_analysis), tab == ANALYSIS) { tab = ANALYSIS }
                         tabs.forEach { t -> TabChip(c, t, tab == t, onRemove = { actions.removeTab(t); if (tab == t) tab = ALL }) { tab = t } }
-                        AddChip(c) { adding = !adding }
                     }
-                    if (adding || (tab == ALL && trending.isNotEmpty())) {
-                        Trending(c, trending, adding) { t -> actions.addTab(t); tab = t; adding = false }
+                    // Results fill in as you type: writers, columns, a live search, accounts.
+                    SearchField(c, query, { query = it }) { q -> if (q.isNotBlank()) { actions.addTab(q.trim()); tab = q.trim(); query = "" } }
+                    if (query.isBlank() && trending.isNotEmpty() && (tab == ALL || tab == FOLLOWING)) {
+                        Trending(c, trending) { t -> actions.addTab(t); tab = t }
                     }
                 }
             }
-            when (tab) {
+            if (query.trim().length >= 2) {
+                searchResults(c, source, query.trim(), columns, appLanguage, followedAuthors, followedAccounts, actions,
+                    onAddTab = { q -> actions.addTab(q); tab = q; query = "" })
+            } else when (tab) {
                 FOLLOWING -> followingTab(c, source, columns, followedAuthors, followedAccounts, appLanguage, actions, refresh)
                 ALL, ANALYSIS -> {
                     val kind = if (tab == ALL) OpinionKind.OPINION else OpinionKind.ANALYSIS
@@ -202,9 +207,15 @@ private fun LazyListScope.followingTab(
             }
         }
     }
+    // Columnists from the outlets' own opinion pages, in this page's language first, then English.
+    val writers = columnists(columns.orEmpty(), appLanguage, authors)
+    writers.groupBy { it.language }.forEach { (lang, list) ->
+        item("cw-$lang") { Rule(c, tr(R.string.op_columnists, news.openwire.domain.engine.Languages.of(lang)?.nativeName ?: lang)) }
+        items(list.take(12), key = { "w" + it.key }) { w -> WriterRow(c, w, followed = false) { actions.toggleAuthor(w.name) } }
+    }
     val voices = OpinionCatalog.voicesFor(appLanguage).filter { it.handle !in accounts }
     if (voices.isNotEmpty()) {
-        item("voices") { Rule(c, tr(R.string.op_voices)) }
+        item("voices") { Rule(c, tr(R.string.op_on_bluesky)) }
         items(voices, key = { "v" + it.handle }) { v -> VoiceRow(c, v, followed = false) { actions.toggleAccount(v.handle) } }
     }
 }
@@ -282,19 +293,7 @@ private fun TabChip(c: OpEdPalette, label: String, on: Boolean, onRemove: (() ->
 }
 
 @Composable
-private fun AddChip(c: OpEdPalette, onClick: () -> Unit) {
-    Row(
-        Modifier.clip(CircleShape).border(1.dp, c.accent, CircleShape).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Filled.Add, null, tint = c.accent, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(4.dp))
-        Text(tr(R.string.op_add_topic), style = sans(13.sp, FontWeight.SemiBold), color = c.accent)
-    }
-}
-
-@Composable
-private fun Trending(c: OpEdPalette, topics: List<String>, typing: Boolean, onAdd: (String) -> Unit) {
+private fun Trending(c: OpEdPalette, topics: List<String>, onAdd: (String) -> Unit) {
     Column(Modifier.padding(top = 10.dp, bottom = 4.dp)) {
         Text(tr(R.string.op_trending).uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = c.dim)
         Spacer(Modifier.height(6.dp))
@@ -310,24 +309,32 @@ private fun Trending(c: OpEdPalette, topics: List<String>, typing: Boolean, onAd
                 }
             }
         }
-        if (typing) {
-            var text by rememberSaveable { mutableStateOf("") }
-            Row(
-                Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(c.surface)
-                    .border(1.dp, c.rule, RoundedCornerShape(8.dp)).padding(horizontal = 14.dp, vertical = 11.dp),
-            ) {
-                Box(Modifier.weight(1f)) {
-                    if (text.isEmpty()) Text(tr(R.string.op_new_topic_hint), style = sans(14.sp), color = c.dim)
-                    BasicTextField(
-                        text, { text = it }, singleLine = true,
-                        textStyle = TextStyle(color = c.text, fontSize = 14.sp), cursorBrush = SolidColor(c.accent),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(onDone = { if (text.isNotBlank()) onAdd(text.trim()) }),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
+    }
+}
+
+@Composable
+private fun SearchField(c: OpEdPalette, text: String, onChange: (String) -> Unit, onDone: (String) -> Unit) {
+    Row(
+        Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(c.surface)
+            .border(1.dp, if (text.isNotEmpty()) c.accent else c.rule, RoundedCornerShape(10.dp)).padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.Search, null, tint = c.dim, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(10.dp))
+        Box(Modifier.weight(1f)) {
+            if (text.isEmpty()) Text(tr(R.string.op_search_hint), style = sans(14.sp), color = c.dim)
+            BasicTextField(
+                text, onChange, singleLine = true,
+                textStyle = TextStyle(color = c.text, fontSize = 14.sp), cursorBrush = SolidColor(c.accent),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onDone(text) }),
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
+        if (text.isNotEmpty()) Icon(
+            Icons.Filled.Close, null, tint = c.dim,
+            modifier = Modifier.clip(CircleShape).clickable { onChange("") }.padding(4.dp).size(16.dp),
+        )
     }
 }
 
@@ -467,5 +474,91 @@ private fun VoiceRow(c: OpEdPalette, v: Voice, followed: Boolean, onFollow: () -
             Text("\u2066@${v.handle} · Bluesky\u2069", style = sans(11.sp), color = c.dim)
         }
         FollowChip(c, followed, onFollow)
+    }
+}
+
+/** A writer seen in today's columns. */
+private data class Writer(val key: String, val name: String, val outlet: String, val language: String, val latest: Article, val count: Int)
+
+/**
+ * Today's columnists: bylines from the columns (not an outlet's own name), most prolific
+ * first, grouped with Editrove's language first, then English, then the rest.
+ */
+private fun columnists(columns: List<OpinionSource.Column>, appLanguage: String, followed: Set<String>): List<Writer> {
+    val skip = followed.map(OpinionCatalog::authorKey).toSet()
+    return columns.filter { it.article.author != null }
+        .groupBy { OpinionCatalog.authorKey(it.article.author!!) }
+        .filter { (k, list) ->
+            val a = list.first().article
+            k.isNotBlank() && k !in skip && a.author!!.length <= 40 &&
+                !a.author.equals(a.source, true) && OpinionCatalog.authorKey(a.source.orEmpty()) != k
+        }
+        .map { (k, list) ->
+            val newest = list.maxByOrNull { it.article.publishedAt ?: 0L }!!
+            Writer(k, newest.article.author!!, newest.article.source.orEmpty(), newest.language, newest.article, list.size)
+        }
+        .sortedWith(compareBy<Writer>({ when (it.language) { appLanguage -> 0; "en" -> 1; else -> 2 } }, { -it.count }, { -(it.latest.publishedAt ?: 0L) }))
+}
+
+@Composable
+private fun WriterRow(c: OpEdPalette, w: Writer, followed: Boolean, onFollow: () -> Unit) {
+    Row(Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(38.dp).clip(CircleShape).background(c.accent), contentAlignment = Alignment.Center) {
+            Text(w.name.trim().firstOrNull()?.uppercase() ?: "•", style = serif(17.sp, FontWeight.Bold), color = c.onAccent)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(w.name, style = serif(16.sp, FontWeight.SemiBold).copy(fontStyle = FontStyle.Italic), color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                listOf(w.outlet, tr(R.string.op_pieces, w.count)).filter { it.isNotBlank() }.joinToString("  ·  "),
+                style = sans(11.sp), color = c.dim, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Text(w.latest.title, style = sans(12.sp), color = c.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.width(8.dp))
+        FollowChip(c, followed, onFollow)
+    }
+}
+
+/** Results as you type: matching writers, columns and accounts at once, then a live search. */
+private fun LazyListScope.searchResults(
+    c: OpEdPalette, source: OpinionSource, q: String, columns: List<OpinionSource.Column>?, appLanguage: String,
+    authors: Set<String>, accounts: Set<String>, actions: OpinionActions, onAddTab: (String) -> Unit,
+) {
+    val all = columns.orEmpty()
+    val keys = authors.map(OpinionCatalog::authorKey).toSet()
+    item("s-add") {
+        Row(Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                tr(R.string.op_add_as_tab, q), style = sans(13.sp, FontWeight.SemiBold), color = c.onAccent,
+                modifier = Modifier.clip(CircleShape).background(c.accent).clickable { onAddTab(q) }.padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+        }
+    }
+    val writers = columnists(all, appLanguage, emptySet()).filter { it.name.contains(q, true) || it.outlet.contains(q, true) }
+    if (writers.isNotEmpty()) {
+        item("s-w") { Rule(c, tr(R.string.op_results_writers)) }
+        items(writers.take(8), key = { "sw" + it.key }) { w -> WriterRow(c, w, followed = w.key in keys) { actions.toggleAuthor(w.name) } }
+    }
+    val voices = OpinionCatalog.VOICES.filter { it.name.contains(q, true) || it.handle.contains(q, true) }
+    if (voices.isNotEmpty()) {
+        item("s-v") { Rule(c, tr(R.string.op_on_bluesky)) }
+        items(voices, key = { "sv" + it.handle }) { v -> VoiceRow(c, v, followed = v.handle in accounts) { actions.toggleAccount(v.handle) } }
+    }
+    val local = all.map { it.article }.filter { a -> a.title.contains(q, true) || a.summary?.contains(q, true) == true || a.author?.contains(q, true) == true }
+    item("s-c") {
+        // The live search waits for a pause in typing before asking the network.
+        val searched by produceState<List<Article>?>(null, q, appLanguage) {
+            value = null
+            kotlinx.coroutines.delay(450)
+            value = source.topicColumns(q, appLanguage)
+        }
+        val list = (local + searched.orEmpty()).distinctBy { it.title.lowercase() }.take(25)
+        Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
+            Rule(c, tr(R.string.op_results_columns))
+            if (list.isEmpty()) Status(c, if (searched == null) tr(R.string.op_searching) else tr(R.string.op_nothing))
+            list.forEach { ColumnCard(c, it, it.author?.let { a -> OpinionCatalog.authorKey(a) in keys } == true, actions) }
+            if (searched == null && list.isNotEmpty()) Status(c, tr(R.string.op_searching))
+        }
     }
 }

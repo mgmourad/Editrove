@@ -109,6 +109,7 @@ class BriefingService : Service() {
         scope.launch {
             news.openwire.widget.WidgetData.refreshIfStale(this@BriefingService, topicId)
             val stories = news.openwire.widget.WidgetData.articles(this@BriefingService, topicId)
+            p.awaitReady()
             preparing = false
             if (stories.isNotEmpty()) {
                 p.play(label, stories)

@@ -95,4 +95,14 @@ class RssSourceTest {
         val second = RssNormalizer(DomainRegistry()).normalize(items[1], "TOP", 1, feedName = "CBC News")
         assertEquals("https://i.cbc.ca/two.jpg", second.imageUrl)
     }
+
+    @Test
+    fun photoCreditInSourceTagIsNotTheOutlet() {
+        val xml = """<rss><channel><item><title>Trump heads to Asia</title><link>https://www.france24.com/en/asia-pacific/20261117-trump</link>
+            <source url="https://s.france24.com/media/display/x.jpg">© Manuel Balce Ceneta, AP</source><pubDate>Tue, 17 Nov 2026 03:07:59 GMT</pubDate></item></channel></rss>"""
+        val item = GoogleNewsRssSource().parse(xml).first()
+        val a = RssNormalizer(DomainRegistry()).normalize(item, "INTERNATIONAL", 0, feedName = "France 24", feedUrl = "https://www.france24.com/en/rss")
+        org.junit.Assert.assertEquals("France 24", a.source)
+        org.junit.Assert.assertEquals("france24.com", a.domain)
+    }
 }

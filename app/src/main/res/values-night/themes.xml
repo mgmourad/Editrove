@@ -6,4 +6,10 @@
         <item name="android:navigationBarColor">@color/obsidian</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
+    <!-- Time picker for scheduled briefings, in Editrove's colours. -->
+    <style name="Editrove.TimePicker" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:colorAccent">#FB3768</item>
+        <item name="android:colorPrimary">#FB3768</item>
+        <item name="android:colorBackground">#181A24</item>
+    </style>
 </resources>

@@ -87,6 +87,7 @@ object SettingsCodec {
                     settings.briefing.voice?.let { put("voice", it) }
                     put("speed", settings.briefing.speed); put("count", settings.briefing.count)
                     put("detail", settings.briefing.detail.name); put("openingCue", settings.briefing.openingCue); put("stings", settings.briefing.stings)
+                    put("slots", news.openwire.domain.model.BriefingSlot.encode(settings.briefing.slots))
                 }
             }
         }
@@ -190,8 +191,9 @@ object SettingsCodec {
                     speed = ((b["speed"] as? JsonPrimitive)?.contentOrNull?.toFloatOrNull() ?: 1f).coerceIn(0.5f, 2.5f),
                     count = ((b["count"] as? JsonPrimitive)?.intOrNull ?: 8).coerceIn(1, 30),
                     detail = news.openwire.domain.model.BriefingDetail.entries.firstOrNull { it.name == b["detail"].str() } ?: news.openwire.domain.model.BriefingDetail.HEADLINES,
-                    openingCue = ((b["openingCue"] as? JsonPrimitive)?.intOrNull ?: 1).coerceIn(0, 4),
+                    openingCue = ((b["openingCue"] as? JsonPrimitive)?.intOrNull ?: 1).coerceIn(0, news.openwire.domain.model.BriefingPrefs.CUE_COUNT),
                     stings = b["stings"].bool() ?: true,
+                    slots = news.openwire.domain.model.BriefingSlot.decode(b["slots"].str()),
                 )
             } ?: defaults.briefing,
         )

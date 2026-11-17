@@ -72,6 +72,8 @@ class ArticleTextExtractor(
         .build(),
     /** Turns a news.google.com wrapper into the publisher's own URL (null if it can't). */
     private val resolveLink: suspend (String) -> String? = { null },
+    /** Loads a page the way a browser does (for sites that refuse plain HTTP clients). */
+    private val renderPage: suspend (String) -> String? = { null },
 ) {
     private companion object {
         /** Site chrome that leaks into `<p>` tags (comment prompts, newsletter and cookie banners…). */
@@ -82,6 +84,7 @@ class ArticleTextExtractor(
             // "About us" blurbs from site footers and sidebars.
             "is provided by", "launched in 20", "launched in 19", "media company", "sign-in, which works",
             "download the app", "watch live", "all rights", "is a leading", "our journalists", "send us a tip",
+            "support trusted journalism", "support our journalism", "become a member", "donate now", "make a gift",
         )
         val PAYWALL_HINTS = listOf(
             "subscribe to continue", "to continue reading", "already a subscriber", "subscribers only",
@@ -96,7 +99,12 @@ class ArticleTextExtractor(
     suspend fun extract(link: String): ArticleContent? {
         // Google News wrappers carry no article: read the publisher's page instead.
         val url = if (news.openwire.domain.engine.GoogleNewsUrls.isGoogleNewsUrl(link)) resolveLink(link) ?: return null else link
-        val direct = extractFrom(url)?.copy(via = TextSource.PUBLISHER, viaUrl = url)
+        val fetched = extractFrom(url)?.copy(via = TextSource.PUBLISHER, viaUrl = url)
+        if (complete(fetched)) return fetched
+        // Blocked or script-built pages: read what a browser would show.
+        val rendered = if (fetched != null && fetched.text.length >= 600) null
+        else runCatching { renderPage(url) }.getOrNull()?.let { parse(it) }?.copy(via = TextSource.PUBLISHER, viaUrl = url)
+        val direct = listOfNotNull(fetched, rendered).maxByOrNull { it.text.length }
         if (complete(direct)) return direct
         val wayback = waybackSnapshot(url)?.let { snap -> extractFrom(snap.second)?.copy(via = TextSource.WAYBACK, viaUrl = snap.first) }
         if (complete(wayback)) return wayback.mergeMeta(direct)
@@ -133,14 +141,21 @@ class ArticleTextExtractor(
 
     private suspend fun extractFrom(url: String): ArticleContent? = withContext(Dispatchers.IO) {
         try {
-            val html = get(url) ?: return@withContext null
+            get(url)?.let { parse(it) }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun parse(html: String): ArticleContent? {
+        try {
             val doc = Jsoup.parse(html)
             val title = doc.selectFirst("h1")?.text().orEmpty().ifEmpty { doc.title() }
             val paragraphs = articleParagraphs(doc)
             val text = paragraphs.joinToString("\n\n")
-            if (text.isBlank()) return@withContext null
+            if (text.isBlank()) return null
             val imageUrl = doc.meta("og:image") ?: doc.selectFirst("article img")?.attr("src")
-            ArticleContent(
+            return ArticleContent(
                 title = title,
                 text = text,
                 imageUrl = imageUrl,
@@ -150,7 +165,7 @@ class ArticleTextExtractor(
                     ?.takeIf { it.isNotBlank() && !it.startsWith("http") && it.length < 80 },
             )
         } catch (e: Exception) {
-            null
+            return null
         }
     }
 
@@ -160,7 +175,11 @@ class ArticleTextExtractor(
      * then the container holding the most paragraph text is taken as the article.
      */
     internal fun articleParagraphs(doc: Document): List<String> {
-        doc.select(CHROME).remove()
+        // Drop page chrome, but never a block holding much of the page's paragraph text:
+        // layout wrappers are often named "has-sidebar", "share-layout"… and contain the story.
+        fun pText(e: org.jsoup.nodes.Element) = e.select("p").sumOf { p -> p.text().length.takeIf { it > 40 } ?: 0 }
+        val total = pText(doc.body() ?: doc).coerceAtLeast(1)
+        doc.select(CHROME).filter { pText(it) < total * 0.25 }.forEach { it.remove() }
         val candidates = doc.select("article, [itemprop=articleBody], main, section, div")
         val best = candidates.maxByOrNull { el ->
             el.children().filter { it.tagName() == "p" }.sumOf { p -> p.text().length.takeIf { it > 40 } ?: 0 }

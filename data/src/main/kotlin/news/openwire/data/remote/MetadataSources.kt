@@ -109,27 +109,36 @@ class ImageResolver(
     private val client: OkHttpClient = OkHttpClient.Builder().connectTimeout(4, TimeUnit.SECONDS).readTimeout(6, TimeUnit.SECONDS).build(),
     /** Turns a news.google.com wrapper into the publisher's own URL (null if it can't). */
     private val resolveLink: suspend (String) -> String? = { null },
+    /** Browser-rendered HTML for sites that refuse plain HTTP clients. */
+    private val renderPage: suspend (String) -> String? = { null },
 ) {
     private val cache = ConcurrentHashMap<String, String>()
+
+    /** Remembers a photo found elsewhere (e.g. by the reader) so cards can show it. */
+    fun remember(link: String?, imageUrl: String?) {
+        if (!link.isNullOrBlank() && !imageUrl.isNullOrBlank()) cache[link] = imageUrl
+    }
     private val misses = ConcurrentHashMap<String, Long>()
     private val permits = Semaphore(3)
 
     suspend fun resolve(link: String?): String? {
         if (link.isNullOrBlank()) return null
         val articleUrl = if (link.contains("news.google.com")) resolveLink(link) ?: return null else link
+        cache[link]?.let { return it }
         cache[articleUrl]?.let { return it }
         misses[articleUrl]?.let { if (System.currentTimeMillis() - it < 10 * 60_000L) return null }
         return permits.withPermit {
-            withContext(Dispatchers.IO) {
-                val html = runCatching {
+            val html = withContext(Dispatchers.IO) {
+                runCatching {
                     client.newCall(
                         Request.Builder().url(articleUrl)
                             .header("User-Agent", "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36")
                             .build(),
                     ).execute().use { r -> if (r.isSuccessful) r.body?.source()?.let { s -> s.request(400_000); s.buffer.readUtf8(minOf(s.buffer.size, 400_000)) } else null }
                 }.getOrNull()
-                ImageExtractor.fromHtml(html, articleUrl)
             }
+            // Refused (403 / bot wall)? Read the page as a browser renders it.
+            ImageExtractor.fromHtml(html ?: runCatching { renderPage(articleUrl) }.getOrNull(), articleUrl)
         }.also { if (it != null) cache[articleUrl] = it else misses[articleUrl] = System.currentTimeMillis() }
     }
 }
@@ -140,6 +149,9 @@ class ImageResolver(
  */
 class PublisherLogoResolver(
     private val client: OkHttpClient = OkHttpClient.Builder().connectTimeout(4, TimeUnit.SECONDS).readTimeout(6, TimeUnit.SECONDS).build(),
+    /** Saved logos (domain → URL) so each publisher's home page is read once, not every launch. */
+    private val load: (String) -> String? = { null },
+    private val save: (String, String) -> Unit = { _, _ -> },
 ) {
     private val cache = ConcurrentHashMap<String, String>()
     private val misses = ConcurrentHashMap<String, Long>()
@@ -148,6 +160,7 @@ class PublisherLogoResolver(
     suspend fun logo(domain: String?): String? {
         val d = domain?.lowercase()?.removePrefix("www.")?.takeIf { it.contains('.') } ?: return null
         cache[d]?.let { return it }
+        load(d)?.let { cache[d] = it; return it }
         misses[d]?.let { if (System.currentTimeMillis() - it < 60 * 60_000L) return null }
         return permits.withPermit {
             withContext(Dispatchers.IO) {
@@ -164,7 +177,7 @@ class PublisherLogoResolver(
                     found ?: listOf("https://www.$d/apple-touch-icon.png", "https://$d/apple-touch-icon.png").firstOrNull { isImage(it) }
                 }.getOrNull()
             }
-        }.also { if (it != null) cache[d] = it else misses[d] = System.currentTimeMillis() }
+        }.also { if (it != null) { cache[d] = it; save(d, it) } else misses[d] = System.currentTimeMillis() }
     }
 
     private fun isImage(url: String): Boolean = runCatching {

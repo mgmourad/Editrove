@@ -36,6 +36,7 @@ import news.openwire.ui.home.sans
 import news.openwire.ui.home.serif
 import news.openwire.ui.theme.Glass
 import news.openwire.ui.theme.OpenWireTheme
+import kotlinx.coroutines.launch
 
 /**
  * Shown when "Topic of Choice" is added to the home screen (and when it's reconfigured):
@@ -60,9 +61,9 @@ class TopicWidgetConfigureActivity : ComponentActivity() {
                         item {
                             Text("TOPIC OF CHOICE", style = mono(10.sp, FontWeight.SemiBold), color = g.accentSoft)
                             Spacer(Modifier.height(6.dp))
-                            Text("Which topic should this widget brief?", style = serif(26.sp, lineHeight = 30.sp), color = g.textPrimary)
+                            Text("Which topic should this widget show?", style = serif(26.sp, lineHeight = 30.sp), color = g.textPrimary)
                             Spacer(Modifier.height(6.dp))
-                            Text("It shows that topic's stories and plays its audio briefing. Long-press the widget to change it later.", style = sans(13.sp, lineHeight = 19.sp), color = g.textSecondary)
+                            Text("It shows that topic's latest stories, with a refresh button. Long-press the widget to change it later.", style = sans(13.sp, lineHeight = 19.sp), color = g.textSecondary)
                             Spacer(Modifier.height(10.dp))
                         }
                         items(topics, key = { it.id }) { t ->
@@ -84,7 +85,10 @@ class TopicWidgetConfigureActivity : ComponentActivity() {
 
     private fun pick(id: Int, topicId: String) {
         BriefWidgets.setTopic(this, id, topicId)
-        BriefWidgets.update(this, TopicWidgetReceiver::class.java, id)
+        val app = applicationContext
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            runCatching { TopicNewsWidget().update(app, androidx.glance.appwidget.GlanceAppWidgetManager(app).getGlanceIdBy(id)) }
+        }
         // Make sure the widget has stories to show.
         WidgetSync.refreshTopic(this, topicId)
         setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id))

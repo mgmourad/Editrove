@@ -212,6 +212,9 @@ internal fun ArticleBody(
         value = if (url.isEmpty()) BodyState.Failed
         else actions.extractor.extract(url)?.let { BodyState.Loaded(it) } ?: BodyState.Failed
     }
+    // A photo the reader found is remembered, so the story's card shows it next time.
+    val images = LocalImageResolver.current
+    LaunchedEffect(state) { (state as? BodyState.Loaded)?.content?.imageUrl?.let { images?.remember(article.originalUrl, it) } }
     val content = (state as? BodyState.Loaded)?.content
 
     Column(Modifier.widthIn(max = 672.dp).fillMaxWidth()) {

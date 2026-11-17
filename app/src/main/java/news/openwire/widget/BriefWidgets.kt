@@ -56,7 +56,7 @@ object BriefWidgets {
     fun updateAll(context: Context) {
         val app = context.applicationContext
         val mgr = AppWidgetManager.getInstance(app)
-        for (cls in listOf(AudioBriefWidgetReceiver::class.java, TopicWidgetReceiver::class.java)) {
+        for (cls in listOf(AudioBriefWidgetReceiver::class.java)) {
             val ids = runCatching { mgr.getAppWidgetIds(ComponentName(app, cls)) }.getOrNull() ?: continue
             ids.forEach { update(app, cls, it) }
         }
@@ -279,6 +279,3 @@ abstract class BriefWidgetProvider : AppWidgetProvider() {
 
 /** The Editrove Daily Brief: the Top Stories briefing. */
 class AudioBriefWidgetReceiver : BriefWidgetProvider()
-
-/** Topic of Choice: one topic, chosen when the widget is added. */
-class TopicWidgetReceiver : BriefWidgetProvider()

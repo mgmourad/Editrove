@@ -51,7 +51,7 @@ open in a reader with the publisher's standfirst, a drop cap, a pull quote and a
 Audio briefings play like a broadcast: an opening cue that sinks under the anchor, dated
 open, hand-offs and transition stings between stories, and a sign-off. Choose **Headlines**
 (each headline and its subtitle), **Summaries** (plus the key points from the story's Summary
-box) or **Full articles**, the number of stories, the voice and the speed. A **floating
+box) or **Full articles**, the number of stories, the voice and the speed, and schedule a **Morning, Afternoon and Evening briefing** that plays at the tap of a notification. A **floating
 mini-player** follows you down the page.
 
 </td>
@@ -109,10 +109,10 @@ and notifications all live on your device. Updates arrive straight from GitHub R
   <img src=".github/readme/full_light.webp" width="49%" alt="Full view in the light theme">
 </p>
 
-<p align="center"><b>On your home screen</b> — Editrove widgets in Black Glass and Editorial Paper</p>
+<p align="center"><b>On your home screen</b> — the Daily Brief widget</p>
 
 <p align="center">
-  <img src=".github/readme/widgets.webp" width="98%" alt="Editrove widgets: Daily Brief player with chapter queue, Top Stories Bento, and the light theme">
+  <img src=".github/readme/widgets.webp" width="50%" alt="Editrove widgets: Daily Brief player with chapter queue, Top Stories Bento, and the light theme">
 </p>
 
 <p align="center"><b>Out of your way</b> — what's new after each update · every setting in one place</p>
@@ -130,7 +130,7 @@ and notifications all live on your device. Updates arrive straight from GitHub R
 | **Sources** | 117 feeds, including the Washington Post, NBC, CBS, BBC, NPR, Axios, The Economist, The Atlantic, Bloomberg, WSJ, ESPN, MIT Technology Review, NASA and more. Each gets a fair share; 2 stories from one outlet in a row at most |
 | **Paywall engine** | Per-publisher strategies with an editable rules list; archive checks with grey-out; a reader-service health check and fallback chain |
 | **Reading** | In-app reader with on-device summary, narration, pull quotes and drop caps; text from the publisher, then Wayback, then archive.today |
-| **Widgets** | **The Editrove Daily Brief** and **Topic of Choice**: the app's Audio Briefing card on your home screen, in the app's own fonts, with play/pause, ±15 s, previous/next story, speed and a live waveform (Topic of Choice briefs the one topic you pick, with a refresh button). Plus **Top Stories** with photos and bookmarks. They resize from 2×2 to an unfolded 6×3 |
+| **Widgets** | **The Editrove Daily Brief**: the app's Audio Briefing card on your home screen, in the app's own fonts, with play/pause, ±15 s, previous/next story, speed and a live waveform. **Top Stories** and **Topic of Choice** (the one topic you pick, with a refresh button) show photos, sections and bookmarks. They resize from 2×2 to an unfolded 6×3 |
 | **Open anything** | Share a link from any app, select a URL and pick *Open in Editrove*, or paste one. It's routed and opened in the reader |
 | **Smart curation** | An on-device editorial ranker: where editors placed a story, how many outlets cover it, freshness, source authority and section fit (hard news leads the front page), then de-duplicated and diversified. "Also covered by" shows who else is running a story, and an optional, local-only tuning favours outlets you save and like. Applies to every topic, Discover and the audio briefing |
 | **Breaking news** | Optional heads-up alerts when newsrooms you pick (AP, Reuters, BBC, CNN and more) break a story, separate from topic alerts |
@@ -183,7 +183,7 @@ vulnerability.
 Editrove began as a fork of the original **OpenWire** web app by **Anson Lai**. Its paywall
 engine, source catalog and feed pipeline are ported from that project and built on here. Typefaces:
 Newsreader, Inter and JetBrains Mono (SIL Open Font License). Briefing opening cues and the
-transition sting are royalty-free music from [Fesliyan Studios](https://www.fesliyanstudios.com/royalty-free-music/downloads-c/breaking-news-intro-music/26).
+transition sting are royalty-free music from [Fesliyan Studios](https://www.fesliyanstudios.com/royalty-free-music/downloads-c/breaking-news-intro-music/26) and [Pixabay](https://pixabay.com/music/) (cues 5–11).
 
 The legacy web app (`index.html`, `css/`, `js/`) and the scheduled feed pipeline
 (`sync_news.py`, GitHub Actions) remain in this repository. The pipeline publishes the

@@ -1,0 +1,11 @@
+Editrove 0.7.0 Beta 4 — Full articles again, scheduled briefings
+• Articles open in full again. Beta 3's page cleanup was removing the story itself on sites like BBC and PBS.
+• Sites that block apps (like France 24) now open in full: Editrove reads them the way a browser does.
+• Stories that come through Google News now link straight to the publisher, so their text, photos and "Continue on…" work.
+• Sharper publisher icons and logos everywhere.
+• Topic of Choice is now a news widget: the stories of the topic you pick, with a refresh button.
+• Notifications pop up on screen, and no longer pile in when you open the app.
+• Scheduled briefings: set a Morning, Afternoon and Evening time in Settings › Audio briefing. Tap the notification and the latest briefing plays.
+• Seven new opening cues, and "English (United States) · IOM" as the default narrator.
+• New notification sounds: a soft bell for topic alerts and scheduled briefings, and the briefing's transition sting for breaking news.
+• Editrove now reads its own news feed, refreshed every 30 minutes.

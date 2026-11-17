@@ -12,8 +12,9 @@
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:updatePeriodMillis="0"
-    android:initialLayout="@layout/widget_brief"
-    android:previewImage="@drawable/widget_preview_topic"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:previewImage="@drawable/ic_brand"
+    android:previewLayout="@layout/widget_preview_topic"
     android:configure="news.openwire.widget.TopicWidgetConfigureActivity"
     android:widgetFeatures="reconfigurable"
     android:description="@string/widget_topic_desc" />

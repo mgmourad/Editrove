@@ -6,4 +6,10 @@
         <item name="android:navigationBarColor">@color/paper</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>
+    <!-- Time picker for scheduled briefings, in Editrove's colours. -->
+    <style name="Editrove.TimePicker" parent="android:Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorAccent">#E11D48</item>
+        <item name="android:colorPrimary">#E11D48</item>
+        <item name="android:colorBackground">#FFFFFF</item>
+    </style>
 </resources>

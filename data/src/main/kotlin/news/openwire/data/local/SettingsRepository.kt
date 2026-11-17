@@ -85,6 +85,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         val refreshMinutes: Int = 60,
         val breakingEnabled: Boolean = false,
         val breakingOutlets: Set<String>? = null,
+        val briefingSlots: String? = null,
     ) {
         fun toSettings() = UserSettings(
             edition = LocalEdition(city, region, country),
@@ -108,7 +109,8 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
             briefing = news.openwire.domain.model.BriefingPrefs(
                 voice = briefingVoice, speed = briefingSpeed.coerceIn(0.5f, 2.5f), count = briefingCount.coerceIn(1, 30),
                 detail = news.openwire.domain.model.BriefingDetail.entries.firstOrNull { it.name == briefingDetail } ?: news.openwire.domain.model.BriefingDetail.HEADLINES,
-                openingCue = briefingCue.coerceIn(0, 4), stings = briefingStings,
+                openingCue = briefingCue.coerceIn(0, news.openwire.domain.model.BriefingPrefs.CUE_COUNT), stings = briefingStings,
+                slots = news.openwire.domain.model.BriefingSlot.decode(briefingSlots),
             ),
         )
 
@@ -123,6 +125,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 s.unfoldedLayout.name, s.autoCheckUpdates, s.autoInstallUpdates,
                 s.briefing.voice, s.briefing.speed, s.briefing.count, s.briefing.detail.name, s.briefing.openingCue, s.briefing.stings,
                 s.personalize, s.refreshMinutes, s.breakingEnabled, s.breakingOutlets,
+                news.openwire.domain.model.BriefingSlot.encode(s.briefing.slots),
             )
         }
     }

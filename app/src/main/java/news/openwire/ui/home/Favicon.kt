@@ -8,6 +8,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,13 +28,24 @@ fun faviconUrl(domain: String?, size: Int = 64): String? =
  */
 @Composable
 fun SourceLogo(domain: String?, source: String?, size: Dp = 18.dp, modifier: Modifier = Modifier) {
-    val url = faviconUrl(domain, (size.value * 4).toInt())
+    // The publisher's own high-res icon (manifest / touch icon), else a 128px+ favicon —
+    // never the tiny default, which looks blurry even at 18dp on a dense screen.
+    val logos = LocalLogoResolver.current
+    val favicon = faviconUrl(domain, maxOf(128, (size.value * 4).toInt()))
+    val best by androidx.compose.runtime.produceState<String?>(null, domain) { value = logos?.logo(domain) }
+    var failed by androidx.compose.runtime.remember(best) { androidx.compose.runtime.mutableStateOf(false) }
+    val url = best?.takeIf { !failed } ?: favicon
     if (url != null) {
-        AsyncImage(
-            model = url,
-            contentDescription = null,
-            modifier = modifier.size(size).clip(CircleShape),
-        )
+        Box(modifier.size(size).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White), contentAlignment = Alignment.Center) {
+            AsyncImage(
+                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current).data(url).crossfade(true).build(),
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+                onError = { if (url == best) failed = true },
+                modifier = Modifier.size(size),
+            )
+        }
     } else {
         Box(
             modifier = modifier

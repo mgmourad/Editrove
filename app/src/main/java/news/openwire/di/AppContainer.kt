@@ -41,9 +41,12 @@ class AppContainer(context: Context) {
     val archiveChecker: ArchiveChecker by lazy { ArchiveChecker() }
     /** Publisher URLs behind news.google.com links (reader text, photos, briefings). */
     val googleLinks: news.openwire.data.GoogleLinkResolver by lazy { news.openwire.data.GoogleLinkResolver(context) }
-    val articleTextExtractor: ArticleTextExtractor by lazy { ArticleTextExtractor(resolveLink = { googleLinks.resolve(it) }) }
-    val logoResolver: news.openwire.data.remote.PublisherLogoResolver by lazy { news.openwire.data.remote.PublisherLogoResolver() }
-    val imageResolver: ImageResolver by lazy { ImageResolver(resolveLink = { googleLinks.resolve(it) }) }
+    val articleTextExtractor: ArticleTextExtractor by lazy { ArticleTextExtractor(resolveLink = { googleLinks.resolve(it) }, renderPage = { googleLinks.render(it) }) }
+    val logoResolver: news.openwire.data.remote.PublisherLogoResolver by lazy {
+        val prefs = context.getSharedPreferences("publisher_logos", android.content.Context.MODE_PRIVATE)
+        news.openwire.data.remote.PublisherLogoResolver(load = { prefs.getString(it, null) }, save = { d, u -> prefs.edit().putString(d, u).apply() })
+    }
+    val imageResolver: ImageResolver by lazy { ImageResolver(resolveLink = { googleLinks.resolve(it) }, renderPage = { googleLinks.render(it) }) }
     val serviceHealth: ServiceHealth by lazy { ServiceHealth() }
 
     val updateManager: news.openwire.update.UpdateManager by lazy {
@@ -85,6 +88,7 @@ class AppContainer(context: Context) {
             feedState = feedState,
             interests = { libraryStore.interestDomains() },
             onStored = { news.openwire.widget.WidgetSync.feedsChanged(context) },
+            resolveLink = { googleLinks.resolve(it) },
         )
     }
 

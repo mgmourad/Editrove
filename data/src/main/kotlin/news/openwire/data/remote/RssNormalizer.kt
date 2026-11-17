@@ -32,8 +32,13 @@ class RssNormalizer(private val registry: DomainRegistry) {
         val link = GoogleNewsUrls.decodeEmbeddedGoogleUrl(item.link).ifEmpty { item.link }
         val isGoogle = GoogleNewsUrls.isGoogleNewsUrl(item.link)
         val (title, suffix) = if (isGoogle || feedName == null) parseTitle(item.title) else item.title.trim() to ""
-        val source = item.sourceName ?: suffix.ifEmpty { feedName.orEmpty() }
-        val domain = resolveDomain(source, link, item.source)
+        // Some publisher feeds put a photo credit in <source> ("© Photographer, AP" pointing at
+        // an image CDN): only trust it from Google News, or when it points at the article's own site.
+        val linkHost = registry.normalizeDomain(link)
+        val trustSource = isGoogle || feedName == null ||
+            (item.source != null && registry.normalizeDomain(item.source).let { it.isNotEmpty() && it == linkHost })
+        val source = (if (trustSource) item.sourceName else null) ?: suffix.ifEmpty { feedName.orEmpty() }
+        val domain = resolveDomain(source, link, if (trustSource) item.source else null)
         val summary = PreviewMatcher.cleanPreviewText(item.description).takeIf { it.length > 20 && !isGoogle }
 
         val base = Article(

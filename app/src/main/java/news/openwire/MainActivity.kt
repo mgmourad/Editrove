@@ -4,6 +4,8 @@ package news.openwire
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import kotlinx.coroutines.launch
+import androidx.lifecycle.lifecycleScope
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -108,6 +110,19 @@ class MainActivity : ComponentActivity() {
                 intent.getStringExtra(EXTRA_TAB)?.let { t -> news.openwire.ui.home.NavTab.entries.firstOrNull { it.name == t }?.let(vm::selectTab) }
                 intent.getStringExtra(EXTRA_TOPIC)?.let { vm.selectTopicId(it) }
                 intent.getStringExtra(EXTRA_URL)?.let { vm.openLink(it, title = intent.getStringExtra(EXTRA_TITLE)) }
+                if (intent.getBooleanExtra(EXTRA_AUTOPLAY, false)) {
+                    intent.removeExtra(EXTRA_AUTOPLAY)
+                    vm.selectTopicId("TOP")
+                    vm.selectTab(news.openwire.ui.home.NavTab.AUDIO)
+                    val player = (application as OpenWireApp).container.briefingPlayer
+                    lifecycleScope.launch {
+                        // Refresh first, then play right away.
+                        val top = vm.topics.firstOrNull { it.id == "TOP" } ?: return@launch
+                        val stories = vm.freshStories(top)
+                        player.awaitReady()
+                        if (stories.isNotEmpty()) player.play(top.label, stories)
+                    }
+                }
             }
         }
     }
@@ -117,5 +132,7 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_TAB = "news.openwire.extra.TAB"
         const val EXTRA_URL = "news.openwire.extra.URL"
         const val EXTRA_TITLE = "news.openwire.extra.TITLE"
+        /** Open the Audio tab and play the latest Top Stories briefing (scheduled briefings). */
+        const val EXTRA_AUTOPLAY = "news.openwire.extra.AUTOPLAY"
     }
 }

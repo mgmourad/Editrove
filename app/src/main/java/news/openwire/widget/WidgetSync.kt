@@ -27,6 +27,9 @@ object WidgetSignals {
         internal set
     var feedVersion by mutableIntStateOf(0)
         internal set
+    /** Topics a widget is refreshing right now (spinner on the refresh button). */
+    var refreshing by androidx.compose.runtime.mutableStateOf(emptySet<String>())
+        internal set
 }
 
 /** Keeps the home-screen widgets in step with the briefing player and the feed cache. */
@@ -53,13 +56,18 @@ object WidgetSync {
             delay(120)
             WidgetSignals.audioTick++
             BriefWidgets.updateAll(app)
+            if (has(app, TopicNewsWidget::class.java)) TopicNewsWidget().updateAll(app)
         }
     }
 
     /** Fetches a topic in the background if its cache is stale (e.g. a widget was just set to it). */
     fun refreshTopic(context: Context, topicId: String) {
         val app = context.applicationContext
-        scope.launch { WidgetData.refreshIfStale(app, topicId); BriefWidgets.updateAll(app) }
+        scope.launch {
+            WidgetData.refreshIfStale(app, topicId)
+            WidgetSignals.feedVersion++
+            TopicNewsWidget().updateAll(app)
+        }
     }
 
     /** A topic's cached stories changed (refresh, background refresh, bookmarks). */

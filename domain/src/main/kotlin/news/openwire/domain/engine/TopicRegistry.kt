@@ -45,28 +45,36 @@ object TopicRegistry {
     fun country(code: String?): Country = COUNTRIES.firstOrNull { it.code.equals(code, ignoreCase = true) } ?: COUNTRIES.first()
 
     /** The default lineup for an edition (SPEC §6.1). */
-    fun defaultTopics(edition: LocalEdition = LocalEdition.DEFAULT): List<Topic> {
+    fun defaultTopics(edition: LocalEdition = LocalEdition.DEFAULT, appLanguage: String = java.util.Locale.getDefault().language): List<Topic> {
         val c = country(edition.country)
+        // Every topic is built on the phone from Google News (in the edition's language) plus
+        // the publisher feeds; the published snapshot is only a first paint and a fallback.
+        // Topic feeds read in the app's language: an edition in another language (Cairo while the
+        // app is in English) keeps its own national and city tabs, the rest stay readable.
+        val f = if (c.hl.substringBefore('-').equals(appLanguage, true)) c else COUNTRIES.firstOrNull { it.hl.substringBefore('-').equals(appLanguage, true) } ?: COUNTRIES.first()
+        fun section(name: String) = "https://news.google.com/rss/headlines/section/topic/$name?${f.query}"
+        fun search(q: String) = googleNewsSearchUrl(q, f)
+        val top = "https://news.google.com/rss?${f.query}"
         return listOf(
-            Topic(id = "TOP", label = "Top Stories", snapshotFile = "news_top.json"),
-            Topic(id = "LATEST", label = "Latest", snapshotFile = "news_latest.json"),
-            Topic(id = "AI", label = "AI", snapshotFile = "news_ai.json"),
-            Topic(id = NATIONAL_ID, label = c.nationalLabel, liveUrl = "https://news.google.com/rss?${c.query}", liveOnly = true),
+            Topic(id = "TOP", label = "Top Stories", snapshotFile = "news_top.json", liveUrl = top),
+            Topic(id = "LATEST", label = "Latest", snapshotFile = "news_latest.json", liveUrl = top),
+            Topic(id = "AI", label = "AI", snapshotFile = "news_ai.json", liveUrl = search("\"artificial intelligence\" OR AI when:2d")),
+            Topic(id = NATIONAL_ID, label = c.nationalLabel, liveUrl = "https://news.google.com/rss/headlines/section/topic/NATION?${c.query}", liveOnly = true),
             Topic(
                 id = LOCAL_ID,
                 label = edition.city,
                 liveUrl = googleNewsSearchUrl("\"${edition.city.replace(",", "").trim()}\"", c),
                 liveOnly = true,
             ),
-            Topic(id = "BUSINESS", label = "Business", snapshotFile = "news_business.json"),
-            Topic(id = "TECHNOLOGY", label = "Tech", snapshotFile = "news_technology.json"),
-            Topic(id = "INTERNATIONAL", label = "International", snapshotFile = "news_world.json"),
-            Topic(id = "SCIENCE", label = "Science", snapshotFile = "news_science.json"),
-            Topic(id = "ENTERTAINMENT", label = "Entertainment", snapshotFile = "news_entertainment.json"),
-            Topic(id = "SPORTS", label = "Sports", snapshotFile = "news_sports.json"),
-            Topic(id = "POLITICS", label = "Politics", snapshotFile = "news_politics.json"),
-            Topic(id = "FINANCE", label = "Finance", snapshotFile = "news_finance.json"),
-            Topic(id = "LIFESTYLE", label = "Lifestyle", snapshotFile = "news_lifestyle.json"),
+            Topic(id = "BUSINESS", label = "Business", snapshotFile = "news_business.json", liveUrl = section("BUSINESS")),
+            Topic(id = "TECHNOLOGY", label = "Tech", snapshotFile = "news_technology.json", liveUrl = section("TECHNOLOGY")),
+            Topic(id = "INTERNATIONAL", label = "International", snapshotFile = "news_world.json", liveUrl = section("WORLD")),
+            Topic(id = "SCIENCE", label = "Science", snapshotFile = "news_science.json", liveUrl = section("SCIENCE")),
+            Topic(id = "ENTERTAINMENT", label = "Entertainment", snapshotFile = "news_entertainment.json", liveUrl = section("ENTERTAINMENT")),
+            Topic(id = "SPORTS", label = "Sports", snapshotFile = "news_sports.json", liveUrl = section("SPORTS")),
+            Topic(id = "POLITICS", label = "Politics", snapshotFile = "news_politics.json", liveUrl = search("politics when:1d")),
+            Topic(id = "FINANCE", label = "Finance", snapshotFile = "news_finance.json", liveUrl = search("stock market OR economy OR markets when:1d")),
+            Topic(id = "LIFESTYLE", label = "Lifestyle", snapshotFile = "news_lifestyle.json", liveUrl = section("HEALTH")),
         )
     }
 

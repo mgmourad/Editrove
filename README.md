@@ -134,8 +134,10 @@ and notifications all live on your device. Updates arrive straight from GitHub R
 | **Open anything** | Share a link from any app, select a URL and pick *Open in Editrove*, or paste one. It's routed and opened in the reader |
 | **Smart curation** | An on-device editorial ranker: where editors placed a story, how many outlets cover it, freshness, source authority and section fit (hard news leads the front page), then de-duplicated and diversified. "Also covered by" shows who else is running a story, and an optional, local-only tuning favours outlets you save and like. Applies to every topic, Discover and the audio briefing |
 | **Market watch** | On the Business tab, a MARKETS bar with major indexes, yields, oil, gold, EUR/USD and Bitcoin; tap for a popup with prices, day ranges and sparklines (Yahoo Finance, may be delayed) |
-| **Breaking news** | Optional heads-up alerts when newsrooms you pick (AP, Reuters, BBC, CNN and more) break a story, separate from topic alerts |
-| **Stay current** | Opening the app or switching pages quietly refreshes anything older than a few minutes; background refresh every 15 minutes to 6 hours (your choice); pull to refresh; background refresh; opt-in local notifications per topic |
+| **Breaking news** | Optional heads-up alerts when newsrooms you pick (AP, Reuters, BBC, CNN and more) break a story, or when three or more outlets publish the same story within half an hour. Separate from topic alerts |
+| **Stay current** | Opening the app or switching pages quietly refreshes anything older than a few minutes; background refresh every 15 minutes to 6 hours (your choice); pull to refresh; opt-in local notifications per topic, grouped into one bundle so several updates arrive with a single sound |
+| **Sharing** | Every card and the reader have a share button that sends the headline first, then the publisher's own link (never a Google redirect) |
+| **On-device feeds** | Built-in topics are built on your phone from live newsroom feeds and ranked on the device, so stories are minutes old. The published snapshot is only a first paint and a fallback |
 | **Updates** | Checks GitHub Releases on launch, shows an in-app banner, optional automatic install, a "What's new" note and a full changelog in Settings |
 | **Portability** | Export and import every setting as one JSON file, including backups from the original OpenWire web app |
 
@@ -187,8 +189,8 @@ Newsreader, Inter and JetBrains Mono (SIL Open Font License). Briefing opening c
 transition sting are royalty-free music from [Fesliyan Studios](https://www.fesliyanstudios.com/royalty-free-music/downloads-c/breaking-news-intro-music/26) and [Pixabay](https://pixabay.com/music/) (cues 5–11).
 
 The legacy web app (`index.html`, `css/`, `js/`) and the scheduled feed pipeline
-(`sync_news.py`, GitHub Actions) remain in this repository. The pipeline publishes the
-topic snapshots the app reads.
+(`sync_news.py`, GitHub Actions) remain in this repository. The pipeline publishes topic
+snapshots the app uses only as a first paint and offline fallback; feeds are built on the device.
 
 ## License
 

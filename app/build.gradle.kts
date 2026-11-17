@@ -13,8 +13,8 @@ android {
         applicationId = "news.editrove"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12
-        versionName = "0.7.0-beta.5"
+        versionCode = 13
+        versionName = "0.7.0-beta.6"
 
         // Static host of the published topic snapshots (SPEC §8). Override with
         // -Popenwire.dataUrl=https://example.org/ (e.g. your own GitHub Pages copy).

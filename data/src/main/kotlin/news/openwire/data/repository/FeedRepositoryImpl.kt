@@ -89,7 +89,9 @@ class FeedRepositoryImpl(
 
     override fun observeTopic(topic: Topic, force: Boolean): Flow<FeedResult> = flow {
         val s = settings()
-        val live = topic.liveOnly || topic.snapshotFile == null ||
+        // Built on the phone whenever the topic has a live source; the published snapshot is
+        // the first paint and the fallback, so freshness never depends on a server.
+        val live = topic.liveOnly || topic.snapshotFile == null || topic.liveUrl != null ||
             SourceLibrary.isCustomized(topic, catalog(), s.customFeeds, s.disabledSources)
         if (live) observeLive(topic, s) else observeSnapshot(topic)
     }.flowOn(Dispatchers.Default) // parsing, weaving and routing stay off the main thread
@@ -198,11 +200,16 @@ class FeedRepositoryImpl(
         }.distinctBy { it.url }
         // A built-in topic whose sources were edited still leads with its published front page,
         // minus stories from the sources the reader switched off.
-        val published = if (primaryUrl == null && topic.snapshotFile != null && !topic.isCustom) {
-            // Exactly the stories that came from a switched-off feed (the snapshot records each story's feed).
+        val snapshotOk = topic.snapshotFile != null && !topic.isCustom
+        suspend fun loadPublished(): List<Article> =
+            // Without the stories of switched-off feeds (the snapshot records each story's feed).
             runCatching { remote.fetchTopic(topic.snapshotFile!!).mapIndexed { i, d -> d.toArticle(rank = i) } }.getOrDefault(emptyList())
                 .filter { a -> a.feedUrl == null || SourceLibrary.sourceKey(a.feedUrl) !in s.disabledSources }
-        } else emptyList()
+        var published = if (snapshotOk && (primaryUrl == null || cached.isEmpty())) loadPublished() else emptyList()
+        // First launch: show the published front page at once while the live one is built.
+        if (cached.isEmpty() && primaryUrl != null && published.isNotEmpty()) {
+            emit(FeedResult.Success(rank(topic, NewsProcessor.deduplicate(published)), fromCache = true, updatedAt = clock(), refreshing = true))
+        }
         if (configs.isEmpty() && published.isEmpty()) {
             if (cached.isEmpty()) emit(FeedResult.Empty(topic.id))
             return
@@ -249,7 +256,11 @@ class FeedRepositoryImpl(
             }
             r.copy(articles = list)
         }
-        val primary = prepared.firstOrNull { it.source.isPrimary }?.articles.orEmpty().ifEmpty { published }
+        // Google unavailable (or switched off): the published front page leads instead.
+        val primary = prepared.firstOrNull { it.source.isPrimary }?.articles.orEmpty().ifEmpty {
+            if (published.isEmpty() && snapshotOk) published = loadPublished()
+            published
+        }
         val groups = prepared.filter { !it.source.isPrimary && !it.articles.isNullOrEmpty() }.map { FeedWeaver.Group(it.source, it.articles!!) }
         val isLatest = topic.id == "LATEST"
         var woven = FeedWeaver.weave(primary, groups, norm, FeedWeaver.Options(leadAnchorCount = if (isLatest) 0 else 2))

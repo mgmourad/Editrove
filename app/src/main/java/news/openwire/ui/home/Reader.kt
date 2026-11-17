@@ -188,6 +188,8 @@ fun ReaderSheet(
                 Spacer(Modifier.weight(1f))
                 SpringToggle(liked, ToggleKind.LIKE, { actions.onToggleLiked(article) }, background = g.chipFill, padding = 8.dp)
                 Spacer(Modifier.width(8.dp))
+                ShareButton(article, background = g.chipFill, padding = 8.dp)
+                Spacer(Modifier.width(8.dp))
                 SpringToggle(saved, ToggleKind.BOOKMARK, { actions.onToggleSaved(article) }, background = g.chipFill, padding = 8.dp)
             }
         }
@@ -235,6 +237,8 @@ internal fun ArticleBody(
                     modifier = Modifier.weight(1f),
                 )
                 SpringToggle(liked, ToggleKind.LIKE, { actions.onToggleLiked(article) }, background = g.chipFill, border = g.hairline, padding = 8.dp)
+                Spacer(Modifier.width(8.dp))
+                ShareButton(article, background = g.chipFill, border = g.hairline, padding = 8.dp)
                 Spacer(Modifier.width(8.dp))
                 SpringToggle(saved, ToggleKind.BOOKMARK, { actions.onToggleSaved(article) }, background = g.chipFill, border = g.hairline, padding = 8.dp)
             }

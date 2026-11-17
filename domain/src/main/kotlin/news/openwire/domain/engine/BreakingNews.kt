@@ -56,9 +56,22 @@ object BreakingNews {
         return null
     }
 
-    /** The breaking stories in [articles], newest first, one per story. */
-    fun detect(articles: List<Article>, nowMillis: Long, normalizeDomain: (String) -> String): List<Article> {
-        val hits = articles.filter { reason(it, nowMillis) != null }.sortedByDescending { it.publishedAt ?: 0L }
+    /**
+     * The breaking stories in [articles], newest first, one per story: labelled breaking, or a
+     * story that several of the watched newsrooms published within half an hour of each other
+     * in the last 45 minutes — how a breaking event actually looks in the feeds.
+     */
+    fun detect(articles: List<Article>, nowMillis: Long, normalizeDomain: (String) -> String, minOutlets: Int = 3): List<Article> {
+        val recent = articles.filter { a -> a.publishedAt?.let { nowMillis - it in -600_000L..(60 * 60_000L) } == true }
+        val spread = recent.filter { a ->
+            val t = a.publishedAt ?: return@filter false
+            if (nowMillis - t > 45 * 60_000L) return@filter false
+            val outlets = recent.filter { b ->
+                kotlin.math.abs((b.publishedAt ?: 0L) - t) <= 30 * 60_000L && (b === a || StoryIdentity.sameStory(a, b, normalizeDomain))
+            }.map { normalizeDomain(it.domain ?: it.source ?: "") }.filter { it.isNotEmpty() }.toSet()
+            outlets.size >= minOutlets
+        }
+        val hits = (articles.filter { reason(it, nowMillis) != null } + spread).distinctBy { it.id }.sortedByDescending { it.publishedAt ?: 0L }
         val out = ArrayList<Article>()
         for (a in hits) if (out.none { StoryIdentity.sameStory(it, a, normalizeDomain) }) out += a
         return out

@@ -49,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -517,6 +518,8 @@ fun HeroCard(
                     ScrimPill { Text(badge, style = mono(10.sp), color = Color.White.copy(alpha = 0.9f)) }
                     Spacer(Modifier.width(6.dp))
                 }
+                ShareButton(article, tint = Color.White, background = Color.Black.copy(alpha = 0.45f), border = Color.White.copy(alpha = 0.20f), padding = 8.dp)
+                Spacer(Modifier.width(6.dp))
                 SpringToggle(
                     active = saved,
                     kind = ToggleKind.BOOKMARK,
@@ -598,27 +601,31 @@ fun LeadStoryCard(
                     Spacer(Modifier.width(8.dp))
                     Text(article.publication(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    article.title,
-                    style = serif(30.sp, FontWeight.Bold, lineHeight = 34.sp, tracking = (-0.01).em),
-                    color = g.textPrimary, maxLines = 5, overflow = TextOverflow.Ellipsis,
-                )
-                article.summary?.takeIf { it.isNotBlank() }?.let {
-                    Spacer(Modifier.height(10.dp))
-                    Text(it, style = sans(14.sp, lineHeight = 21.sp), color = g.textSecondary, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                }
-                article.coverageLine(3)?.let {
-                    Spacer(Modifier.height(10.dp))
-                    Text(it, style = sans(12.sp, FontWeight.Medium), color = g.accentSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-                Spacer(Modifier.weight(1f))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(NewsProcessor.formatRelativeTime(article.publishedAt), style = mono(11.sp, tracking = 0.sp), color = g.textSecondary)
-                    article.badgeLabel()?.let {
-                        Text("  ·  $it", style = mono(11.sp, tracking = 0.sp), color = g.textSecondary)
+                // Headline, standfirst and coverage take what's left; the action row always fits.
+                Column(Modifier.weight(1f).clipToBounds()) {
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        article.title,
+                        style = serif(30.sp, FontWeight.Bold, lineHeight = 34.sp, tracking = (-0.01).em),
+                        color = g.textPrimary, maxLines = 5, overflow = TextOverflow.Ellipsis,
+                    )
+                    article.summary?.takeIf { it.isNotBlank() }?.let {
+                        Spacer(Modifier.height(10.dp))
+                        Text(it, style = sans(14.sp, lineHeight = 21.sp), color = g.textSecondary, maxLines = 4, overflow = TextOverflow.Ellipsis)
                     }
-                    Spacer(Modifier.weight(1f))
+                    article.coverageLine(3)?.let {
+                        Spacer(Modifier.height(10.dp))
+                        Text(it, style = sans(12.sp, FontWeight.Medium), color = g.accentSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        NewsProcessor.formatRelativeTime(article.publishedAt) + (article.badgeLabel()?.let { "  ·  $it" } ?: ""),
+                        style = mono(11.sp, tracking = 0.sp), color = g.textSecondary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                    )
+                    ShareButton(article, background = g.chipFill, padding = 8.dp)
+                    Spacer(Modifier.width(6.dp))
                     SpringToggle(saved, ToggleKind.BOOKMARK, { onToggleSaved(article) }, background = g.chipFill, padding = 8.dp)
                 }
             }
@@ -701,6 +708,7 @@ fun BentoCard(
                 maxLines = 1,
             )
             SpringToggle(liked, ToggleKind.LIKE, { onToggleLiked(article) })
+            ShareButton(article, tint = Glass.textPrimary.copy(alpha = 0.7f))
             SpringToggle(saved, ToggleKind.BOOKMARK, { onToggleSaved(article) })
         }
     }

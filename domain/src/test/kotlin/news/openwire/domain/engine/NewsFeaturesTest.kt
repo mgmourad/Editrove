@@ -93,4 +93,16 @@ class NewsFeaturesTest {
         assertEquals(setOf("ap", "bbc"), back.breakingOutlets)
         assertEquals(60, validRefresh(50))
     }
+
+    @Test fun storyCarriedByThreeNewsroomsAtOnceIsBreaking() {
+        val list = listOf(
+            a("ap", "Explosion reported at Port of Houston refinery", "apnews.com", ageMin = 12),
+            a("rt", "Large explosion hits Houston refinery, port says", "reuters.com", ageMin = 18),
+            a("cnn", "Houston refinery explosion: what we know", "cnn.com", ageMin = 25),
+            a("x", "Senate schedules vote on farm bill", "npr.org", ageMin = 20),
+        )
+        val out = BreakingNews.detect(list, NOW, norm)
+        assertEquals(1, out.size)
+        assertTrue(out.first().title.contains("Houston"))
+    }
 }

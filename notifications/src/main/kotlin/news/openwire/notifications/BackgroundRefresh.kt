@@ -72,9 +72,12 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             return if (runAttemptCount < 2) Result.retry() else Result.failure()
         }
         if (refresher.notificationsEnabled() && !onScreen) {
-            updates.filter { it.headlines.isNotEmpty() }.forEach {
-                Notifier.post(applicationContext, it, refresher.storyIntent(applicationContext, it.headlines.first(), it.topicId), refresher.launchIntent(applicationContext, it))
+            val posted = updates.filter { it.headlines.isNotEmpty() }
+            // Several topics in one refresh: one stack with a single sound, not a burst of alerts.
+            posted.forEachIndexed { i, it ->
+                Notifier.post(applicationContext, it, refresher.storyIntent(applicationContext, it.headlines.first(), it.topicId), refresher.launchIntent(applicationContext, it), quiet = i > 0)
             }
+            if (posted.size > 1) Notifier.postSummary(applicationContext, posted)
         }
         return Result.success()
     }
@@ -171,7 +174,27 @@ object Notifier {
      * outlet), not a list of truncated headlines; tapping opens that story, and
      * "See all" opens the topic.
      */
-    fun post(context: Context, update: TopicUpdate, storyIntent: Intent, topicIntent: Intent) {
+    private const val GROUP = "editrove_topics"
+
+    /** The stack header when several topics have news at once (Android groups the rest under it). */
+    fun postSummary(context: Context, updates: List<TopicUpdate>) {
+        if (!canPost(context)) return
+        val total = updates.sumOf { it.headlines.size }
+        val style = NotificationCompat.InboxStyle().setSummaryText("$total new stories")
+        updates.forEach { style.addLine("${it.topicLabel}: ${it.headlines.first().title}") }
+        val n = NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_openwire)
+            .setContentTitle("${updates.size} topics have new stories")
+            .setContentText(updates.joinToString(" · ") { it.topicLabel })
+            .setStyle(style)
+            .setGroup(GROUP).setGroupSummary(true)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
+            .setAutoCancel(true)
+            .build()
+        try { NotificationManagerCompat.from(context).notify(GROUP, 0, n) } catch (e: SecurityException) { }
+    }
+
+    fun post(context: Context, update: TopicUpdate, storyIntent: Intent, topicIntent: Intent, quiet: Boolean = false) {
         if (!canPost(context)) return
         ensureChannel(context)
         val first = update.headlines.first()
@@ -196,6 +219,9 @@ object Notifier {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+            .setGroup(GROUP)
+            .setOnlyAlertOnce(true)
+            .also { if (quiet) it.setSilent(true) }
         if (more > 0) b.addAction(0, "See all ${update.headlines.size}", all)
         val n = b.build()
         try {

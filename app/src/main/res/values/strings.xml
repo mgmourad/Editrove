@@ -387,4 +387,22 @@
     <string name="voice_missing">No %1$s voice is installed yet.</string>
     <string name="voice_unsupported">The speech engine has no %1$s voice.</string>
     <string name="voice_install">Install voice</string>
+    <string name="tab_live">Live</string>
+    <string name="live_kicker">ON AIR</string>
+    <string name="live_sub">News channels and radio, streaming now.</string>
+    <string name="live_tv">TV</string>
+    <string name="live_radio">Radio</string>
+    <string name="live_all">All</string>
+    <string name="live_news_radio">News radio</string>
+    <string name="live_stations_in">Stations in %1$s</string>
+    <string name="live_search_hint">Search all radio stations</string>
+    <string name="live_no_stations">No stations found.</string>
+    <string name="live_unavailable">This stream isn\'t available right now.</string>
+    <string name="live_tuning">Tuning in…</string>
+    <string name="live_on_now">On now</string>
+    <string name="live_now_playing">Now playing</string>
+    <string name="live_stop">Stop</string>
+    <string name="live_play">Play</string>
+    <string name="live_tv_note">Streams come straight from each broadcaster. Channels marked YouTube have no open stream and open their official live page.</string>
+    <string name="live_radio_note">More stations from the open Radio Browser directory (radio-browser.info). Only your country or search words are sent.</string>
 </resources>

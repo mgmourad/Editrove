@@ -64,6 +64,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.LiveTv
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Newspaper
@@ -125,6 +126,7 @@ private val NavTab.icon: ImageVector
         NavTab.TODAY -> Icons.Outlined.Newspaper
         NavTab.DISCOVER -> Icons.Outlined.Search
         NavTab.AUDIO -> Icons.AutoMirrored.Outlined.VolumeUp
+        NavTab.LIVE -> Icons.Outlined.LiveTv
         NavTab.SAVED -> Icons.Outlined.BookmarkBorder
     }
 
@@ -152,6 +154,8 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
     }
 
     val tab by vm.tab.collectAsState()
+    // Live TV pauses when you leave its page (radio keeps playing).
+    LaunchedEffect(tab) { if (tab != NavTab.LIVE) app.container.live.pauseVideo() }
     val topicIndex by vm.topicIndex.collectAsState()
     val selected by vm.selected.collectAsState()
     val sheetOpen by vm.sheetOpen.collectAsState()
@@ -254,7 +258,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                         shownTab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) }, onSettings = { vm.openSettings() },
                         layout = userSettings.unfoldedLayout, onToggleLayout = { vm.toggleUnfoldedLayout() },
                     )
-                    Box(Modifier.fillMaxHeight().width(feedWidth)) {
+                    Box(Modifier.fillMaxHeight().then(if (tab == NavTab.LIVE) Modifier.weight(1f) else Modifier.width(feedWidth))) {
                         TabFeed(
                             pager = pager, vm = vm, tab = tab, compact = false, stateFor = stateFor,
                             ui = FeedUi(savedIds, liked, selected?.id),
@@ -265,7 +269,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                         Box(Modifier.align(Alignment.CenterEnd).width(1.dp).fillMaxHeight().background(Glass.hairline))
                         PaneMiniPlayer(briefing, Modifier.align(Alignment.BottomCenter))
                     }
-                    ReaderPane(
+                    if (tab != NavTab.LIVE) ReaderPane(
                         article = selected,
                         category = category,
                         saved = selected?.id in savedIds,
@@ -385,6 +389,7 @@ private fun categoryLabel(vm: HomeViewModel, tab: NavTab, topicIndex: Int): Stri
     NavTab.TODAY, NavTab.AUDIO -> vm.topics.getOrNull(topicIndex)?.label ?: vm.topics.first().label
     NavTab.DISCOVER -> tr(R.string.tab_discover)
     NavTab.SAVED -> tr(R.string.tab_saved)
+    NavTab.LIVE -> tr(R.string.tab_live)
 }
 
 @Composable
@@ -488,6 +493,7 @@ private fun TabFeed(
         val visible: List<Article> = when (t) {
             NavTab.TODAY, NavTab.AUDIO -> (feeds[topic.id] as? FeedResult.Success)?.articles.orEmpty()
             NavTab.SAVED -> saved
+            NavTab.LIVE -> emptyList()
             NavTab.DISCOVER -> {
                 val byTopic = remember(feeds) {
                     feeds.mapNotNull { (id, r) -> (r as? FeedResult.Success)?.let { id to it.articles } }.toMap()
@@ -511,10 +517,19 @@ private fun TabFeed(
             }
         }
         LaunchedEffect(t, visible.firstOrNull()?.id) { visible.firstOrNull()?.let(onFirstArticle) }
+        if (t == NavTab.LIVE) {
+            val app = LocalContext.current.applicationContext as OpenWireApp
+            news.openwire.live.LiveScreen(
+                padding = padding, live = app.container.live, radio = app.container.radioBrowser,
+                appLanguage = news.openwire.domain.engine.Languages.effective(userSettings.language),
+                country = userSettings.edition.country,
+            )
+            return@HorizontalPager
+        }
 
         val isRefreshing = when (t) {
             NavTab.DISCOVER -> refreshingIds.isNotEmpty()
-            NavTab.SAVED -> false
+            NavTab.SAVED, NavTab.LIVE -> false
             else -> topic.id in refreshingIds
         }
         androidx.compose.material3.pulltorefresh.PullToRefreshBox(
@@ -586,6 +601,7 @@ private fun TabFeed(
                         feed(visible, tr(R.string.tab_saved), ticker = false, title = tr(R.string.feed_saved_stories))
                     }
                 }
+                NavTab.LIVE -> Unit // drawn by LiveScreen above
             }
         }
         }

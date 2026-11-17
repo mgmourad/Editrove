@@ -114,6 +114,15 @@
             android:name="news.openwire.ui.home.BriefingService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <!-- Live TV and radio: keeps playing in the background, with lock-screen controls. -->
+        <service
+            android:name="news.openwire.live.LivePlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

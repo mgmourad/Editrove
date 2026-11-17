@@ -36,7 +36,7 @@ import news.openwire.domain.model.Topic
 import news.openwire.domain.model.UserSettings
 
 enum class NavTab(@androidx.annotation.StringRes private val res: Int) {
-    TODAY(R.string.tab_today), DISCOVER(R.string.tab_discover), AUDIO(R.string.tab_audio), SAVED(R.string.tab_saved);
+    TODAY(R.string.tab_today), DISCOVER(R.string.tab_discover), AUDIO(R.string.tab_audio), LIVE(R.string.tab_live), SAVED(R.string.tab_saved);
 
     val label: String get() = tr(res)
 }
@@ -167,7 +167,7 @@ class HomeViewModel(
         when (tab) {
             NavTab.DISCOVER -> topics.forEach { ensureFresh(it) }
             NavTab.TODAY, NavTab.AUDIO -> ensureFresh(currentTopic)
-            NavTab.SAVED -> Unit
+            NavTab.SAVED, NavTab.LIVE -> Unit
         }
     }
 
@@ -177,7 +177,7 @@ class HomeViewModel(
     fun refresh() {
         when (_tab.value) {
             NavTab.DISCOVER -> topics.forEach { load(it, force = true) }
-            NavTab.SAVED -> Unit
+            NavTab.SAVED, NavTab.LIVE -> Unit
             else -> load(currentTopic, force = true)
         }
     }

@@ -385,4 +385,22 @@
     <string name="voice_missing">لم يُثبَّت صوت باللغة %1$s بعد.</string>
     <string name="voice_unsupported">لا يتضمن محرك النطق صوتاً باللغة %1$s.</string>
     <string name="voice_install">تثبيت الصوت</string>
+    <string name="tab_live">مباشر</string>
+    <string name="live_kicker">على الهواء</string>
+    <string name="live_sub">قنوات إخبارية وإذاعات تبث الآن.</string>
+    <string name="live_tv">تلفزيون</string>
+    <string name="live_radio">راديو</string>
+    <string name="live_all">الكل</string>
+    <string name="live_news_radio">إذاعات إخبارية</string>
+    <string name="live_stations_in">محطات في %1$s</string>
+    <string name="live_search_hint">ابحث في كل محطات الراديو</string>
+    <string name="live_no_stations">لم يُعثر على محطات.</string>
+    <string name="live_unavailable">هذا البث غير متاح الآن.</string>
+    <string name="live_tuning">جارٍ الاتصال…</string>
+    <string name="live_on_now">يُعرض الآن</string>
+    <string name="live_now_playing">قيد التشغيل</string>
+    <string name="live_stop">إيقاف</string>
+    <string name="live_play">تشغيل</string>
+    <string name="live_tv_note">يأتي البث مباشرة من كل قناة. القنوات المعلّمة بـ YouTube ليس لها بث مفتوح وتُفتح صفحتها الرسمية للبث المباشر.</string>
+    <string name="live_radio_note">مزيد من المحطات من دليل Radio Browser المفتوح (radio-browser.info). لا يُرسل سوى بلدك أو كلمات البحث.</string>
 </resources>

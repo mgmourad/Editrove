@@ -89,6 +89,11 @@ dependencies {
     implementation(libs.haze)
     implementation(libs.glance.appwidget)
     implementation(libs.androidx.browser)
+    // Live TV (HLS) and radio, with background playback and lock-screen controls.
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.exoplayer.hls)
+    implementation(libs.media3.ui)
+    implementation(libs.media3.session)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

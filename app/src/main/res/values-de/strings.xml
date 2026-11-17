@@ -385,4 +385,22 @@
     <string name="voice_missing">Noch keine Stimme auf %1$s installiert.</string>
     <string name="voice_unsupported">Die Sprachausgabe hat keine Stimme auf %1$s.</string>
     <string name="voice_install">Stimme installieren</string>
+    <string name="tab_live">Live</string>
+    <string name="live_kicker">AUF SENDUNG</string>
+    <string name="live_sub">Nachrichtensender und Radio, jetzt live.</string>
+    <string name="live_tv">TV</string>
+    <string name="live_radio">Radio</string>
+    <string name="live_all">Alle</string>
+    <string name="live_news_radio">Nachrichtenradio</string>
+    <string name="live_stations_in">Sender in %1$s</string>
+    <string name="live_search_hint">Alle Radiosender durchsuchen</string>
+    <string name="live_no_stations">Keine Sender gefunden.</string>
+    <string name="live_unavailable">Dieser Stream ist gerade nicht verfügbar.</string>
+    <string name="live_tuning">Verbinde…</string>
+    <string name="live_on_now">Läuft jetzt</string>
+    <string name="live_now_playing">Läuft</string>
+    <string name="live_stop">Stopp</string>
+    <string name="live_play">Abspielen</string>
+    <string name="live_tv_note">Die Streams kommen direkt von den Sendern. Mit YouTube markierte Sender haben keinen offenen Stream und öffnen ihre offizielle Live-Seite.</string>
+    <string name="live_radio_note">Weitere Sender aus dem offenen Radio-Browser-Verzeichnis (radio-browser.info). Gesendet werden nur dein Land oder deine Suchwörter.</string>
 </resources>

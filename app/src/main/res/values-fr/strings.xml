@@ -385,4 +385,22 @@
     <string name="voice_missing">Aucune voix %1$s n’est encore installée.</string>
     <string name="voice_unsupported">Le moteur vocal n’a pas de voix %1$s.</string>
     <string name="voice_install">Installer la voix</string>
+    <string name="tab_live">En direct</string>
+    <string name="live_kicker">À L’ANTENNE</string>
+    <string name="live_sub">Chaînes d’info et radios, en direct.</string>
+    <string name="live_tv">TV</string>
+    <string name="live_radio">Radio</string>
+    <string name="live_all">Toutes</string>
+    <string name="live_news_radio">Radios d’info</string>
+    <string name="live_stations_in">Stations : %1$s</string>
+    <string name="live_search_hint">Rechercher toutes les radios</string>
+    <string name="live_no_stations">Aucune station trouvée.</string>
+    <string name="live_unavailable">Ce flux n’est pas disponible pour l’instant.</string>
+    <string name="live_tuning">Connexion…</string>
+    <string name="live_on_now">En ce moment</string>
+    <string name="live_now_playing">En écoute</string>
+    <string name="live_stop">Arrêter</string>
+    <string name="live_play">Lire</string>
+    <string name="live_tv_note">Les flux viennent directement de chaque diffuseur. Les chaînes marquées YouTube n’ont pas de flux ouvert et ouvrent leur page officielle.</string>
+    <string name="live_radio_note">Plus de stations depuis l’annuaire ouvert Radio Browser (radio-browser.info). Seuls votre pays ou vos mots de recherche sont envoyés.</string>
 </resources>

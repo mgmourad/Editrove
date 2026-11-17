@@ -1,0 +1,7 @@
+Editrove 0.7.0 Beta 5 — Faster articles, market watch
+• Articles open much faster: Editrove asks the publisher, a browser view and two archives at once, and shows whichever has the full story first.
+• Sites that block apps (France 24, Slashdot, NBC and others) now open in the reader.
+• Better text for sites that build their pages with scripts (TechCrunch, Vogue and more).
+• Shared or pasted Google News links open the publisher's article.
+• Switching off one source no longer empties a topic: the rest of its stories stay.
+• Business: a new MARKETS bar under LIVE. Tap it for live index, oil, gold, currency and Bitcoin prices with mini charts, from Yahoo Finance (may be delayed).

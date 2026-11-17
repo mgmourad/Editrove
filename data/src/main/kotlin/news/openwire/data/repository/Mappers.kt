@@ -20,6 +20,7 @@ fun ArticleDto.toArticle(rank: Int? = null): Article = Article(
     imageUrl = imageUrl,
     summary = summary?.takeIf { it.length > 20 },
     editorialRank = rank,
+    feedUrl = feedUrl?.takeIf { !it.contains("news.google.com") },
 )
 
 fun Article.toEntity(topicId: String, position: Int = 0): ArticleEntity = ArticleEntity(

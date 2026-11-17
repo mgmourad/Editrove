@@ -31,6 +31,11 @@ class GoogleLinkResolver(context: Context) {
     private val failed = ConcurrentHashMap<String, Long>()
     /** Three hidden WebViews at a time: fast enough for a feed, light on the phone. */
     private val gate = kotlinx.coroutines.sync.Semaphore(3)
+    /**
+     * Hidden WebViews are never attached to a window, and Android holds back View.post /
+     * postDelayed until a view is attached — so all scheduling goes through the main looper.
+     */
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
 
     private fun stored(link: String): String? = cache[link] ?: prefs.getString(key(link), null)?.also { cache[link] = it }
 
@@ -62,7 +67,7 @@ class GoogleLinkResolver(context: Context) {
             if (done) return
             done = true
             web.stopLoading()
-            web.post { web.destroy() }
+            main.post { web.destroy() }
             if (cont.isActive) cont.resume(url)
         }
         web.settings.apply {
@@ -82,7 +87,7 @@ class GoogleLinkResolver(context: Context) {
                 if (!isGoogle(url)) finish(url)
             }
         }
-        cont.invokeOnCancellation { web.post { runCatching { web.stopLoading(); web.destroy() } } }
+        cont.invokeOnCancellation { main.post { runCatching { web.stopLoading(); web.destroy() } } }
         web.loadUrl(link)
     }
 
@@ -94,28 +99,61 @@ class GoogleLinkResolver(context: Context) {
         withContext(Dispatchers.Main) { withTimeoutOrNull(RENDER_MS) { load(url) } }
     }
 
+    /** The reader's own lane: never waits behind a feed's batch of link lookups. */
+    private val readerGate = kotlinx.coroutines.sync.Semaphore(2)
+
+    suspend fun renderForReader(url: String): String? = readerGate.withPermit {
+        withContext(Dispatchers.Main) { withTimeoutOrNull(RENDER_MS) { load(url) } }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private suspend fun load(url: String): String? = suspendCancellableCoroutine { cont ->
         val web = WebView(app)
         var done = false
+        var polling = false
+        val started = android.os.SystemClock.elapsedRealtime()
+        var lastLen = -1
         fun finish(html: String?) {
             if (done) return
             done = true
-            web.post { runCatching { web.stopLoading(); web.destroy() } }
+            main.post { runCatching { web.stopLoading(); web.destroy() } }
             if (cont.isActive) cont.resume(html)
         }
-        web.settings.apply { javaScriptEnabled = true; domStorageEnabled = true; blockNetworkImage = true; loadsImagesAutomatically = false }
-        web.webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView, finishedUrl: String) {
-                // Give client-rendered pages a moment to fill in.
-                view.postDelayed({
-                    if (!done) view.evaluateJavascript("document.documentElement.outerHTML") { json ->
-                        finish(runCatching { org.json.JSONTokener(json).nextValue() as? String }.getOrNull())
-                    }
-                }, 1200)
+        fun grab() = web.evaluateJavascript("document.documentElement.outerHTML") { json ->
+            finish(runCatching { org.json.JSONTokener(json).nextValue() as? String }.getOrNull())
+        }
+        // Watch the page until it holds an article: bot checks ("Just a moment…", "Checking
+        // your connection") run first and then redirect, and some pages build text with scripts.
+        fun poll() {
+            if (done) return
+            web.evaluateJavascript(PROBE_JS) { raw ->
+                if (done) return@evaluateJavascript
+                val v = runCatching { org.json.JSONTokener(raw).nextValue() as? String }.getOrNull().orEmpty()
+                val challenge = v.startsWith("1")
+                val len = v.substringAfter(':').toIntOrNull() ?: 0
+                val waited = android.os.SystemClock.elapsedRealtime() - started
+                when {
+                    !challenge && len >= 1500 -> grab()
+                    !challenge && waited > 3_000 && len == lastLen -> grab() // settled
+                    else -> { lastLen = len; main.postDelayed({ poll() }, 700) }
+                }
             }
         }
-        cont.invokeOnCancellation { web.post { runCatching { web.stopLoading(); web.destroy() } } }
+        web.settings.apply {
+            javaScriptEnabled = true; domStorageEnabled = true; blockNetworkImage = true; loadsImagesAutomatically = false
+            userAgentString = userAgentString.replace("; wv", "") // a plain Chrome tab, not "WebView"
+        }
+        android.webkit.CookieManager.getInstance().setAcceptCookie(true)
+        web.webViewClient = object : WebViewClient() {
+            // (HTTP 403/503 is not an error here: bot checks answer with it, then pass.)
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
+                if (request.isForMainFrame) finish(null) // offline / DNS: nothing will load
+            }
+            override fun onPageFinished(view: WebView, finishedUrl: String) {
+                if (!polling) { polling = true; main.postDelayed({ poll() }, 600) }
+            }
+        }
+        cont.invokeOnCancellation { main.post { runCatching { web.stopLoading(); web.destroy() } } }
         web.loadUrl(url)
     }
 
@@ -129,7 +167,11 @@ class GoogleLinkResolver(context: Context) {
     private companion object {
         const val TIMEOUT_MS = 15_000L
         const val RETRY_MS = 3 * 60_000L
-        const val RENDER_MS = 15_000L
+        const val RENDER_MS = 17_000L
+        /** "challenge:paragraphText" — 1 while a bot check is showing. */
+        const val PROBE_JS = "(function(){var t=(document.title||'').toLowerCase();" +
+            "var c=/just a moment|checking your|attention required|are you a robot|verify you are human|access denied|please wait/.test(t)?1:0;" +
+            "var n=0;document.querySelectorAll('p').forEach(function(p){var l=p.innerText.length;if(l>40)n+=l;});return c+':'+n;})()"
     }
 }
 

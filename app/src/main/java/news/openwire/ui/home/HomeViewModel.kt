@@ -55,6 +55,8 @@ class HomeViewModel(
     private val registry: DomainRegistry,
     /** Returns an archive snapshot URL for a hard-paywalled story, or null when none exists. */
     private val archiveLookup: suspend (Article) -> String?,
+    /** news.google.com wrapper → publisher URL (shared or pasted Google News links). */
+    private val resolveLink: suspend (String) -> String? = { null },
 ) : ViewModel() {
 
     val settings: StateFlow<UserSettings> = settingsRepo.settings
@@ -229,6 +231,19 @@ class HomeViewModel(
         )
         _linkDialog.value = false
         _settingsOpen.value = false
+        if (news.openwire.domain.engine.GoogleNewsUrls.isGoogleNewsUrl(url)) {
+            // A Google News wrapper: open it as soon as the publisher's own link is known.
+            openArticle(base.copy(source = "Google News"))
+            viewModelScope.launch {
+                val real = runCatching { resolveLink(url) }.getOrNull() ?: return@launch
+                val d = registry.normalizeDomain(real)
+                openArticle(StrategyRouter.applyStrategy(registry, base.copy(
+                    id = "link-${real.hashCode()}", originalUrl = real, domain = d,
+                    source = registry.getRule(d).label?.takeIf { it.isNotBlank() } ?: d,
+                )))
+            }
+            return true
+        }
         openArticle(StrategyRouter.applyStrategy(registry, base))
         return true
     }

@@ -18,4 +18,6 @@ data class ArticleDto(
     val archiveUrl: String? = null,
     val imageUrl: String? = null,
     val summary: String? = null,
+    /** The feed the pipeline took this story from. */
+    val feedUrl: String? = null,
 )

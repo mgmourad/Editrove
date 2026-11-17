@@ -196,7 +196,14 @@ class FeedRepositoryImpl(
             if (primaryUrl != null) add(SourceLibrary.GOOGLE_NEWS.copy(url = primaryUrl, name = if (primaryUrl.contains("news.google.com")) "Google News" else topic.label))
             addAll(feeds)
         }.distinctBy { it.url }
-        if (configs.isEmpty()) {
+        // A built-in topic whose sources were edited still leads with its published front page,
+        // minus stories from the sources the reader switched off.
+        val published = if (primaryUrl == null && topic.snapshotFile != null && !topic.isCustom) {
+            // Exactly the stories that came from a switched-off feed (the snapshot records each story's feed).
+            runCatching { remote.fetchTopic(topic.snapshotFile!!).mapIndexed { i, d -> d.toArticle(rank = i) } }.getOrDefault(emptyList())
+                .filter { a -> a.feedUrl == null || SourceLibrary.sourceKey(a.feedUrl) !in s.disabledSources }
+        } else emptyList()
+        if (configs.isEmpty() && published.isEmpty()) {
             if (cached.isEmpty()) emit(FeedResult.Empty(topic.id))
             return
         }
@@ -225,7 +232,7 @@ class FeedRepositoryImpl(
             }.awaitAll()
         }
 
-        if (results.all { it.articles == null }) {
+        if (published.isEmpty() && results.all { it.articles == null }) {
             val msg = "Sources are unavailable right now. ${results.firstOrNull()?.error.orEmpty()}".trim()
             if (cached.isEmpty()) emit(FeedResult.Error(msg))
             else emit(FeedResult.Success(cached, fromCache = true, updatedAt = feedState?.lastUpdated(topic.id) ?: 0L, failedSources = results.map { it.source.name }))
@@ -242,7 +249,7 @@ class FeedRepositoryImpl(
             }
             r.copy(articles = list)
         }
-        val primary = prepared.firstOrNull { it.source.isPrimary }?.articles.orEmpty()
+        val primary = prepared.firstOrNull { it.source.isPrimary }?.articles.orEmpty().ifEmpty { published }
         val groups = prepared.filter { !it.source.isPrimary && !it.articles.isNullOrEmpty() }.map { FeedWeaver.Group(it.source, it.articles!!) }
         val isLatest = topic.id == "LATEST"
         var woven = FeedWeaver.weave(primary, groups, norm, FeedWeaver.Options(leadAnchorCount = if (isLatest) 0 else 2))

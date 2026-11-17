@@ -41,7 +41,13 @@ class AppContainer(context: Context) {
     val archiveChecker: ArchiveChecker by lazy { ArchiveChecker() }
     /** Publisher URLs behind news.google.com links (reader text, photos, briefings). */
     val googleLinks: news.openwire.data.GoogleLinkResolver by lazy { news.openwire.data.GoogleLinkResolver(context) }
-    val articleTextExtractor: ArticleTextExtractor by lazy { ArticleTextExtractor(resolveLink = { googleLinks.resolve(it) }, renderPage = { googleLinks.render(it) }) }
+    val articleTextExtractor: ArticleTextExtractor by lazy { ArticleTextExtractor(
+            resolveLink = { googleLinks.resolve(it) },
+            renderPage = { googleLinks.renderForReader(it) },
+            isPaywalled = { url -> domainRegistry.getRule(domainRegistry.normalizeDomain(url)).paywall.let { it == "hard" || it == "metered" } },
+            diagnostics = true,
+        ) }
+    val markets: news.openwire.data.remote.MarketDataSource by lazy { news.openwire.data.remote.MarketDataSource() }
     val logoResolver: news.openwire.data.remote.PublisherLogoResolver by lazy {
         val prefs = context.getSharedPreferences("publisher_logos", android.content.Context.MODE_PRIVATE)
         news.openwire.data.remote.PublisherLogoResolver(load = { prefs.getString(it, null) }, save = { d, u -> prefs.edit().putString(d, u).apply() })

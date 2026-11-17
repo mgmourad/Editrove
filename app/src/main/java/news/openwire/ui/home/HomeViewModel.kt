@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
@@ -33,7 +35,11 @@ import news.openwire.domain.model.SortMode
 import news.openwire.domain.model.Topic
 import news.openwire.domain.model.UserSettings
 
-enum class NavTab(val label: String) { TODAY("Today"), DISCOVER("Discover"), AUDIO("Audio"), SAVED("Saved") }
+enum class NavTab(@androidx.annotation.StringRes private val res: Int) {
+    TODAY(R.string.tab_today), DISCOVER(R.string.tab_discover), AUDIO(R.string.tab_audio), LIVE(R.string.tab_live), OPINION(R.string.tab_opinion), SAVED(R.string.tab_saved);
+
+    val label: String get() = tr(res)
+}
 
 /** Hard-paywall archive availability for a story (SPEC §6.2 grey-out). */
 sealed interface ArchiveState {
@@ -62,7 +68,7 @@ class HomeViewModel(
     val settings: StateFlow<UserSettings> = settingsRepo.settings
 
     /** All topics (ordered, with visibility) for the current settings. */
-    private fun allTopicsFor(s: UserSettings) = TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder)
+    private fun allTopicsFor(s: UserSettings) = TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder, s.language)
 
     val topicsState: StateFlow<List<Topic>> = settings
         .map { s -> allTopicsFor(s).filter { it.isVisible } }
@@ -161,7 +167,9 @@ class HomeViewModel(
         when (tab) {
             NavTab.DISCOVER -> topics.forEach { ensureFresh(it) }
             NavTab.TODAY, NavTab.AUDIO -> ensureFresh(currentTopic)
-            NavTab.SAVED -> Unit
+            NavTab.SAVED, NavTab.LIVE -> Unit
+            // Trending tabs there come from what every topic is covering.
+            NavTab.OPINION -> topics.forEach { ensureFresh(it) }
         }
     }
 
@@ -171,12 +179,31 @@ class HomeViewModel(
     fun refresh() {
         when (_tab.value) {
             NavTab.DISCOVER -> topics.forEach { load(it, force = true) }
-            NavTab.SAVED -> Unit
+            NavTab.SAVED, NavTab.LIVE, NavTab.OPINION -> Unit
             else -> load(currentTopic, force = true)
         }
     }
 
     fun setSortMode(mode: SortMode) = settingsRepo.update { it.copy(sortMode = mode) }
+
+    fun setTextScale(scale: Float) = settingsRepo.update { it.copy(textScale = scale) }
+
+    // ---- Analysis & Opinion: follows and topic tabs ----
+    fun toggleFollowAuthor(name: String) = settingsRepo.update { s ->
+        val key = news.openwire.domain.opinion.OpinionCatalog.authorKey(name)
+        val existing = s.followedAuthors.firstOrNull { news.openwire.domain.opinion.OpinionCatalog.authorKey(it) == key }
+        s.copy(followedAuthors = if (existing != null) s.followedAuthors - existing else s.followedAuthors + name.trim())
+    }
+
+    fun toggleFollowAccount(handle: String) = settingsRepo.update { s ->
+        s.copy(followedAccounts = if (handle in s.followedAccounts) s.followedAccounts - handle else s.followedAccounts + handle)
+    }
+
+    fun addOpinionTab(topic: String) = settingsRepo.update { s ->
+        if (s.opinionTabs.any { it.equals(topic, true) }) s else s.copy(opinionTabs = s.opinionTabs + topic.trim())
+    }
+
+    fun removeOpinionTab(topic: String) = settingsRepo.update { s -> s.copy(opinionTabs = s.opinionTabs.filterNot { it.equals(topic, true) }) }
 
     fun openArticle(article: Article) {
         _selected.value = article
@@ -218,7 +245,7 @@ class HomeViewModel(
     fun openLink(text: String?, subject: String? = null, title: String? = null): Boolean {
         val url = SharedUrl.extract(text, subject)
         if (url.isEmpty()) {
-            _messages.trySend("That doesn't look like a web link.")
+            _messages.trySend(tr(R.string.msg_not_a_link))
             return false
         }
         val domain = registry.normalizeDomain(url)

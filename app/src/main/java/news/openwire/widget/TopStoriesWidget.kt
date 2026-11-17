@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.widget
 
+import news.openwire.i18n.tr
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,7 +51,7 @@ class TopStoriesWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        provideContent { StoriesWidget(FeedSpec("TOP", "Top Stories", refreshable = false)) }
+        provideContent { StoriesWidget(FeedSpec("TOP", tr(R.string.widget_top_label), refreshable = false)) }
     }
 }
 
@@ -68,7 +69,7 @@ class TopicNewsWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val widgetId = androidx.glance.appwidget.GlanceAppWidgetManager(context).getAppWidgetId(id)
         val topicId = BriefWidgets.topicFor(context, TopicWidgetReceiver::class.java, widgetId)
-        val label = WidgetData.topics(context).firstOrNull { it.id == topicId }?.label ?: "Top Stories"
+        val label = WidgetData.topics(context).firstOrNull { it.id == topicId }?.label ?: tr(R.string.widget_top_label)
         provideContent { StoriesWidget(FeedSpec(topicId, label, refreshable = true)) }
     }
 }
@@ -94,7 +95,7 @@ internal fun RefreshButton(spec: FeedSpec, onPhoto: Boolean = false) {
         contentAlignment = Alignment.Center,
     ) {
         if (busy) androidx.glance.appwidget.CircularProgressIndicator(GlanceModifier.size(16.dp), color = if (onPhoto) W.white else W.textSecondary)
-        else Image(ImageProvider(R.drawable.wic_refresh), contentDescription = "Refresh", colorFilter = androidx.glance.ColorFilter.tint(if (onPhoto) W.white else W.textSecondary), modifier = GlanceModifier.size(16.dp))
+        else Image(ImageProvider(R.drawable.wic_refresh), contentDescription = tr(R.string.action_refresh), colorFilter = androidx.glance.ColorFilter.tint(if (onPhoto) W.white else W.textSecondary), modifier = GlanceModifier.size(16.dp))
     }
 }
 
@@ -125,7 +126,7 @@ private fun StoriesWidget(spec: FeedSpec) {
         val list = stories
         when {
             list == null -> Loading()
-            list.isEmpty() -> Empty("No ${spec.title} stories yet. Open Editrove or tap refresh.", spec)
+            list.isEmpty() -> Empty(tr(R.string.widget_empty, spec.title), spec)
             else -> when (SizeClass.of(size)) {
                 SizeClass.COMPACT -> CompactLead(list.first(), spec)
                 SizeClass.WIDE -> WideSplit(list, size.width, spec)
@@ -152,7 +153,7 @@ internal fun Empty(message: String, spec: FeedSpec? = null) {
 
 private fun editionLabel(): String {
     val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-    return when (h) { in 4..11 -> "MORNING EDITION"; in 12..16 -> "AFTERNOON EDITION"; else -> "EVENING EDITION" }
+    return tr(when (h) { in 4..11 -> R.string.morning_edition; in 12..16 -> R.string.afternoon_edition; else -> R.string.evening_edition })
 }
 
 /** Photo (or obsidian fallback) with the multi-stop editorial mask. */
@@ -195,7 +196,7 @@ private fun WideSplit(list: List<WidgetStory>, width: Dp, spec: FeedSpec) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Monogram(20.dp)
                     Spacer(GlanceModifier.width(6.dp))
-                    Pill("LEAD", W.white, W.photoChip)
+                    Pill(tr(R.string.lead), W.white, W.photoChip)
                 }
                 Spacer(GlanceModifier.defaultWeight())
                 Text(lead.category.uppercase(), style = mono(9.sp, W.onPhoto, bold = true), maxLines = 1)
@@ -236,7 +237,7 @@ private fun Bento(list: List<WidgetStory>, width: Dp, height: Dp, columns: Int, 
         Row(GlanceModifier.fillMaxWidth().height(26.dp), verticalAlignment = Alignment.CenterVertically) {
             Monogram(24.dp)
             Text("  ${spec.title}", style = serif(16.sp), modifier = GlanceModifier.defaultWeight(), maxLines = 1)
-            if (updated > 0) Pill("Updated ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(updated))}", W.textSecondary, W.chip, size = 10.sp)
+            if (updated > 0) Pill(tr(R.string.status_updated, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(updated))), W.textSecondary, W.chip, size = 10.sp)
             if (spec.refreshable) { Spacer(GlanceModifier.width(6.dp)); RefreshButton(spec) }
         }
         Spacer(GlanceModifier.height(8.dp))

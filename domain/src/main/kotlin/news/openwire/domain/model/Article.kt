@@ -27,6 +27,8 @@ data class Article(
     val coverage: Int? = null,
     /** Other outlets running the same story (display names), for "Also covered by". */
     val alsoCoveredBy: List<String> = emptyList(),
+    /** The writer, when the feed names one (opinion columns, analysis). */
+    val author: String? = null,
 ) {
     /** True when the routing engine needs an archive snapshot to open this story. */
     val needsArchive: Boolean get() = badge == "Archive.is" || badge == "Wayback"

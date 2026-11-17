@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Spring
@@ -36,6 +38,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -207,12 +210,12 @@ fun SpringToggle(
         ToggleKind.LIKE -> Triple(
             if (active) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
             if (active) Glass.accent else inactiveTint,
-            if (active) "Unlike" else "Like",
+            tr(if (active) R.string.cd_unlike else R.string.cd_like),
         )
         ToggleKind.BOOKMARK -> Triple(
             if (active) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
             if (active) Amber400 else inactiveTint,
-            if (active) "Remove from saved" else "Save story",
+            tr(if (active) R.string.cd_unsave else R.string.cd_save),
         )
     }
     Box(
@@ -237,3 +240,39 @@ enum class ToggleKind { LIKE, BOOKMARK }
 
 /** Tween used for posture / pane transitions. */
 fun <T> springTween(durationMs: Int = 450) = tween<T>(durationMs, easing = SpringEasing)
+
+/** "Headline" then the publisher's own link (never a Google or archive wrapper). */
+fun shareText(a: news.openwire.domain.model.Article): String {
+    val link = listOf(a.originalUrl, a.targetUrl).firstOrNull { u ->
+        !u.isNullOrBlank() && !u.contains("news.google.com") && !u.contains("archive.") && !u.contains("web.archive.org")
+    } ?: a.originalUrl.orEmpty()
+    return a.title.trim() + "\n" + link
+}
+
+/** Share button for cards and the reader: headline first, then the article link. */
+@androidx.compose.runtime.Composable
+fun ShareButton(
+    article: news.openwire.domain.model.Article,
+    tint: androidx.compose.ui.graphics.Color = Glass.textPrimary,
+    background: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Transparent,
+    border: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Transparent,
+    padding: androidx.compose.ui.unit.Dp = 6.dp,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Box(
+        Modifier.clip(CircleShape).background(background).border(1.dp, border, CircleShape)
+            .clickable {
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                    .putExtra(android.content.Intent.EXTRA_TEXT, shareText(article))
+                    .putExtra(android.content.Intent.EXTRA_SUBJECT, article.title)
+                context.startActivity(android.content.Intent.createChooser(send, tr(R.string.share_story)))
+            }
+            .padding(padding),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.Icon(
+            androidx.compose.material.icons.Icons.Outlined.Share, contentDescription = tr(R.string.share_story),
+            tint = tint, modifier = Modifier.size(18.dp),
+        )
+    }
+}

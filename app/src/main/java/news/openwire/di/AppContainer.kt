@@ -48,6 +48,11 @@ class AppContainer(context: Context) {
             diagnostics = true,
         ) }
     val markets: news.openwire.data.remote.MarketDataSource by lazy { news.openwire.data.remote.MarketDataSource() }
+    val radioBrowser: news.openwire.data.remote.RadioBrowserSource by lazy { news.openwire.data.remote.RadioBrowserSource() }
+    val xPosts: news.openwire.data.remote.XPostSource by lazy { news.openwire.data.remote.XPostSource() }
+    val opinion: news.openwire.data.remote.OpinionSource by lazy { news.openwire.data.remote.OpinionSource(GoogleNewsRssSource(), RssNormalizer(domainRegistry)) }
+    /** Live TV and radio; starting either pauses the audio briefing. */
+    val live: news.openwire.live.LiveController by lazy { news.openwire.live.LiveController(context) { if (briefingPlayer.playing) briefingPlayer.pause() } }
     val logoResolver: news.openwire.data.remote.PublisherLogoResolver by lazy {
         val prefs = context.getSharedPreferences("publisher_logos", android.content.Context.MODE_PRIVATE)
         news.openwire.data.remote.PublisherLogoResolver(load = { prefs.getString(it, null) }, save = { d, u -> prefs.edit().putString(d, u).apply() })

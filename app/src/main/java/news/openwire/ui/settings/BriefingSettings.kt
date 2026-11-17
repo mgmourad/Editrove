@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.settings
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import android.media.MediaPlayer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
@@ -73,7 +75,25 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
 
     // A private engine for listing voices and previews.
     var ready by remember { mutableStateOf(false) }
-    val tts = remember { TextToSpeech(context.applicationContext) { ready = it == TextToSpeech.SUCCESS } }
+    val tts = remember { TextToSpeech(context.applicationContext, { ready = it == TextToSpeech.SUCCESS }, news.openwire.i18n.VoiceSetup.engine(context)) }
+    // A voice in Editrove's language: fetched automatically when the engine has one to download.
+    val appLang = news.openwire.domain.engine.Languages.effective(s.language)
+    var voiceState by remember { mutableStateOf<news.openwire.i18n.VoiceSetup.State?>(null) }
+    var voiceCheck by remember { mutableIntStateOf(0) }
+    LaunchedEffect(appLang, voiceCheck) {
+        if (appLang == "en") return@LaunchedEffect
+        voiceState = news.openwire.i18n.VoiceSetup.ensure(context, appLang, s.edition.country)
+        // While it downloads, look again now and then.
+        while (voiceState == news.openwire.i18n.VoiceSetup.State.DOWNLOADING) {
+            delay(5_000)
+            voiceState = news.openwire.i18n.VoiceSetup.ensure(context, appLang, s.edition.country)
+        }
+        // A voice that just arrived becomes the briefing's voice (unless one in this language is chosen).
+        val chosen = s.briefing.voice
+        if (voiceState == news.openwire.i18n.VoiceSetup.State.READY && (chosen == null || !chosen.lowercase().startsWith(appLang))) {
+            news.openwire.i18n.VoiceSetup.lastReady?.let { name -> vm.setBriefing { it.copy(voice = name) } }
+        }
+    }
     var cuePlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var cuePlaying by remember { mutableIntStateOf(0) }
     DisposableEffect(Unit) { onDispose { tts.stop(); tts.shutdown(); cuePlayer?.release() } }
@@ -97,18 +117,23 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
     fun preview(voice: Voice?) {
         tts.stop()
         tts.setSpeechRate(p.speed)
-        (voice ?: news.openwire.ui.home.BriefingVoices.preferred(runCatching { tts.voices }.getOrNull().orEmpty()) ?: tts.defaultVoice)?.let { tts.voice = it }
-        tts.speak("Good evening. This is your Top Stories briefing from Editrove.", TextToSpeech.QUEUE_FLUSH, null, "preview")
+        val lang = voice?.locale?.language ?: appLang
+        (voice ?: news.openwire.ui.home.BriefingVoices.preferred(runCatching { tts.voices }.getOrNull().orEmpty(), lang) ?: tts.defaultVoice)?.let { tts.voice = it }
+        val sample = news.openwire.domain.engine.BriefingScript.intro(
+            news.openwire.domain.engine.Languages.topicName("TOP", lang) ?: "Top Stories", 8,
+            news.openwire.domain.model.BriefingDetail.HEADLINES, java.time.LocalDateTime.now(), lang,
+        )
+        tts.speak(sample, TextToSpeech.QUEUE_FLUSH, null, "preview")
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            "Your briefing is read by your phone's own text-to-speech voice with a news-anchor script, an opening cue and transition stings. Nothing leaves your device.",
+            tr(R.string.briefing_intro),
             style = sans(12.sp, lineHeight = 18.sp), color = g.textSecondary, modifier = Modifier.padding(horizontal = 4.dp),
         )
 
-        Section("Scheduled briefings") {
-            Text("At each time you'll get a notification. Tap it and Editrove fetches the latest Top Stories and starts playing.", style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary)
+        Section(tr(R.string.briefing_reminders_channel)) {
+            Text(tr(R.string.scheduled_hint), style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary)
             Spacer(Modifier.height(6.dp))
             p.slots.forEach { slot ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -130,7 +155,7 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
             if (p.slots.any { it.enabled } && !news.openwire.briefing.BriefingReminders.canExact(context)) {
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Briefings may arrive up to 10 minutes late. Tap to allow exact timing.",
+                    tr(R.string.exact_hint),
                     style = sans(11.sp, FontWeight.Medium), color = g.accentSoft,
                     modifier = Modifier.clickable {
                         runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, android.net.Uri.parse("package:${context.packageName}"))) }
@@ -139,28 +164,28 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
             }
         }
 
-        Section("Detail") {
+        Section(tr(R.string.detail)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BriefingDetail.entries.forEach { d -> chip(d.label, p.detail == d) { vm.setBriefing { it.copy(detail = d) } } }
             }
             Spacer(Modifier.height(8.dp))
             Text(
                 when (p.detail) {
-                    BriefingDetail.HEADLINES -> "Quick: each headline with its source."
-                    BriefingDetail.SUMMARIES -> "Each headline, then the key details from the article."
-                    BriefingDetail.FULL -> "Each article read in full, with an anchor hand-off between stories. Long."
+                    BriefingDetail.HEADLINES -> tr(R.string.detail_headlines_hint)
+                    BriefingDetail.SUMMARIES -> tr(R.string.detail_summaries_hint)
+                    BriefingDetail.FULL -> tr(R.string.detail_full_hint)
                 },
                 style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary,
             )
         }
 
-        Section("Number of stories") {
+        Section(tr(R.string.story_count)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 BriefingPrefs.COUNTS.forEach { n -> chip("$n", p.count == n) { vm.setBriefing { it.copy(count = n) } } }
             }
         }
 
-        Section("Playback speed") {
+        Section(tr(R.string.playback_speed)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 BriefingPrefs.SPEEDS.forEach { v ->
                     chip(speedLabel(v), p.speed == v) { vm.setBriefing { it.copy(speed = v) } }
@@ -168,14 +193,14 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
             }
         }
 
-        Section("Opening cue") {
-            Text("Plays at the top of the briefing, then sinks under the narrator and fades away.", style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary)
+        Section(tr(R.string.opening_cue)) {
+            Text(tr(R.string.opening_cue_hint), style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary)
             Spacer(Modifier.height(8.dp))
-            OptionRow("No opening cue", null, p.openingCue == 0, playing = false, onPreview = null) { vm.setBriefing { it.copy(openingCue = 0) } }
+            OptionRow(tr(R.string.no_opening_cue), null, p.openingCue == 0, playing = false, onPreview = null) { vm.setBriefing { it.copy(openingCue = 0) } }
             BriefingPlayer.CUES.forEachIndexed { i, res ->
                 val n = i + 1
                 OptionRow(
-                    "Cue $n · ${CUE_NAMES[i]}", if (n == 1) "Default" else null, p.openingCue == n, playing = cuePlaying == n,
+                    tr(R.string.cue_n, n, CUE_NAMES[i]), if (n == 1) tr(R.string.default_label) else null, p.openingCue == n, playing = cuePlaying == n,
                     onPreview = {
                         cuePlayer?.release(); cuePlayer = null
                         if (cuePlaying == n) cuePlaying = 0
@@ -187,28 +212,46 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
             Box(Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(g.hairline))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Transition stings", style = sans(14.sp, FontWeight.Medium), color = g.textPrimary)
-                    Text("A short news sting between stories.", style = sans(11.sp), color = g.textSecondary)
+                    Text(tr(R.string.stings), style = sans(14.sp, FontWeight.Medium), color = g.textPrimary)
+                    Text(tr(R.string.stings_hint), style = sans(11.sp), color = g.textSecondary)
                 }
                 switch(p.stings) { on -> vm.setBriefing { it.copy(stings = on) } }
             }
             Spacer(Modifier.height(6.dp))
-            Text("Music: royalty-free from Fesliyan Studios and Pixabay.", style = sans(10.sp), color = g.textMuted)
+            Text(tr(R.string.music_credit), style = sans(10.sp), color = g.textMuted)
         }
 
-        Section("Voice") {
-            OptionRow("Editrove default", "English (United States) · IOM, or the closest installed voice", p.voice == null, playing = false, onPreview = { preview(null) }) { vm.setBriefing { it.copy(voice = null) } }
-            if (!ready) Text("Loading voices…", style = sans(12.sp), color = g.textSecondary, modifier = Modifier.padding(vertical = 8.dp))
+        Section(tr(R.string.voice)) {
+            voiceState?.let { st ->
+                val name = news.openwire.domain.engine.Languages.of(appLang)?.nativeName ?: appLang
+                val (msg, action) = when (st) {
+                    news.openwire.i18n.VoiceSetup.State.READY -> tr(R.string.voice_ready, name) to null
+                    news.openwire.i18n.VoiceSetup.State.DOWNLOADING -> tr(R.string.voice_downloading, name) to null
+                    news.openwire.i18n.VoiceSetup.State.MISSING -> tr(R.string.voice_missing, name) to tr(R.string.voice_install)
+                    news.openwire.i18n.VoiceSetup.State.UNSUPPORTED -> tr(R.string.voice_unsupported, name) to tr(R.string.voice_install)
+                }
+                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(msg, style = sans(12.sp, FontWeight.Medium, lineHeight = 17.sp), color = if (st == news.openwire.i18n.VoiceSetup.State.READY) g.textSecondary else g.accentSoft, modifier = Modifier.weight(1f))
+                    if (action != null) Text(
+                        action, style = sans(12.sp, FontWeight.SemiBold), color = g.textPrimary,
+                        modifier = Modifier.padding(start = 8.dp).clip(CircleShape).background(g.chipFill)
+                            .clickable { runCatching { context.startActivity(news.openwire.i18n.VoiceSetup.installIntent()) }; voiceCheck++ }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                    )
+                }
+            }
+            OptionRow(tr(R.string.voice_default), tr(R.string.voice_default_hint), p.voice == null, playing = false, onPreview = { preview(null) }) { vm.setBriefing { it.copy(voice = null) } }
+            if (!ready) Text(tr(R.string.loading_voices), style = sans(12.sp), color = g.textSecondary, modifier = Modifier.padding(vertical = 8.dp))
             voices.forEach { v ->
                 OptionRow(voiceLabel(v), voiceDetail(v), p.voice == v.name, playing = false, onPreview = { preview(v) }) { vm.setBriefing { it.copy(voice = v.name) } }
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                if (showAll) "Show only ${locale.displayLanguage} voices" else "Show voices in all languages",
+                if (showAll) tr(R.string.voices_only, locale.displayLanguage) else tr(R.string.voices_all),
                 style = sans(12.sp, FontWeight.SemiBold), color = g.accentSoft,
                 modifier = Modifier.clip(CircleShape).clickable { showAll = !showAll }.padding(vertical = 8.dp),
             )
-            Text("More voices: Android Settings › Text-to-speech › Google Speech Services › Install voice data.", style = sans(10.sp, lineHeight = 15.sp), color = g.textMuted)
+            Text(tr(R.string.more_voices), style = sans(10.sp, lineHeight = 15.sp), color = g.textMuted)
         }
     }
 }
@@ -221,8 +264,8 @@ private fun voiceLabel(v: Voice): String {
 }
 
 private fun voiceDetail(v: Voice): String = listOfNotNull(
-    if (v.isNetworkConnectionRequired) "Network" else "On-device",
-    if (v.quality >= Voice.QUALITY_HIGH) "High quality" else null,
+    if (v.isNetworkConnectionRequired) tr(R.string.voice_network) else tr(R.string.voice_local),
+    if (v.quality >= Voice.QUALITY_HIGH) tr(R.string.voice_hq) else null,
 ).joinToString(" · ")
 
 @Composable
@@ -254,7 +297,7 @@ private fun OptionRow(title: String, detail: String?, selected: Boolean, playing
             Box(
                 Modifier.size(34.dp).clip(CircleShape).background(g.chipFill).clickable(onClick = onPreview),
                 contentAlignment = Alignment.Center,
-            ) { Icon(if (playing) Icons.Filled.Stop else Icons.Filled.PlayArrow, "Preview", tint = g.textPrimary, modifier = Modifier.size(16.dp)) }
+            ) { Icon(if (playing) Icons.Filled.Stop else Icons.Filled.PlayArrow, tr(R.string.preview), tint = g.textPrimary, modifier = Modifier.size(16.dp)) }
         }
     }
 }

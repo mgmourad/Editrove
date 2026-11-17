@@ -89,7 +89,9 @@ class FeedRepositoryImpl(
 
     override fun observeTopic(topic: Topic, force: Boolean): Flow<FeedResult> = flow {
         val s = settings()
-        val live = topic.liveOnly || topic.snapshotFile == null ||
+        // Built on the phone whenever the topic has a live source; the published snapshot is
+        // the first paint and the fallback, so freshness never depends on a server.
+        val live = topic.liveOnly || topic.snapshotFile == null || topic.liveUrl != null ||
             SourceLibrary.isCustomized(topic, catalog(), s.customFeeds, s.disabledSources)
         if (live) observeLive(topic, s) else observeSnapshot(topic)
     }.flowOn(Dispatchers.Default) // parsing, weaving and routing stay off the main thread
@@ -191,18 +193,27 @@ class FeedRepositoryImpl(
         if (cached.isNotEmpty()) emit(FeedResult.Success(cached, fromCache = true, updatedAt = feedState?.lastUpdated(topic.id) ?: 0L, refreshing = true))
 
         val primaryUrl = topic.liveUrl?.takeIf { "google_news" !in s.disabledSources || !it.contains("news.google.com") }
-        val feeds = SourceLibrary.feedsForTopic(topic, catalog(), s.customFeeds, s.disabledSources)
+        // A topic read in another language (Arabic, French…) keeps to that language: the built-in
+        // catalog and the published snapshot are English, so only the reader's own sources join it.
+        val feedLang = news.openwire.domain.engine.Languages.feedLanguage(topic.liveUrl)
+        val foreign = feedLang?.let { it != "en" } == true
+        val feeds = SourceLibrary.feedsForTopic(topic, catalog(), s.customFeeds, s.disabledSources).filter { !foreign || it.isCustom }
         val configs = buildList {
             if (primaryUrl != null) add(SourceLibrary.GOOGLE_NEWS.copy(url = primaryUrl, name = if (primaryUrl.contains("news.google.com")) "Google News" else topic.label))
             addAll(feeds)
         }.distinctBy { it.url }
         // A built-in topic whose sources were edited still leads with its published front page,
         // minus stories from the sources the reader switched off.
-        val published = if (primaryUrl == null && topic.snapshotFile != null && !topic.isCustom) {
-            // Exactly the stories that came from a switched-off feed (the snapshot records each story's feed).
+        val snapshotOk = topic.snapshotFile != null && !topic.isCustom && !foreign
+        suspend fun loadPublished(): List<Article> =
+            // Without the stories of switched-off feeds (the snapshot records each story's feed).
             runCatching { remote.fetchTopic(topic.snapshotFile!!).mapIndexed { i, d -> d.toArticle(rank = i) } }.getOrDefault(emptyList())
                 .filter { a -> a.feedUrl == null || SourceLibrary.sourceKey(a.feedUrl) !in s.disabledSources }
-        } else emptyList()
+        var published = if (snapshotOk && (primaryUrl == null || cached.isEmpty())) loadPublished() else emptyList()
+        // First launch: show the published front page at once while the live one is built.
+        if (cached.isEmpty() && primaryUrl != null && published.isNotEmpty()) {
+            emit(FeedResult.Success(rank(topic, NewsProcessor.deduplicate(published)), fromCache = true, updatedAt = clock(), refreshing = true))
+        }
         if (configs.isEmpty() && published.isEmpty()) {
             if (cached.isEmpty()) emit(FeedResult.Empty(topic.id))
             return
@@ -247,9 +258,19 @@ class FeedRepositoryImpl(
                 // Google search already honours the query; publisher feeds are matched locally.
                 if (!(r.source.isPrimary && r.source.url.contains("news.google.com"))) list = PreviewMatcher.filterKeywordArticles(list, topic.keywords)
             }
+            // A news topic never shows week-old stories: some feeds stopped updating years ago
+            // and still serve their last items (CNN's rss.cnn.com, frozen since 2023).
+            val cutoff = clock() - STALE_MS
+            list = list.filter { a -> (a.publishedAt ?: Long.MAX_VALUE) >= cutoff || (topic.isCustom && topic.keywords.isEmpty()) }
+            // An Arabic topic keeps to Arabic headlines (a source added for an English topic doesn't leak in).
+            if (feedLang == "ar" && !r.source.isPrimary) list = list.filter { RX_ARABIC.containsMatchIn(it.title) }
             r.copy(articles = list)
         }
-        val primary = prepared.firstOrNull { it.source.isPrimary }?.articles.orEmpty().ifEmpty { published }
+        // Google unavailable (or switched off): the published front page leads instead.
+        val primary = prepared.firstOrNull { it.source.isPrimary }?.articles.orEmpty().ifEmpty {
+            if (published.isEmpty() && snapshotOk) published = loadPublished()
+            published
+        }
         val groups = prepared.filter { !it.source.isPrimary && !it.articles.isNullOrEmpty() }.map { FeedWeaver.Group(it.source, it.articles!!) }
         val isLatest = topic.id == "LATEST"
         var woven = FeedWeaver.weave(primary, groups, norm, FeedWeaver.Options(leadAnchorCount = if (isLatest) 0 else 2))
@@ -303,3 +324,6 @@ class FeedRepositoryImpl(
         const val RESOLVE_LIMIT = 40
     }
 }
+
+private const val STALE_MS = 7L * 24 * 60 * 60 * 1000
+private val RX_ARABIC = Regex("[\\u0600-\\u06FF]")

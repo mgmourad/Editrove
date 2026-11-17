@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.Canvas
@@ -96,10 +98,10 @@ fun MarketBar() {
             Row(
                 Modifier.clip(CircleShape).background(Up.copy(alpha = 0.16f)).padding(horizontal = 10.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
-            ) { Text("MARKETS", style = mono(10.sp, FontWeight.SemiBold), color = Up) }
+            ) { Text(tr(R.string.markets), style = mono(10.sp, FontWeight.SemiBold), color = Up) }
             Spacer(Modifier.width(10.dp))
-            if (list == null) Text("Loading market watch…", style = sans(12.sp), color = g.textSecondary)
-            else if (list.isEmpty()) Text("Market data unavailable — tap for Yahoo Finance", style = sans(12.sp), color = g.textSecondary)
+            if (list == null) Text(tr(R.string.markets_loading), style = sans(12.sp), color = g.textSecondary)
+            else if (list.isEmpty()) Text(tr(R.string.markets_unavailable), style = sans(12.sp), color = g.textSecondary)
             else LazyRow(state = listState, modifier = Modifier.weight(1f), userScrollEnabled = false, verticalAlignment = Alignment.CenterVertically) {
                 items(list, key = { it.symbol }) { q ->
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 16.dp)) {
@@ -132,15 +134,15 @@ private fun MarketSheet(initial: List<MarketQuote>, source: MarketDataSource, on
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("MARKET WATCH", style = mono(10.sp, FontWeight.SemiBold), color = Up)
-                    Text("Markets today", style = serif(24.sp), color = g.textPrimary)
+                    Text(tr(R.string.market_watch), style = mono(10.sp, FontWeight.SemiBold), color = Up)
+                    Text(tr(R.string.markets_today), style = serif(24.sp), color = g.textPrimary)
                 }
-                Text("Close", style = sans(13.sp, FontWeight.SemiBold), color = g.accentSoft,
+                Text(tr(R.string.action_close), style = sans(13.sp, FontWeight.SemiBold), color = g.accentSoft,
                     modifier = Modifier.clip(CircleShape).clickable(onClick = onClose).padding(horizontal = 12.dp, vertical = 6.dp))
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                "Updated " + java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(updated)) + " · refreshes every 30 s · tap a row for details",
+                tr(R.string.markets_updated, java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(updated))),
                 style = sans(11.sp), color = g.textSecondary,
             )
             Spacer(Modifier.height(12.dp))
@@ -155,7 +157,7 @@ private fun MarketSheet(initial: List<MarketQuote>, source: MarketDataSource, on
                         Column(Modifier.weight(1f)) {
                             Text(q.label, style = sans(14.sp, FontWeight.SemiBold), color = g.textPrimary)
                             val lo = q.dayLow; val hi = q.dayHigh
-                            val range = if (lo != null && hi != null) "Day ${fmt(lo)}–${fmt(hi)}" else q.name
+                            val range = if (lo != null && hi != null) tr(R.string.markets_day_range, fmt(lo), fmt(hi)) else q.name
                             Text(range, style = mono(10.sp), color = g.textSecondary)
                         }
                         Sparkline(q, Modifier.width(72.dp).height(26.dp))
@@ -176,9 +178,9 @@ private fun MarketSheet(initial: List<MarketQuote>, source: MarketDataSource, on
                     .clickable { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Markets.YAHOO_MARKETS))) }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text("Open Yahoo Finance ↗", style = sans(13.sp, FontWeight.SemiBold), color = g.textPrimary) }
+            ) { Text(tr(R.string.markets_open_yahoo), style = sans(13.sp, FontWeight.SemiBold), color = g.textPrimary) }
             Spacer(Modifier.height(8.dp))
-            Text("Prices from Yahoo Finance, may be delayed. Not investment advice.", style = sans(10.sp), color = g.textMuted)
+            Text(tr(R.string.markets_disclaimer), style = sans(10.sp), color = g.textMuted)
         }
     }
 }

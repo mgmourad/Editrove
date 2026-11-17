@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.widget
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
@@ -44,6 +46,8 @@ import kotlinx.coroutines.launch
  */
 class TopicWidgetConfigureActivity : ComponentActivity() {
 
+    override fun attachBaseContext(newBase: android.content.Context) = super.attachBaseContext(news.openwire.i18n.AppLocale.wrap(newBase))
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -59,11 +63,11 @@ class TopicWidgetConfigureActivity : ComponentActivity() {
                 Box(Modifier.fillMaxSize().background(g.canvas).windowInsetsPadding(WindowInsets.safeDrawing)) {
                     LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         item {
-                            Text("TOPIC OF CHOICE", style = mono(10.sp, FontWeight.SemiBold), color = g.accentSoft)
+                            Text(tr(R.string.toc_kicker), style = mono(10.sp, FontWeight.SemiBold), color = g.accentSoft)
                             Spacer(Modifier.height(6.dp))
-                            Text("Which topic should this widget show?", style = serif(26.sp, lineHeight = 30.sp), color = g.textPrimary)
+                            Text(tr(R.string.toc_title), style = serif(26.sp, lineHeight = 30.sp), color = g.textPrimary)
                             Spacer(Modifier.height(6.dp))
-                            Text("It shows that topic's latest stories, with a refresh button. Long-press the widget to change it later.", style = sans(13.sp, lineHeight = 19.sp), color = g.textSecondary)
+                            Text(tr(R.string.toc_body), style = sans(13.sp, lineHeight = 19.sp), color = g.textSecondary)
                             Spacer(Modifier.height(10.dp))
                         }
                         items(topics, key = { it.id }) { t ->
@@ -73,7 +77,7 @@ class TopicWidgetConfigureActivity : ComponentActivity() {
                                         Text(t.label, style = serif(18.sp), color = g.textPrimary)
                                         if (t.keywords.isNotEmpty()) Text(t.keywords.joinToString(", "), style = sans(11.sp), color = g.textSecondary, maxLines = 1)
                                     }
-                                    if (t.id == current) Text("SELECTED", style = mono(9.sp, FontWeight.SemiBold), color = g.accentSoft, modifier = Modifier.padding(start = 8.dp))
+                                    if (t.id == current) Text(tr(R.string.selected), style = mono(9.sp, FontWeight.SemiBold), color = g.accentSoft, modifier = Modifier.padding(start = 8.dp))
                                 }
                             }
                         }

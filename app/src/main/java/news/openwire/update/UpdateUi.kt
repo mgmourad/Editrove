@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.update
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -95,9 +97,9 @@ fun UpdateBanner(manager: UpdateManager, onOpen: () -> Unit, modifier: Modifier 
             Column(Modifier.weight(1f)) {
                 Text(
                     when (state) {
-                        is UpdateState.Downloading -> "Downloading Editrove ${r.version}…"
-                        is UpdateState.Installing -> "Installing Editrove ${r.version}…"
-                        else -> "Editrove ${r.version} is available"
+                        is UpdateState.Downloading -> tr(R.string.upd_downloading, r.version)
+                        is UpdateState.Installing -> tr(R.string.upd_installing, r.version)
+                        else -> tr(R.string.upd_available_banner, r.version)
                     },
                     style = sans(13.sp, FontWeight.SemiBold), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
@@ -106,14 +108,14 @@ fun UpdateBanner(manager: UpdateManager, onOpen: () -> Unit, modifier: Modifier 
                         progress = { s.progress }, color = g.accent, trackColor = g.chipFill,
                         modifier = Modifier.padding(top = 6.dp, end = 8.dp).fillMaxWidth().height(3.dp).clip(CircleShape),
                     )
-                    else -> Text("Tap to see what's new and update", style = sans(11.sp), color = g.textSecondary, maxLines = 1)
+                    else -> Text(tr(R.string.upd_tap), style = sans(11.sp), color = g.textSecondary, maxLines = 1)
                 }
             }
             if (state is UpdateState.Available) {
                 Box(
                     Modifier.size(32.dp).clip(CircleShape).clickable { manager.dismiss(r); manager.check() },
                     contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Filled.Close, "Dismiss", tint = g.textSecondary, modifier = Modifier.size(16.dp)) }
+                ) { Icon(Icons.Filled.Close, tr(R.string.dismiss), tint = g.textSecondary, modifier = Modifier.size(16.dp)) }
             }
         }
     }
@@ -138,7 +140,7 @@ fun WhatsNewDialog(entry: Changelog.Entry, onDismiss: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.AutoAwesome, null, tint = g.accentSoft, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("WHAT'S NEW", style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = g.accentSoft)
+                Text(tr(R.string.whats_new), style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = g.accentSoft)
             }
             Spacer(Modifier.height(6.dp))
             Text(entry.title, style = serif(24.sp, FontWeight.Bold, lineHeight = 28.sp), color = g.textPrimary)
@@ -150,7 +152,7 @@ fun WhatsNewDialog(entry: Changelog.Entry, onDismiss: () -> Unit) {
             Box(
                 Modifier.fillMaxWidth().clip(CircleShape).background(g.accent).clickable(onClick = onDismiss).padding(vertical = 13.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text("Got it", style = sans(13.sp, FontWeight.SemiBold), color = Color.White) }
+            ) { Text(tr(R.string.got_it), style = sans(13.sp, FontWeight.SemiBold), color = Color.White) }
         }
     }
 }
@@ -183,15 +185,15 @@ fun UpdatesSettings(
         GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(18.dp)) {
             Text("Editrove ${manager.currentVersion}", style = serif(24.sp, FontWeight.Bold), color = g.textPrimary)
             Spacer(Modifier.height(4.dp))
-            val checked = manager.lastChecked.takeIf { it > 0 }?.let { "Last checked " + news.openwire.domain.engine.NewsProcessor.formatRelativeTime(it) } ?: "Not checked yet"
+            val checked = manager.lastChecked.takeIf { it > 0 }?.let { tr(R.string.upd_last_checked, news.openwire.domain.engine.NewsProcessor.formatRelativeTime(it)) } ?: tr(R.string.upd_not_checked)
             Text(
                 when (val s = state) {
-                    UpdateState.Checking -> "Checking GitHub for updates…"
-                    is UpdateState.UpToDate -> "You're up to date · $checked"
-                    is UpdateState.Available -> "Version ${s.release.version} is available"
-                    is UpdateState.Downloading -> "Downloading ${s.release.version} · ${(s.progress * 100).toInt()}%"
-                    is UpdateState.Installing -> "Installing ${s.release.version}…"
-                    is UpdateState.NeedsPermission -> "Allow Editrove to install updates to continue"
+                    UpdateState.Checking -> tr(R.string.upd_checking)
+                    is UpdateState.UpToDate -> tr(R.string.upd_uptodate, checked)
+                    is UpdateState.Available -> tr(R.string.upd_version_available, s.release.version)
+                    is UpdateState.Downloading -> tr(R.string.upd_downloading_pct, s.release.version, (s.progress * 100).toInt())
+                    is UpdateState.Installing -> tr(R.string.upd_installing_v, s.release.version)
+                    is UpdateState.NeedsPermission -> tr(R.string.upd_needs_permission)
                     is UpdateState.Failed -> s.message
                     UpdateState.Idle -> checked
                 },
@@ -209,29 +211,29 @@ fun UpdatesSettings(
             }
             when {
                 state is UpdateState.NeedsPermission && !manager.canRequestInstalls() ->
-                    Pill("Allow installing updates", primary = true) { context.startActivity(manager.permissionIntent()) }
+                    Pill(tr(R.string.upd_allow), primary = true) { context.startActivity(manager.permissionIntent()) }
                 state is UpdateState.NeedsPermission ->
-                    Pill("Continue update", primary = true) { (state as UpdateState.NeedsPermission).release.let(manager::install) }
-                release != null && manager.canInstall -> Pill("Download & install ${release.version}", primary = true) { manager.install(release) }
-                else -> Pill(if (state is UpdateState.Checking) "Checking…" else "Check for updates", primary = false) { manager.check() }
+                    Pill(tr(R.string.upd_continue), primary = true) { (state as UpdateState.NeedsPermission).release.let(manager::install) }
+                release != null && manager.canInstall -> Pill(tr(R.string.upd_download_install, release.version), primary = true) { manager.install(release) }
+                else -> Pill(tr(if (state is UpdateState.Checking) R.string.checking else R.string.upd_check), primary = false) { manager.check() }
             }
             release?.takeIf { it.notes.isNotBlank() }?.let { r ->
                 Spacer(Modifier.height(16.dp))
-                Text("IN ${r.version}", style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.textSecondary)
+                Text(tr(R.string.upd_in, r.version), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.textSecondary)
                 Spacer(Modifier.height(6.dp))
                 Text(Releases.plainNotes(r.notes).take(1800), style = sans(12.5.sp, lineHeight = 19.sp), color = g.textPrimary.copy(alpha = 0.9f))
             }
         }
         GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(18.dp)) {
-            SwitchLine("Check for updates automatically", "Every time you open or return to Editrove. Asks GitHub's public releases list — nothing about you is sent.", autoCheck, onAutoCheck, switch)
+            SwitchLine(tr(R.string.upd_auto_check), tr(R.string.upd_auto_check_sub), autoCheck, onAutoCheck, switch)
             Box(Modifier.fillMaxWidth().padding(vertical = 6.dp).height(1.dp).background(g.hairline))
             SwitchLine(
-                "Install updates automatically",
-                "Downloads, verifies and installs new versions as soon as they're found. Android asks you to confirm the first one; after that, updates install on their own (Android 12+).",
+                tr(R.string.upd_auto_install),
+                tr(R.string.upd_auto_install_sub),
                 autoInstall, onAutoInstall, switch,
             )
         }
-        Text("CHANGELOG", style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.textSecondary, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
+        Text(tr(R.string.changelog), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.textSecondary, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
         changelog.entries.forEach { e ->
             GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(18.dp)) {
                 Text(e.title, style = serif(18.sp, FontWeight.Bold, lineHeight = 22.sp), color = g.textPrimary)

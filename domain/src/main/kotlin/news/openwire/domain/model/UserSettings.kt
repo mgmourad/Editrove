@@ -7,6 +7,19 @@ package news.openwire.domain.model
  */
 data class UserSettings(
     val edition: LocalEdition = LocalEdition.DEFAULT,
+    /** Editrove's language ("" = the phone's). Also picks the language topic feeds read in. */
+    val language: String = "",
+    /** Edition and language before the last switch, for a one-tap way back. */
+    val previousEdition: LocalEdition? = null,
+    val previousLanguage: String? = null,
+    /** Article text size, 1 = normal (the reader's A− / A+ and Appearance both set it). */
+    val textScale: Float = 1f,
+    /** Writers followed on the Analysis & Opinion page (bylines). */
+    val followedAuthors: Set<String> = emptySet(),
+    /** Bluesky accounts followed there (handles). */
+    val followedAccounts: Set<String> = emptySet(),
+    /** Topic tabs added there (from trending suggestions or typed). */
+    val opinionTabs: List<String> = emptyList(),
     val customTopics: List<Topic> = emptyList(),
     val hiddenTopics: Set<String> = emptySet(),
     /** Topic ids in display order; null = default order. */
@@ -37,8 +50,19 @@ data class UserSettings(
     val breakingEnabled: Boolean = false,
     /** Newsrooms watched for breaking news (keys from BreakingNews.OUTLETS). */
     val breakingOutlets: Set<String> = news.openwire.domain.engine.BreakingNews.DEFAULT_KEYS,
+    /** Real-time breaking alerts over a kept-open connection (opt-in, off by default). */
+    val realtimeAlerts: Boolean = false,
     /** Audio briefing voice, speed, length, detail and sound design. */
     val briefing: BriefingPrefs = BriefingPrefs(),
 )
 
 enum class UnfoldedLayout(val label: String) { SPLIT("Split view"), FULL("Full view") }
+
+/** Text sizes offered by the reader's A− / A+. */
+val TEXT_SCALES = listOf(0.85f, 1f, 1.15f, 1.3f, 1.5f, 1.75f)
+
+/** The next size up or down from [current]. */
+fun stepTextScale(current: Float, up: Boolean): Float {
+    val i = TEXT_SCALES.indexOfFirst { it >= current - 0.01f }.let { if (it < 0) TEXT_SCALES.lastIndex else it }
+    return TEXT_SCALES[(if (up) i + 1 else i - 1).coerceIn(0, TEXT_SCALES.lastIndex)]
+}

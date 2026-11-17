@@ -13,8 +13,8 @@ android {
         applicationId = "news.editrove"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12
-        versionName = "0.7.0-beta.5"
+        versionCode = 13
+        versionName = "0.7.0-beta.6"
 
         // Static host of the published topic snapshots (SPEC §8). Override with
         // -Popenwire.dataUrl=https://example.org/ (e.g. your own GitHub Pages copy).
@@ -89,6 +89,11 @@ dependencies {
     implementation(libs.haze)
     implementation(libs.glance.appwidget)
     implementation(libs.androidx.browser)
+    // Live TV (HLS) and radio, with background playback and lock-screen controls.
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.exoplayer.hls)
+    implementation(libs.media3.ui)
+    implementation(libs.media3.session)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="n_refresh_channel">Hintergrundaktualisierung</string>
+    <string name="n_updating">Nachrichten werden aktualisiert</string>
+    <string name="n_headlines_channel">Neue Schlagzeilen</string>
+    <string name="n_headlines_channel_desc">Neue Meldungen in Themen, denen du folgst</string>
+    <string name="n_breaking_channel">Eilmeldungen</string>
+    <string name="n_breaking_channel_desc">Eilmeldungen der Redaktionen, denen du folgst</string>
+    <string name="n_new_stories">%1$d neue Meldungen</string>
+    <string name="n_topics_have_news">%1$d Themen haben Neues</string>
+    <string name="n_topic_new">%1$s · %2$d neue Meldungen</string>
+    <string name="n_more">+%1$d weitere</string>
+    <string name="n_see_all">Alle %1$d ansehen</string>
+    <string name="n_breaking">Eilmeldung</string>
+</resources>

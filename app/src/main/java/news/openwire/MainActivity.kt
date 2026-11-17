@@ -59,9 +59,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun attachBaseContext(newBase: android.content.Context) = super.attachBaseContext(news.openwire.i18n.AppLocale.wrap(newBase))
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        news.openwire.i18n.L10n.init(this)
+        // A language picked in the phone's own per-app setting becomes Editrove's too.
+        news.openwire.i18n.AppLocale.systemChoice(this)?.let { sys ->
+            if (sys != container.settingsRepository.settings.value.language) container.settingsRepository.update { it.copy(language = sys) }
+        }
+        // Editrove in another language: make sure the briefing has a voice in it (fetched once).
+        container.settingsRepository.settings.value.let { st ->
+            val lang = news.openwire.domain.engine.Languages.effective(st.language)
+            // …and select it for the briefing (the standard voice for the language).
+            lifecycleScope.launch { news.openwire.i18n.VoiceSetup.adopt(this@MainActivity, container.settingsRepository) }
+        }
+        // Real-time alerts follow their switch (started from here, while the app is in front).
+        lifecycleScope.launch {
+            container.settingsRepository.settings.collect { st -> news.openwire.realtime.RealtimeAlertService.sync(this@MainActivity, st) }
+        }
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val mode by vm.themeMode.collectAsState()

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import news.openwire.i18n.tr
+import news.openwire.i18n.text
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -62,6 +64,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.LiveTv
+import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Newspaper
@@ -123,6 +127,8 @@ private val NavTab.icon: ImageVector
         NavTab.TODAY -> Icons.Outlined.Newspaper
         NavTab.DISCOVER -> Icons.Outlined.Search
         NavTab.AUDIO -> Icons.AutoMirrored.Outlined.VolumeUp
+        NavTab.LIVE -> Icons.Outlined.LiveTv
+        NavTab.OPINION -> Icons.Outlined.FormatQuote
         NavTab.SAVED -> Icons.Outlined.BookmarkBorder
     }
 
@@ -146,10 +152,14 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
             scope = scope,
             onToggleSaved = { vm.toggleSaved(it) },
             onToggleLiked = { vm.toggleLiked(it) },
+            onTextScale = { vm.setTextScale(it) },
+            loadPost = { app.container.xPosts.post(it) },
         )
     }
 
     val tab by vm.tab.collectAsState()
+    // Live TV pauses when you leave its page (radio keeps playing).
+    LaunchedEffect(tab) { if (tab != NavTab.LIVE) app.container.live.pauseVideo() }
     val topicIndex by vm.topicIndex.collectAsState()
     val selected by vm.selected.collectAsState()
     val sheetOpen by vm.sheetOpen.collectAsState()
@@ -194,7 +204,10 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
     val briefing = rememberBriefingPlayer()
     val userSettings by vm.settings.collectAsState()
 
-    CompositionLocalProvider(LocalImageResolver provides app.container.imageResolver, LocalLogoResolver provides app.container.logoResolver, LocalMarkets provides app.container.markets, LocalBriefingPlayer provides briefing) {
+    val previewLoader: suspend (Article) -> String? = remember {
+        { a -> (a.originalUrl ?: a.targetUrl)?.let { app.container.articleTextExtractor.preview(it, a.title) } }
+    }
+    CompositionLocalProvider(LocalTextScale provides userSettings.textScale, LocalArticlePreview provides previewLoader, LocalImageResolver provides app.container.imageResolver, LocalLogoResolver provides app.container.logoResolver, LocalMarkets provides app.container.markets, LocalBriefingPlayer provides briefing) {
     SharedTransitionLayout {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= ExpandedBreakpoint
@@ -249,7 +262,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                         shownTab, onSelectTab, onToggleTheme = { vm.toggleTheme(it) }, onSettings = { vm.openSettings() },
                         layout = userSettings.unfoldedLayout, onToggleLayout = { vm.toggleUnfoldedLayout() },
                     )
-                    Box(Modifier.fillMaxHeight().width(feedWidth)) {
+                    Box(Modifier.fillMaxHeight().then(if (tab == NavTab.LIVE) Modifier.weight(1f) else Modifier.width(feedWidth))) {
                         TabFeed(
                             pager = pager, vm = vm, tab = tab, compact = false, stateFor = stateFor,
                             ui = FeedUi(savedIds, liked, selected?.id),
@@ -260,7 +273,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                         Box(Modifier.align(Alignment.CenterEnd).width(1.dp).fillMaxHeight().background(Glass.hairline))
                         PaneMiniPlayer(briefing, Modifier.align(Alignment.BottomCenter))
                     }
-                    ReaderPane(
+                    if (tab != NavTab.LIVE) ReaderPane(
                         article = selected,
                         category = category,
                         saved = selected?.id in savedIds,
@@ -378,8 +391,10 @@ private fun SharedTransitionScope.ReaderSheetHost(
 
 private fun categoryLabel(vm: HomeViewModel, tab: NavTab, topicIndex: Int): String = when (tab) {
     NavTab.TODAY, NavTab.AUDIO -> vm.topics.getOrNull(topicIndex)?.label ?: vm.topics.first().label
-    NavTab.DISCOVER -> "Discover"
-    NavTab.SAVED -> "Saved"
+    NavTab.DISCOVER -> tr(R.string.tab_discover)
+    NavTab.SAVED -> tr(R.string.tab_saved)
+    NavTab.LIVE -> tr(R.string.tab_live)
+    NavTab.OPINION -> tr(R.string.tab_opinion)
 }
 
 @Composable
@@ -483,6 +498,7 @@ private fun TabFeed(
         val visible: List<Article> = when (t) {
             NavTab.TODAY, NavTab.AUDIO -> (feeds[topic.id] as? FeedResult.Success)?.articles.orEmpty()
             NavTab.SAVED -> saved
+            NavTab.LIVE, NavTab.OPINION -> emptyList()
             NavTab.DISCOVER -> {
                 val byTopic = remember(feeds) {
                     feeds.mapNotNull { (id, r) -> (r as? FeedResult.Success)?.let { id to it.articles } }.toMap()
@@ -506,10 +522,38 @@ private fun TabFeed(
             }
         }
         LaunchedEffect(t, visible.firstOrNull()?.id) { visible.firstOrNull()?.let(onFirstArticle) }
+        if (t == NavTab.LIVE) {
+            val app = LocalContext.current.applicationContext as OpenWireApp
+            news.openwire.live.LiveScreen(
+                padding = padding, live = app.container.live, radio = app.container.radioBrowser,
+                appLanguage = news.openwire.domain.engine.Languages.effective(userSettings.language),
+                country = userSettings.edition.country,
+            )
+            return@HorizontalPager
+        }
+        if (t == NavTab.OPINION) {
+            val app = LocalContext.current.applicationContext as OpenWireApp
+            val headlines = remember(feeds) { feeds.values.flatMap { (it as? FeedResult.Success)?.articles.orEmpty() } }
+            news.openwire.opinion.OpinionScreen(
+                padding = padding, source = app.container.opinion,
+                appLanguage = news.openwire.domain.engine.Languages.effective(userSettings.language),
+                news = headlines,
+                followedAuthors = userSettings.followedAuthors, followedAccounts = userSettings.followedAccounts, tabs = userSettings.opinionTabs,
+                actions = remember(vm) {
+                    news.openwire.opinion.OpinionActions(
+                        openArticle = onOpen,
+                        openLink = { vm.openLink(it) },
+                        toggleAuthor = vm::toggleFollowAuthor, toggleAccount = vm::toggleFollowAccount,
+                        addTab = vm::addOpinionTab, removeTab = vm::removeOpinionTab,
+                    )
+                },
+            )
+            return@HorizontalPager
+        }
 
         val isRefreshing = when (t) {
             NavTab.DISCOVER -> refreshingIds.isNotEmpty()
-            NavTab.SAVED -> false
+            NavTab.SAVED, NavTab.LIVE, NavTab.OPINION -> false
             else -> topic.id in refreshingIds
         }
         androidx.compose.material3.pulltorefresh.PullToRefreshBox(
@@ -546,13 +590,13 @@ private fun TabFeed(
                             }
                             val ordered = news.openwire.domain.engine.FeedOrdering.apply(r.articles, userSettings.sortMode)
                             if (t == NavTab.AUDIO) fullRow("briefing-${topic.id}") { HeadlineBriefingCard(topic.label, ordered, userSettings.briefing, onSettings = { vm.openSettingsAt("briefing") }, fresh = { vm.freshStories(topic) }) }
-                            feed(ordered, topic.label, ticker = t == NavTab.TODAY, title = if (t == NavTab.AUDIO) "Listen Next" else "Bento Dispatch")
+                            feed(ordered, topic.label, ticker = t == NavTab.TODAY, title = if (t == NavTab.AUDIO) tr(R.string.feed_listen_next) else tr(R.string.feed_bento))
                         }
                         is FeedResult.Error -> fullRow("err-${topic.id}") {
-                            MessageCard("Unable to load ${topic.label}", r.message, "Try again") { vm.retry(topic) }
+                            MessageCard(tr(R.string.msg_unable_load, topic.label), r.message, tr(R.string.action_try_again)) { vm.retry(topic) }
                         }
                         is FeedResult.Empty -> fullRow("empty-${topic.id}") {
-                            MessageCard("No stories right now", "This edition has nothing new yet. Check back later.", "Refresh") { vm.retry(topic) }
+                            MessageCard(tr(R.string.msg_no_stories), tr(R.string.msg_no_stories_body), tr(R.string.action_refresh)) { vm.retry(topic) }
                         }
                         null, FeedResult.Loading -> skeletonItems()
                     }
@@ -561,26 +605,27 @@ private fun TabFeed(
                     fullRow("search") { SearchPill(query, vm::setQuery) }
                     val pastedUrl = news.openwire.domain.engine.SharedUrl.extract(query).takeIf { query.contains('.') && !query.trim().contains(' ') }
                     if (!pastedUrl.isNullOrEmpty()) fullRow("open-link") {
-                        MessageCard("Open this link", pastedUrl + "\nEditrove will route it around its paywall.", "Open") { vm.openLink(pastedUrl) }
+                        MessageCard(tr(R.string.msg_open_link), pastedUrl + "\n" + tr(R.string.msg_open_link_body), tr(R.string.action_open)) { vm.openLink(pastedUrl) }
                     }
                     if (visible.isEmpty()) {
                         fullRow("discover-empty") {
-                            if (query.isBlank()) MessageCard("Gathering every edition…", "Discover searches across all topics once they load.")
-                            else MessageCard("Nothing matches “$query”", "Try a publisher name or a different keyword.")
+                            if (query.isBlank()) MessageCard(tr(R.string.msg_gathering), tr(R.string.msg_gathering_body))
+                            else MessageCard(tr(R.string.msg_no_match, query), tr(R.string.msg_no_match_body))
                         }
                     } else {
-                        feed(visible, "Discover", ticker = false, title = if (query.isBlank()) "Top Across Editions" else "Results")
+                        feed(visible, tr(R.string.tab_discover), ticker = false, title = if (query.isBlank()) tr(R.string.feed_top_across) else tr(R.string.feed_results))
                     }
                 }
                 NavTab.SAVED -> {
                     if (visible.isEmpty()) {
                         fullRow("saved-empty") {
-                            MessageCard("No saved stories yet", "Tap the bookmark icon on any story to curate your offline reading list.")
+                            MessageCard(tr(R.string.msg_no_saved), tr(R.string.msg_no_saved_body))
                         }
                     } else {
-                        feed(visible, "Saved", ticker = false, title = "Saved Stories")
+                        feed(visible, tr(R.string.tab_saved), ticker = false, title = tr(R.string.feed_saved_stories))
                     }
                 }
+                NavTab.LIVE, NavTab.OPINION -> Unit // drawn by their own screens above
             }
         }
         }
@@ -598,7 +643,7 @@ private fun SearchPill(query: String, onQuery: (String) -> Unit) {
         Icon(Icons.Outlined.Search, contentDescription = null, tint = g.textSecondary, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(10.dp))
         Box(Modifier.weight(1f)) {
-            if (query.isEmpty()) Text("Search stories and publishers", style = sans(14.sp), color = g.textMuted)
+            if (query.isEmpty()) Text(tr(R.string.search_hint), style = sans(14.sp), color = g.textMuted)
             BasicTextField(
                 value = query,
                 onValueChange = onQuery,
@@ -625,34 +670,34 @@ private fun HeadlineBriefingCard(
     val player = LocalBriefingPlayer.current ?: return
     val scope = rememberCoroutineScope()
     var updating by remember { mutableStateOf(false) }
-    val mine = player.title == "$topicLabel briefing"
+    val mine = player.title == tr(R.string.briefing_title, topicLabel)
     val playing = mine && player.playing
     val count = minOf(prefs.count, articles.size)
     GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), contentPadding = PaddingValues(18.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("AUDIO BRIEFING", style = mono(10.sp, FontWeight.SemiBold, 0.16.sp), color = g.accentSoft, modifier = Modifier.weight(1f))
+            Text(tr(R.string.audio_briefing_kicker), style = mono(10.sp, FontWeight.SemiBold, 0.16.sp), color = g.accentSoft, modifier = Modifier.weight(1f))
             Row(
                 Modifier.clip(CircleShape).background(g.chipFill).clickable(onClick = onSettings).padding(horizontal = 10.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(androidx.compose.material.icons.Icons.Outlined.Tune, null, tint = g.textSecondary, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text("${prefs.detail.label} · ${"%.2g".format(prefs.speed).trimEnd('0').trimEnd('.')}×", style = sans(11.sp, FontWeight.Medium), color = g.textSecondary)
+                Text("${prefs.detail.text} · ${"%.2g".format(prefs.speed).trimEnd('0').trimEnd('.')}×", style = sans(11.sp, FontWeight.Medium), color = g.textSecondary)
             }
         }
         Spacer(Modifier.height(6.dp))
         Text(
             when (prefs.detail) {
-                news.openwire.domain.model.BriefingDetail.HEADLINES -> "$topicLabel in $count headlines"
-                news.openwire.domain.model.BriefingDetail.SUMMARIES -> "$topicLabel: $count stories, summarised"
-                news.openwire.domain.model.BriefingDetail.FULL -> "$topicLabel: $count stories in full"
+                news.openwire.domain.model.BriefingDetail.HEADLINES -> tr(R.string.briefing_card_headlines, topicLabel, count)
+                news.openwire.domain.model.BriefingDetail.SUMMARIES -> tr(R.string.briefing_card_summaries, topicLabel, count)
+                news.openwire.domain.model.BriefingDetail.FULL -> tr(R.string.briefing_card_full, topicLabel, count)
             },
             style = serif(22.sp, FontWeight.Bold, lineHeight = 26.sp), color = g.textPrimary,
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            if (mine && player.progress.isNotBlank()) player.progress + " · keep scrolling while it plays"
-            else "Read by your on-device voice like a news broadcast — nothing leaves your phone.",
+            if (mine && player.progress.isNotBlank()) player.progress + " · " + tr(R.string.briefing_keep_scrolling)
+            else tr(R.string.briefing_card_body),
             style = sans(12.sp, lineHeight = 18.sp), color = g.textPrimary.copy(alpha = 0.6f),
         )
         Spacer(Modifier.height(14.dp))
@@ -676,19 +721,19 @@ private fun HeadlineBriefingCard(
             ) {
                 Icon(if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow, null, tint = Color.White, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(if (updating) "Getting the latest…" else if (playing) "Pause" else if (mine) "Resume" else "Play briefing", style = sans(12.sp, FontWeight.SemiBold), color = Color.White)
+                Text(tr(if (updating) R.string.briefing_getting_latest else if (playing) R.string.action_pause else if (mine) R.string.action_resume else R.string.briefing_play), style = sans(12.sp, FontWeight.SemiBold), color = Color.White)
             }
             if (mine) {
                 Spacer(Modifier.width(6.dp))
-                SkipButton(Icons.Filled.SkipPrevious, "Previous story") { player.skipPrevious() }
-                SkipButton(Icons.Filled.SkipNext, "Next story") { player.skipNext() }
+                SkipButton(Icons.Filled.SkipPrevious, tr(R.string.previous_story)) { player.skipPrevious() }
+                SkipButton(Icons.Filled.SkipNext, tr(R.string.next_story)) { player.skipNext() }
             }
             Spacer(Modifier.width(10.dp))
             Box(Modifier.weight(1f).height(16.dp)) { Waveform(playing) }
         }
         if (mine && player.storyTitle != null) {
             Spacer(Modifier.height(10.dp))
-            Text("Now: " + player.storyTitle, style = sans(12.sp, FontWeight.Medium), color = g.textPrimary.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(tr(R.string.briefing_now, player.storyTitle.orEmpty()), style = sans(12.sp, FontWeight.Medium), color = g.textPrimary.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -706,13 +751,15 @@ private fun BottomNavPill(
     val g = Glass
     val scale by animateFloatAsState(if (compact) 0.9f else 1f, springTween(380), label = "navScale")
     val alpha by animateFloatAsState(if (compact) 0.85f else 1f, tween(300), label = "navAlpha")
+    // Six pages: tighter spacing on narrow (cover) screens so every tab fits.
+    val narrow = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 420
     Row(
         modifier = modifier
             .graphicsLayer { scaleX = scale; scaleY = scale; this.alpha = alpha }
             .glassSurface(CircleShape, fill = Color.Transparent, elevation = 16.dp)
             .frostedGlass(haze)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = if (narrow) 6.dp else 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (narrow) 1.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         NavTab.entries.forEach { tab ->
@@ -725,7 +772,7 @@ private fun BottomNavPill(
                     .clip(CircleShape)
                     .background(bg)
                     .clickable { onSelectTab(tab) }
-                    .padding(horizontal = if (active) 18.dp else 14.dp, vertical = 11.dp),
+                    .padding(horizontal = if (active) (if (narrow) 13.dp else 18.dp) else (if (narrow) 10.dp else 14.dp), vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(20.dp))
@@ -734,7 +781,7 @@ private fun BottomNavPill(
                     enter = expandHorizontally(springTween(360)) + fadeIn(springTween(360)),
                     exit = shrinkHorizontally(springTween(300)) + fadeOut(tween(120)),
                 ) {
-                    Text(tab.label, style = sans(13.5.sp, FontWeight.SemiBold), color = Color.White, modifier = Modifier.padding(start = 8.dp))
+                    Text(tab.label, style = sans(13.5.sp, FontWeight.SemiBold), color = Color.White, maxLines = 1, modifier = Modifier.padding(start = if (narrow) 6.dp else 8.dp).widthIn(max = 96.dp))
                 }
             }
         }
@@ -794,7 +841,7 @@ private fun SideRail(
                 AnimatedContent(full, transitionSpec = { (fadeIn(tween(220)) + scaleIn(tween(220), 0.7f)) togetherWith fadeOut(tween(120)) }, label = "layoutIcon") { f ->
                     Icon(
                         if (f) androidx.compose.material.icons.Icons.Outlined.VerticalSplit else androidx.compose.material.icons.Icons.Outlined.ViewDay,
-                        contentDescription = if (f) "Switch to split view" else "Switch to full view",
+                        contentDescription = tr(if (f) R.string.cd_split_view else R.string.cd_full_view),
                         tint = if (f) g.accentSoft else g.textPrimary.copy(alpha = 0.6f), modifier = Modifier.size(20.dp),
                     )
                 }
@@ -804,7 +851,7 @@ private fun SideRail(
                 Modifier.size(40.dp).clip(RoundedCornerShape(16.dp)).clickable(onClick = onSettings),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(androidx.compose.material.icons.Icons.Outlined.Settings, contentDescription = "Settings", tint = g.textPrimary.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
+                Icon(androidx.compose.material.icons.Icons.Outlined.Settings, contentDescription = tr(R.string.settings), tint = g.textPrimary.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
             }
             Spacer(Modifier.height(16.dp))
             // Where the prototype shows a profile photo: Editrove has no accounts, so this
@@ -821,7 +868,7 @@ private fun SideRail(
                 ) { dark ->
                     Icon(
                         if (dark) Icons.Outlined.DarkMode else Icons.Outlined.LightMode,
-                        contentDescription = if (dark) "Switch to Editorial Paper" else "Switch to Black Glass",
+                        contentDescription = tr(if (dark) R.string.cd_to_paper else R.string.cd_to_glass),
                         tint = if (dark) g.indigo else Amber400,
                         modifier = Modifier.size(18.dp),
                     )
@@ -855,11 +902,11 @@ private fun LinkDialog(onOpen: (String) -> Unit, onDismiss: () -> Unit) {
                 .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {},
             contentPadding = PaddingValues(22.dp),
         ) {
-            Text("OPEN A LINK", style = mono(10.sp, FontWeight.SemiBold, 0.16.sp), color = g.accentSoft)
+            Text(tr(R.string.open_link_kicker), style = mono(10.sp, FontWeight.SemiBold, 0.16.sp), color = g.accentSoft)
             Spacer(Modifier.height(4.dp))
-            Text("Read any article", style = serif(22.sp, FontWeight.Bold), color = g.textPrimary)
+            Text(tr(R.string.open_link_title), style = serif(22.sp, FontWeight.Bold), color = g.textPrimary)
             Spacer(Modifier.height(4.dp))
-            Text("Paste a link — Editrove picks the right way around its paywall and opens it in the reader.", style = sans(12.sp, lineHeight = 18.sp), color = g.textSecondary)
+            Text(tr(R.string.open_link_body), style = sans(12.sp, lineHeight = 18.sp), color = g.textSecondary)
             Spacer(Modifier.height(14.dp))
             Box(Modifier.fillMaxWidth().glassSurface(RoundedCornerShape(16.dp), fill = g.glassPill, elevation = 0.dp).padding(14.dp)) {
                 if (text.isEmpty()) Text("https://…", style = sans(14.sp), color = g.textMuted)
@@ -875,11 +922,11 @@ private fun LinkDialog(onOpen: (String) -> Unit, onDismiss: () -> Unit) {
                 Box(
                     Modifier.weight(1f).clip(CircleShape).background(g.chipFill).clickable(onClick = onDismiss).padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center,
-                ) { Text("Cancel", style = sans(13.sp, FontWeight.SemiBold), color = g.textPrimary) }
+                ) { Text(tr(R.string.action_cancel), style = sans(13.sp, FontWeight.SemiBold), color = g.textPrimary) }
                 Box(
                     Modifier.weight(1f).clip(CircleShape).background(g.accent).clickable { onOpen(text) }.padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center,
-                ) { Text("Open", style = sans(13.sp, FontWeight.SemiBold), color = Color.White) }
+                ) { Text(tr(R.string.action_open), style = sans(13.sp, FontWeight.SemiBold), color = Color.White) }
             }
         }
     }

@@ -2,9 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- "Use my location" for the edition: approximate (city-level) only, asked when tapped. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Audio briefing keeps playing in the background / on the lock screen. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Opt-in real-time breaking alerts keep one connection open while switched on. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Self-update from GitHub Releases (user-initiated or opted-in automatic installs). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -12,6 +16,14 @@
 
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Speech engines for the audio briefing (Google's holds the downloadable voices). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <package android:name="com.google.android.tts" />
+    </queries>
 
     <application
         android:name=".OpenWireApp"
@@ -21,6 +33,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
+        android:localeConfig="@xml/locales_config"
         android:enableOnBackInvokedCallback="true"
         android:theme="@style/Theme.OpenWire">
 
@@ -103,6 +116,24 @@
             android:name="news.openwire.ui.home.BriefingService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <!-- Real-time breaking alerts (opt-in): one kept-open connection to Bluesky's public stream. -->
+        <service
+            android:name="news.openwire.realtime.RealtimeAlertService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Real-time breaking-news alerts: a user-enabled connection to a public news stream, shown with a permanent notification." />
+        </service>
+        <!-- Live TV and radio: keeps playing in the background, with lock-screen controls. -->
+        <service
+            android:name="news.openwire.live.LivePlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

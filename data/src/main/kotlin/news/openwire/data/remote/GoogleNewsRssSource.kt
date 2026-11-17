@@ -85,6 +85,7 @@ class GoogleNewsRssSource(
                         source = sourceEl?.getAttribute("url")?.takeIf { it.isNotEmpty() },
                         sourceName = sourceEl?.textContent?.trim()?.takeIf { it.isNotEmpty() },
                         imageUrl = mediaImage(node),
+                        author = byline(textOf(node, "dc:creator") ?: textOf(node, "author")),
                     ),
                 )
             }
@@ -110,6 +111,7 @@ class GoogleNewsRssSource(
                         description = textOf(node, "summary") ?: textOf(node, "content"),
                         source = null,
                         imageUrl = mediaImage(node),
+                        author = byline((node.getElementsByTagName("author").item(0) as? Element)?.let { a -> textOf(a, "name") ?: a.textContent?.trim() }),
                     ),
                 )
             }
@@ -130,6 +132,14 @@ class GoogleNewsRssSource(
             }
         }
         return null
+    }
+
+    /** "jane@x.com (Jane Doe)" → "Jane Doe"; drops e-mail-only and over-long values. */
+    private fun byline(raw: String?): String? {
+        val t = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        val inParens = Regex("\\(([^)]+)\\)").find(t)?.groupValues?.get(1)
+        val name = (inParens ?: t).replace(Regex("\\s+"), " ").trim().removePrefix("By ").removePrefix("by ")
+        return name.takeIf { it.length in 2..80 && !it.contains('@') && !it.startsWith("http") }
     }
 
     private fun textOf(parent: Element, tag: String): String? =

@@ -19,6 +19,8 @@ object TopicRegistry {
     /** A Google News locale for an edition country. */
     data class Country(val code: String, val name: String, val nationalLabel: String, val hl: String, val ceid: String) {
         val query: String get() = "hl=$hl&gl=$code&ceid=$ceid"
+        /** The news language ("ar", "fr", …). */
+        val language: String get() = hl.substringBefore('-')
     }
 
     val COUNTRIES: List<Country> = listOf(
@@ -40,33 +42,52 @@ object TopicRegistry {
         Country("BR", "Brazil", "Brasil", "pt-BR", "BR:pt-419"),
         Country("JP", "Japan", "日本", "ja", "JP:ja"),
         Country("EG", "Egypt", "مصر", "ar", "EG:ar"),
+        Country("SA", "Saudi Arabia", "السعودية", "ar", "SA:ar"),
+        Country("LB", "Lebanon", "لبنان", "ar", "LB:ar"),
+        Country("MA", "Morocco", "Maroc", "fr", "MA:fr"),
+        Country("BE", "Belgium", "Belgique", "fr", "BE:fr"),
+        Country("CH", "Switzerland", "Schweiz", "de", "CH:de"),
+        Country("AT", "Austria", "Österreich", "de", "AT:de"),
+        Country("AR", "Argentina", "Argentina", "es-419", "AR:es-419"),
+        Country("CO", "Colombia", "Colombia", "es-419", "CO:es-419"),
+        Country("CL", "Chile", "Chile", "es-419", "CL:es-419"),
     )
 
     fun country(code: String?): Country = COUNTRIES.firstOrNull { it.code.equals(code, ignoreCase = true) } ?: COUNTRIES.first()
 
     /** The default lineup for an edition (SPEC §6.1). */
-    fun defaultTopics(edition: LocalEdition = LocalEdition.DEFAULT): List<Topic> {
+    fun defaultTopics(edition: LocalEdition = LocalEdition.DEFAULT, appLanguage: String = Languages.effective(null)): List<Topic> {
         val c = country(edition.country)
+        val lang = Languages.of(appLanguage)?.code ?: "en"
+        fun name(id: String) = Languages.topicName(id, lang) ?: id
+        // Every topic is built on the phone from Google News (in the edition's language) plus
+        // the publisher feeds; the published snapshot is only a first paint and a fallback.
+        // Topic feeds read in the app's language: an edition in another language (Cairo while the
+        // app is in English) keeps its own national and city tabs, the rest stay readable.
+        val f = if (c.language == lang) c else COUNTRIES.firstOrNull { it.language == lang } ?: COUNTRIES.first()
+        fun section(name: String) = "https://news.google.com/rss/headlines/section/topic/$name?${f.query}"
+        fun search(q: String) = googleNewsSearchUrl(q, f)
+        val top = "https://news.google.com/rss?${f.query}"
         return listOf(
-            Topic(id = "TOP", label = "Top Stories", snapshotFile = "news_top.json"),
-            Topic(id = "LATEST", label = "Latest", snapshotFile = "news_latest.json"),
-            Topic(id = "AI", label = "AI", snapshotFile = "news_ai.json"),
-            Topic(id = NATIONAL_ID, label = c.nationalLabel, liveUrl = "https://news.google.com/rss?${c.query}", liveOnly = true),
+            Topic(id = "TOP", label = name("TOP"), snapshotFile = "news_top.json", liveUrl = top),
+            Topic(id = "LATEST", label = name("LATEST"), snapshotFile = "news_latest.json", liveUrl = top),
+            Topic(id = "AI", label = name("AI"), snapshotFile = "news_ai.json", liveUrl = search(Languages.query("AI", f.language))),
+            Topic(id = NATIONAL_ID, label = Languages.countryName(c.code, lang), liveUrl = "https://news.google.com/rss/headlines/section/topic/NATION?${c.query}", liveOnly = true),
             Topic(
                 id = LOCAL_ID,
                 label = edition.city,
                 liveUrl = googleNewsSearchUrl("\"${edition.city.replace(",", "").trim()}\"", c),
                 liveOnly = true,
             ),
-            Topic(id = "BUSINESS", label = "Business", snapshotFile = "news_business.json"),
-            Topic(id = "TECHNOLOGY", label = "Tech", snapshotFile = "news_technology.json"),
-            Topic(id = "INTERNATIONAL", label = "International", snapshotFile = "news_world.json"),
-            Topic(id = "SCIENCE", label = "Science", snapshotFile = "news_science.json"),
-            Topic(id = "ENTERTAINMENT", label = "Entertainment", snapshotFile = "news_entertainment.json"),
-            Topic(id = "SPORTS", label = "Sports", snapshotFile = "news_sports.json"),
-            Topic(id = "POLITICS", label = "Politics", snapshotFile = "news_politics.json"),
-            Topic(id = "FINANCE", label = "Finance", snapshotFile = "news_finance.json"),
-            Topic(id = "LIFESTYLE", label = "Lifestyle", snapshotFile = "news_lifestyle.json"),
+            Topic(id = "BUSINESS", label = name("BUSINESS"), snapshotFile = "news_business.json", liveUrl = section("BUSINESS")),
+            Topic(id = "TECHNOLOGY", label = name("TECHNOLOGY"), snapshotFile = "news_technology.json", liveUrl = section("TECHNOLOGY")),
+            Topic(id = "INTERNATIONAL", label = name("INTERNATIONAL"), snapshotFile = "news_world.json", liveUrl = section("WORLD")),
+            Topic(id = "SCIENCE", label = name("SCIENCE"), snapshotFile = "news_science.json", liveUrl = section("SCIENCE")),
+            Topic(id = "ENTERTAINMENT", label = name("ENTERTAINMENT"), snapshotFile = "news_entertainment.json", liveUrl = section("ENTERTAINMENT")),
+            Topic(id = "SPORTS", label = name("SPORTS"), snapshotFile = "news_sports.json", liveUrl = section("SPORTS")),
+            Topic(id = "POLITICS", label = name("POLITICS"), snapshotFile = "news_politics.json", liveUrl = search(Languages.query("POLITICS", f.language))),
+            Topic(id = "FINANCE", label = name("FINANCE"), snapshotFile = "news_finance.json", liveUrl = search(Languages.query("FINANCE", f.language))),
+            Topic(id = "LIFESTYLE", label = name("LIFESTYLE"), snapshotFile = "news_lifestyle.json", liveUrl = section("HEALTH")),
         )
     }
 
@@ -82,8 +103,9 @@ object TopicRegistry {
         custom: List<Topic>,
         hidden: Set<String>,
         order: List<String>?,
+        language: String = "",
     ): List<Topic> {
-        val defaults = defaultTopics(edition)
+        val defaults = defaultTopics(edition, Languages.effective(language))
         val ids = defaults.map { it.id }.toMutableSet()
         val all = (defaults + custom.filter { ids.add(it.id) }.map { it.copy(isCustom = true) })
             .map { it.copy(isVisible = it.id !in hidden) }

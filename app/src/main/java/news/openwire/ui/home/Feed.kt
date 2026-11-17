@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import news.openwire.i18n.tr
+import news.openwire.i18n.text
+import news.openwire.R
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -43,12 +46,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
+import news.openwire.domain.engine.FeedWeaver
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -111,11 +117,22 @@ fun Article.coverageLine(names: Int = 2): String? {
     if (alsoCoveredBy.isEmpty()) return null
     val shown = alsoCoveredBy.take(names).joinToString(", ")
     val more = alsoCoveredBy.size - names
-    return "Also covered by $shown" + if (more > 0) " +$more" else ""
+    return tr(R.string.also_covered, shown) + if (more > 0) " +$more" else ""
 }
 
 /** Paywall badge from the routing engine, shown where the mock shows read time. */
-fun Article.badgeLabel(): String? = badge?.takeIf { it.isNotBlank() } ?: status?.replaceFirstChar { it.uppercase() }
+fun Article.badgeLabel(): String? {
+    val raw = badge?.takeIf { it.isNotBlank() } ?: status?.replaceFirstChar { it.uppercase() } ?: return null
+    // Service names stay as they are; the plain words are translated.
+    return when (raw) {
+        "Free" -> tr(R.string.badge_free)
+        "Locked" -> tr(R.string.badge_locked)
+        "Archive" -> tr(R.string.badge_archive)
+        "Bypassed" -> tr(R.string.badge_bypassed)
+        "Open source" -> tr(R.string.badge_open_source)
+        else -> raw
+    }
+}
 
 // ---- Masthead + category pills ----------------------------------------------
 
@@ -124,7 +141,7 @@ fun Article.badgeLabel(): String? = badge?.takeIf { it.isNotBlank() } ?: status?
 fun Masthead(edition: String, onEdition: () -> Unit, onSettings: () -> Unit, modifier: Modifier = Modifier) {
     val g = Glass
     val date = remember {
-        LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE • MMM d", Locale.ENGLISH)).uppercase()
+        LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE • MMM d", Locale.getDefault())).uppercase()
     }
     Row(
         modifier = modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 16.dp),
@@ -159,7 +176,7 @@ fun Masthead(edition: String, onEdition: () -> Unit, onSettings: () -> Unit, mod
             contentAlignment = Alignment.Center,
         ) {
             androidx.compose.material3.Icon(
-                androidx.compose.material.icons.Icons.Outlined.Settings, contentDescription = "Settings",
+                androidx.compose.material.icons.Icons.Outlined.Settings, contentDescription = tr(R.string.settings),
                 tint = g.textPrimary, modifier = Modifier.size(16.dp),
             )
         }
@@ -187,15 +204,15 @@ fun FeedControls(
                 val bg by animateColorAsState(if (active) g.glassElevated else Color.Transparent, tween(240, easing = SpringEasing), label = "sortBg")
                 Box(
                     Modifier.clip(CircleShape).background(bg).clickable { onSort(m) }.padding(horizontal = 10.dp, vertical = 5.dp),
-                ) { Text(m.label, style = sans(11.sp, if (active) FontWeight.SemiBold else FontWeight.Medium), color = if (active) g.textPrimary else g.textSecondary) }
+                ) { Text(m.text, style = sans(11.sp, if (active) FontWeight.SemiBold else FontWeight.Medium), color = if (active) g.textPrimary else g.textSecondary) }
             }
         }
         Spacer(Modifier.weight(1f))
         val label = when {
-            refreshing -> "Refreshing…"
-            updatedAt > 0 -> "Updated " + NewsProcessor.formatRelativeTime(updatedAt)
-            else -> "Saved copy"
-        } + if (failed.isNotEmpty() && !refreshing) " · ${failed.size} source${if (failed.size > 1) "s" else ""} offline" else ""
+            refreshing -> tr(R.string.status_refreshing)
+            updatedAt > 0 -> tr(R.string.status_updated, NewsProcessor.formatRelativeTime(updatedAt))
+            else -> tr(R.string.status_saved_copy)
+        } + if (failed.isNotEmpty() && !refreshing) " · " + tr(if (failed.size > 1) R.string.status_offline_many else R.string.status_offline_one, failed.size) else ""
         Row(
             Modifier.clip(CircleShape).clickable(enabled = !refreshing, onClick = onRefresh).padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -205,7 +222,7 @@ fun FeedControls(
             val spin = rememberInfiniteTransition(label = "spin")
             val angle by spin.animateFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "a")
             androidx.compose.material3.Icon(
-                androidx.compose.material.icons.Icons.Filled.Refresh, contentDescription = "Refresh",
+                androidx.compose.material.icons.Icons.Filled.Refresh, contentDescription = tr(R.string.action_refresh),
                 tint = g.accentSoft, modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = if (refreshing) angle else 0f },
             )
         }
@@ -302,7 +319,7 @@ fun LazyGridScope.feedItems(
     onToggleSaved: (Article) -> Unit,
     onToggleLiked: (Article) -> Unit,
     showTicker: Boolean = true,
-    sectionTitle: String = "Bento Dispatch",
+    sectionTitle: String = tr(R.string.feed_bento),
     archive: Map<String, ArchiveState> = emptyMap(),
     /** Full view: magazine lead card and multi-column grid with feature cards. */
     magazine: Boolean = false,
@@ -345,7 +362,7 @@ fun LazyGridScope.feedItems(
                     color = Glass.textPrimary.copy(alpha = 0.6f),
                     modifier = Modifier.weight(1f),
                 )
-                Text("${rest.size} Curated Reads", style = sans(11.sp, FontWeight.Medium), color = Glass.accentSoft)
+                Text(tr(R.string.curated_reads, rest.size), style = sans(11.sp, FontWeight.Medium), color = Glass.accentSoft)
             }
         }
     }
@@ -472,7 +489,7 @@ private fun LivePill(pulsing: Boolean) {
             Box(Modifier.size(6.dp).clip(CircleShape).background(g.accent))
         }
         Spacer(Modifier.width(6.dp))
-        Text("LIVE", style = mono(10.sp, FontWeight.SemiBold, 0.1.em), color = g.accentSoft)
+        Text(tr(R.string.live), style = mono(10.sp, FontWeight.SemiBold, 0.1.em), color = g.accentSoft)
     }
 }
 
@@ -517,6 +534,8 @@ fun HeroCard(
                     ScrimPill { Text(badge, style = mono(10.sp), color = Color.White.copy(alpha = 0.9f)) }
                     Spacer(Modifier.width(6.dp))
                 }
+                ShareButton(article, tint = Color.White, background = Color.Black.copy(alpha = 0.45f), border = Color.White.copy(alpha = 0.20f), padding = 8.dp)
+                Spacer(Modifier.width(6.dp))
                 SpringToggle(
                     active = saved,
                     kind = ToggleKind.BOOKMARK,
@@ -598,27 +617,39 @@ fun LeadStoryCard(
                     Spacer(Modifier.width(8.dp))
                     Text(article.publication(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Spacer(Modifier.height(14.dp))
-                Text(
-                    article.title,
-                    style = serif(30.sp, FontWeight.Bold, lineHeight = 34.sp, tracking = (-0.01).em),
-                    color = g.textPrimary, maxLines = 5, overflow = TextOverflow.Ellipsis,
-                )
-                article.summary?.takeIf { it.isNotBlank() }?.let {
-                    Spacer(Modifier.height(10.dp))
-                    Text(it, style = sans(14.sp, lineHeight = 21.sp), color = g.textSecondary, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                }
-                article.coverageLine(3)?.let {
-                    Spacer(Modifier.height(10.dp))
-                    Text(it, style = sans(12.sp, FontWeight.Medium), color = g.accentSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-                Spacer(Modifier.weight(1f))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(NewsProcessor.formatRelativeTime(article.publishedAt), style = mono(11.sp, tracking = 0.sp), color = g.textSecondary)
-                    article.badgeLabel()?.let {
-                        Text("  ·  $it", style = mono(11.sp, tracking = 0.sp), color = g.textSecondary)
+                // Headline, standfirst and coverage take what's left; the action row always fits.
+                Column(Modifier.weight(1f).clipToBounds()) {
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        article.title,
+                        style = serif(30.sp, FontWeight.Bold, lineHeight = 34.sp, tracking = (-0.01).em),
+                        color = g.textPrimary, maxLines = 5, overflow = TextOverflow.Ellipsis,
+                    )
+                    // The feed's excerpt, or (Google items carry none) the story's opening from its page.
+                    val excerpt = article.summary?.takeIf { it.isNotBlank() && FeedWeaver.calculateTitleSimilarity(it, article.title) < 0.7 }
+                    val loader = LocalArticlePreview.current
+                    val opening by produceState(excerpt, article.id) {
+                        if (value == null && loader != null) value = runCatching { loader(article) }.getOrNull()
                     }
-                    Spacer(Modifier.weight(1f))
+                    androidx.compose.animation.AnimatedVisibility(opening != null, enter = androidx.compose.animation.fadeIn()) {
+                        Column {
+                            Spacer(Modifier.height(10.dp))
+                            Text(opening.orEmpty(), style = sans(14.sp, lineHeight = 21.sp), color = g.textSecondary, maxLines = 6, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    article.coverageLine(3)?.let {
+                        Spacer(Modifier.height(10.dp))
+                        Text(it, style = sans(12.sp, FontWeight.Medium), color = g.accentSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        NewsProcessor.formatRelativeTime(article.publishedAt) + (article.badgeLabel()?.let { "  ·  $it" } ?: ""),
+                        style = mono(11.sp, tracking = 0.sp), color = g.textSecondary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                    )
+                    ShareButton(article, background = g.chipFill, padding = 8.dp)
+                    Spacer(Modifier.width(6.dp))
                     SpringToggle(saved, ToggleKind.BOOKMARK, { onToggleSaved(article) }, background = g.chipFill, padding = 8.dp)
                 }
             }
@@ -701,12 +732,16 @@ fun BentoCard(
                 maxLines = 1,
             )
             SpringToggle(liked, ToggleKind.LIKE, { onToggleLiked(article) })
+            ShareButton(article, tint = Glass.textPrimary.copy(alpha = 0.7f))
             SpringToggle(saved, ToggleKind.BOOKMARK, { onToggleSaved(article) })
         }
     }
 }
 
 /** Resolves missing lead photos from the article page (js/imageService.js). */
+/** Loads a story's opening lines for cards whose feed gave no excerpt. */
+val LocalArticlePreview = androidx.compose.runtime.staticCompositionLocalOf<(suspend (Article) -> String?)?> { null }
+
 val LocalImageResolver = androidx.compose.runtime.staticCompositionLocalOf<news.openwire.data.remote.ImageResolver?> { null }
 
 private val GrayscaleFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) })

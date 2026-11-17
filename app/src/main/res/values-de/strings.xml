@@ -403,4 +403,7 @@
     <string name="live_play">Abspielen</string>
     <string name="live_tv_note">Die Streams kommen direkt von den Sendern. Mit YouTube markierte Sender haben keinen offenen Stream und öffnen ihre offizielle Live-Seite.</string>
     <string name="live_radio_note">Weitere Sender aus dem offenen Radio-Browser-Verzeichnis (radio-browser.info). Gesendet werden nur dein Land oder deine Suchwörter.</string>
+    <string name="text_size">Textgröße</string>
+    <string name="text_size_hint">Meldungen öffnen in dieser Größe. Das kleine und das große A oben in jeder Meldung ändern sie ebenfalls.</string>
+    <string name="text_size_sample">Editrove setzt jede Meldung in eine ruhige Lesespalte, damit auch lange Artikel angenehm zu lesen sind.</string>
 </resources>

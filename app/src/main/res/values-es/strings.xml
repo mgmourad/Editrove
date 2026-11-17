@@ -403,4 +403,7 @@
     <string name="live_play">Reproducir</string>
     <string name="live_tv_note">Las emisiones llegan directamente de cada cadena. Los canales marcados con YouTube no tienen emisión abierta y abren su página oficial.</string>
     <string name="live_radio_note">Más emisoras del directorio abierto Radio Browser (radio-browser.info). Solo se envía tu país o tus palabras de búsqueda.</string>
+    <string name="text_size">Tamaño del texto</string>
+    <string name="text_size_hint">Las noticias se abren con este tamaño. Los botones A pequeña y A grande de cada noticia también lo cambian.</string>
+    <string name="text_size_sample">Editrove presenta cada noticia en una columna de lectura limpia, para que los artículos largos sean cómodos de leer.</string>
 </resources>

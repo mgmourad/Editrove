@@ -113,6 +113,8 @@ class SettingsViewModel(
     }
 
     /** Adds or removes a suggested local newsroom. */
+    fun setTextScale(scale: Float) = settingsRepo.update { it.copy(textScale = scale) }
+
     fun toggleLocalSource(sug: news.openwire.domain.engine.LocalSources.Suggestion, on: Boolean, regional: Boolean = false) = settingsRepo.update { s ->
         if (on) {
             if (s.customFeeds.any { it.url == sug.url }) s

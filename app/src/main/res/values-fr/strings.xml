@@ -403,4 +403,7 @@
     <string name="live_play">Lire</string>
     <string name="live_tv_note">Les flux viennent directement de chaque diffuseur. Les chaînes marquées YouTube n’ont pas de flux ouvert et ouvrent leur page officielle.</string>
     <string name="live_radio_note">Plus de stations depuis l’annuaire ouvert Radio Browser (radio-browser.info). Seuls votre pays ou vos mots de recherche sont envoyés.</string>
+    <string name="text_size">Taille du texte</string>
+    <string name="text_size_hint">Les articles s’ouvrent à cette taille. Les petit et grand boutons A en haut de chaque article la changent aussi.</string>
+    <string name="text_size_sample">Editrove met chaque article en page dans une colonne de lecture claire, pour lire confortablement les textes longs.</string>
 </resources>

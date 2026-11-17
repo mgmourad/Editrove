@@ -102,7 +102,37 @@ class ReaderActions(
     val scope: CoroutineScope,
     val onToggleSaved: (Article) -> Unit,
     val onToggleLiked: (Article) -> Unit,
+    /** Changes the article text size (kept for every article). */
+    val onTextScale: (Float) -> Unit = {},
 )
+
+/** The reader's text size (1 = normal), from the settings. */
+val LocalTextScale = androidx.compose.runtime.compositionLocalOf { 1f }
+
+/** A− / A+: smaller and larger article text. */
+@Composable
+fun TextSizeControl(onChange: (Float) -> Unit, background: Color = Glass.chipFill, border: Color? = null) {
+    val g = Glass
+    val scale = LocalTextScale.current
+    Row(
+        Modifier.clip(CircleShape).background(background).then(if (border != null) Modifier.border(1.dp, border, CircleShape) else Modifier),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val canDown = scale > news.openwire.domain.model.TEXT_SCALES.first() + 0.01f
+        val canUp = scale < news.openwire.domain.model.TEXT_SCALES.last() - 0.01f
+        Box(
+            Modifier.clickable(enabled = canDown) { onChange(news.openwire.domain.model.stepTextScale(scale, up = false)) }
+                .padding(start = 12.dp, end = 8.dp, top = 6.dp, bottom = 6.dp).height(22.dp),
+            contentAlignment = Alignment.Center,
+        ) { Text("A", style = serif(13.sp, FontWeight.Bold), color = g.textPrimary.copy(alpha = if (canDown) 1f else 0.35f)) }
+        Box(Modifier.width(1.dp).height(16.dp).background(g.hairline))
+        Box(
+            Modifier.clickable(enabled = canUp) { onChange(news.openwire.domain.model.stepTextScale(scale, up = true)) }
+                .padding(start = 8.dp, end = 12.dp, top = 6.dp, bottom = 6.dp).height(22.dp),
+            contentAlignment = Alignment.Center,
+        ) { Text("A", style = serif(19.sp, FontWeight.Bold), color = g.textPrimary.copy(alpha = if (canUp) 1f else 0.35f)) }
+    }
+}
 
 /**
  * The detail pane (unfolded). Selecting a new story crossfades + slides it in,
@@ -188,6 +218,8 @@ fun ReaderSheet(
                     Text(tr(R.string.reader_back), style = sans(12.sp, FontWeight.SemiBold), color = g.textPrimary)
                 }
                 Spacer(Modifier.weight(1f))
+                TextSizeControl(actions.onTextScale)
+                Spacer(Modifier.width(8.dp))
                 SpringToggle(liked, ToggleKind.LIKE, { actions.onToggleLiked(article) }, background = g.chipFill, padding = 8.dp)
                 Spacer(Modifier.width(8.dp))
                 ShareButton(article, background = g.chipFill, padding = 8.dp)
@@ -221,6 +253,11 @@ internal fun ArticleBody(
     LaunchedEffect(state) { (state as? BodyState.Loaded)?.content?.imageUrl?.let { images?.remember(article.originalUrl, it) } }
     val content = (state as? BodyState.Loaded)?.content
 
+    // The whole article (headline, standfirst, summary, body) follows the chosen text size.
+    val baseDensity = androidx.compose.ui.platform.LocalDensity.current
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(baseDensity.density, baseDensity.fontScale * LocalTextScale.current),
+    ) {
     Column(Modifier.widthIn(max = 672.dp).fillMaxWidth()) {
         if (showMetaBar) {
             Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -238,6 +275,8 @@ internal fun ArticleBody(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
+                TextSizeControl(actions.onTextScale, border = g.hairline)
+                Spacer(Modifier.width(8.dp))
                 SpringToggle(liked, ToggleKind.LIKE, { actions.onToggleLiked(article) }, background = g.chipFill, border = g.hairline, padding = 8.dp)
                 Spacer(Modifier.width(8.dp))
                 ShareButton(article, background = g.chipFill, border = g.hairline, padding = 8.dp)
@@ -415,6 +454,7 @@ internal fun ArticleBody(
                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = g.accentSoft, modifier = Modifier.size(16.dp))
             }
         }
+    }
     }
 }
 

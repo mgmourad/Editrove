@@ -405,4 +405,7 @@
     <string name="live_play">Play</string>
     <string name="live_tv_note">Streams come straight from each broadcaster. Channels marked YouTube have no open stream and open their official live page.</string>
     <string name="live_radio_note">More stations from the open Radio Browser directory (radio-browser.info). Only your country or search words are sent.</string>
+    <string name="text_size">Text size</string>
+    <string name="text_size_hint">Stories open at this size. The small and large A buttons at the top of any story change it too.</string>
+    <string name="text_size_sample">Editrove sets each story in a clean reading column, so long articles stay comfortable to read.</string>
 </resources>

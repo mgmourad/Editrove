@@ -150,6 +150,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
             scope = scope,
             onToggleSaved = { vm.toggleSaved(it) },
             onToggleLiked = { vm.toggleLiked(it) },
+            onTextScale = { vm.setTextScale(it) },
         )
     }
 
@@ -203,7 +204,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
     val previewLoader: suspend (Article) -> String? = remember {
         { a -> (a.originalUrl ?: a.targetUrl)?.let { app.container.articleTextExtractor.preview(it, a.title) } }
     }
-    CompositionLocalProvider(LocalArticlePreview provides previewLoader, LocalImageResolver provides app.container.imageResolver, LocalLogoResolver provides app.container.logoResolver, LocalMarkets provides app.container.markets, LocalBriefingPlayer provides briefing) {
+    CompositionLocalProvider(LocalTextScale provides userSettings.textScale, LocalArticlePreview provides previewLoader, LocalImageResolver provides app.container.imageResolver, LocalLogoResolver provides app.container.logoResolver, LocalMarkets provides app.container.markets, LocalBriefingPlayer provides briefing) {
     SharedTransitionLayout {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= ExpandedBreakpoint

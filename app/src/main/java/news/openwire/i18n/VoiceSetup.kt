@@ -31,6 +31,8 @@ object VoiceSetup {
         voices.filter { it.locale.language == lang }
             .sortedWith(
                 compareByDescending<Voice> { installed(it) }
+                    // The engine's standard voice for the language first (listed first in settings).
+                    .thenByDescending { !it.name.contains("-x-") }
                     .thenByDescending { country != null && it.locale.country.equals(country, true) }
                     .thenBy { it.isNetworkConnectionRequired }
                     .thenByDescending { it.quality },
@@ -40,6 +42,10 @@ object VoiceSetup {
      * Checks (and, when needed, starts downloading) a voice for [lang]. [country] picks the
      * accent when there's a choice (an Egyptian edition prefers an Egyptian Arabic voice).
      */
+    /** The voice [ensure] settled on (its name), when one is installed. */
+    @Volatile var lastReady: String? = null
+        private set
+
     suspend fun ensure(context: Context, lang: String, country: String? = null): State = withContext(Dispatchers.Main) {
         val app = context.applicationContext
         val engine = engine(app)
@@ -55,7 +61,7 @@ object VoiceSetup {
             val all = runCatching { t.voices.orEmpty() }.getOrDefault(emptySet())
             val pick = best(all, lang, country)
             when {
-                pick != null && installed(pick) -> State.READY
+                pick != null && installed(pick) -> { lastReady = pick.name; State.READY }
                 pick != null -> {
                     // Selecting a listed-but-missing voice and speaking makes Google's engine fetch it.
                     t.voice = pick
@@ -72,6 +78,26 @@ object VoiceSetup {
         } finally {
             t.stop(); t.shutdown()
         }
+    }
+
+    /**
+     * Makes the briefing speak Editrove's language: with the app in Arabic (say) and the voice
+     * still on Editrove's default or on another language's voice, the language's standard
+     * voice is selected. Back in English, a voice from another language is cleared.
+     */
+    suspend fun adopt(context: Context, settings: news.openwire.data.local.SettingsRepository) {
+        val s = settings.settings.value
+        val lang = news.openwire.domain.engine.Languages.effective(s.language)
+        val current = s.briefing.voice
+        val currentLang = current?.substringBefore('-')?.lowercase()
+        if (lang == "en") {
+            if (current != null && currentLang != null && currentLang != "en") settings.update { it.copy(briefing = it.briefing.copy(voice = null)) }
+            return
+        }
+        if (current != null && currentLang == lang) return
+        if (ensure(context, lang, s.edition.country) != State.READY) return
+        val name = lastReady ?: return
+        settings.update { it.copy(briefing = it.briefing.copy(voice = name)) }
     }
 
     /** Google's speech engine when installed, else the phone's default (null). */

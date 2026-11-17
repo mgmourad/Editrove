@@ -184,6 +184,8 @@ class HomeViewModel(
 
     fun setSortMode(mode: SortMode) = settingsRepo.update { it.copy(sortMode = mode) }
 
+    fun setTextScale(scale: Float) = settingsRepo.update { it.copy(textScale = scale) }
+
     fun openArticle(article: Article) {
         _selected.value = article
         _sheetOpen.value = true

@@ -862,6 +862,28 @@ private fun AppearancePage(vm: SettingsViewModel, themeMode: ThemeMode, onTheme:
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { ThemeMode.entries.forEach { m -> Chip(themeLabel(m), selected = m == themeMode) { onTheme(m) } } }
         }
         Section {
+            Label(tr(R.string.text_size))
+            androidx.compose.runtime.CompositionLocalProvider(news.openwire.ui.home.LocalTextScale provides s.textScale) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    news.openwire.ui.home.TextSizeControl(onChange = vm::setTextScale)
+                    Spacer(Modifier.width(12.dp))
+                    Text("${(s.textScale * 100).toInt()}%", style = mono(12.sp, FontWeight.SemiBold), color = Glass.textSecondary)
+                    if (s.textScale != 1f) {
+                        Spacer(Modifier.weight(1f))
+                        TextButton(tr(R.string.reset)) { vm.setTextScale(1f) }
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            // A sample paragraph at the chosen size.
+            Text(
+                tr(R.string.text_size_sample),
+                style = sans((14.5f * s.textScale).sp, lineHeight = (25f * s.textScale).sp), color = Glass.textPrimary,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(tr(R.string.text_size_hint), style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary)
+        }
+        Section {
             Label(tr(R.string.unfolded_layout))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 news.openwire.domain.model.UnfoldedLayout.entries.forEach { m -> Chip(m.text, selected = m == s.unfoldedLayout) { vm.setUnfoldedLayout(m) } }

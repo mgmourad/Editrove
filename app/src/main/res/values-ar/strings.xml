@@ -403,4 +403,7 @@
     <string name="live_play">تشغيل</string>
     <string name="live_tv_note">يأتي البث مباشرة من كل قناة. القنوات المعلّمة بـ YouTube ليس لها بث مفتوح وتُفتح صفحتها الرسمية للبث المباشر.</string>
     <string name="live_radio_note">مزيد من المحطات من دليل Radio Browser المفتوح (radio-browser.info). لا يُرسل سوى بلدك أو كلمات البحث.</string>
+    <string name="text_size">حجم النص</string>
+    <string name="text_size_hint">تُفتح الأخبار بهذا الحجم. ويمكن تغييره أيضاً من زرّي A الصغير والكبير أعلى أي خبر.</string>
+    <string name="text_size_sample">يعرض Editrove كل خبر في عمود قراءة مريح، لتبقى المقالات الطويلة سهلة القراءة.</string>
 </resources>

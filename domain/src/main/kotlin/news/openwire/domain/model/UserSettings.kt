@@ -12,6 +12,8 @@ data class UserSettings(
     /** Edition and language before the last switch, for a one-tap way back. */
     val previousEdition: LocalEdition? = null,
     val previousLanguage: String? = null,
+    /** Article text size, 1 = normal (the reader's A− / A+ and Appearance both set it). */
+    val textScale: Float = 1f,
     val customTopics: List<Topic> = emptyList(),
     val hiddenTopics: Set<String> = emptySet(),
     /** Topic ids in display order; null = default order. */
@@ -47,3 +49,12 @@ data class UserSettings(
 )
 
 enum class UnfoldedLayout(val label: String) { SPLIT("Split view"), FULL("Full view") }
+
+/** Text sizes offered by the reader's A− / A+. */
+val TEXT_SCALES = listOf(0.85f, 1f, 1.15f, 1.3f, 1.5f, 1.75f)
+
+/** The next size up or down from [current]. */
+fun stepTextScale(current: Float, up: Boolean): Float {
+    val i = TEXT_SCALES.indexOfFirst { it >= current - 0.01f }.let { if (it < 0) TEXT_SCALES.lastIndex else it }
+    return TEXT_SCALES[(if (up) i + 1 else i - 1).coerceIn(0, TEXT_SCALES.lastIndex)]
+}

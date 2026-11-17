@@ -88,6 +88,11 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
             delay(5_000)
             voiceState = news.openwire.i18n.VoiceSetup.ensure(context, appLang, s.edition.country)
         }
+        // A voice that just arrived becomes the briefing's voice (unless one in this language is chosen).
+        val chosen = s.briefing.voice
+        if (voiceState == news.openwire.i18n.VoiceSetup.State.READY && (chosen == null || !chosen.lowercase().startsWith(appLang))) {
+            news.openwire.i18n.VoiceSetup.lastReady?.let { name -> vm.setBriefing { it.copy(voice = name) } }
+        }
     }
     var cuePlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var cuePlaying by remember { mutableIntStateOf(0) }

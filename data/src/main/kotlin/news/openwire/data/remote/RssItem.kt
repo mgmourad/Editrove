@@ -12,6 +12,8 @@ data class RssItem(
     val sourceName: String? = null,
     /** media:content / media:thumbnail / image enclosure, when present. */
     val imageUrl: String? = null,
+    /** Byline (dc:creator / author), when the feed names one. */
+    val author: String? = null,
 )
 
 /** A parsed feed: its channel title and items. */

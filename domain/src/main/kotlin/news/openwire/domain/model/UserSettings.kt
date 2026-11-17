@@ -14,6 +14,12 @@ data class UserSettings(
     val previousLanguage: String? = null,
     /** Article text size, 1 = normal (the reader's A− / A+ and Appearance both set it). */
     val textScale: Float = 1f,
+    /** Writers followed on the Analysis & Opinion page (bylines). */
+    val followedAuthors: Set<String> = emptySet(),
+    /** Bluesky accounts followed there (handles). */
+    val followedAccounts: Set<String> = emptySet(),
+    /** Topic tabs added there (from trending suggestions or typed). */
+    val opinionTabs: List<String> = emptyList(),
     val customTopics: List<Topic> = emptyList(),
     val hiddenTopics: Set<String> = emptySet(),
     /** Topic ids in display order; null = default order. */

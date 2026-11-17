@@ -25,6 +25,8 @@ data class ArticleContent(
     val viaUrl: String? = null,
     /** True when only a teaser could be read (paywall and no snapshot). */
     val partial: Boolean = false,
+    /** Posts from X the story embeds (x.com status links), shown as cards under the text. */
+    val embeds: List<String> = emptyList(),
 ) {
     val paragraphs: List<String> get() = text.split("\n\n").filter { it.isNotBlank() }
     val wordCount: Int get() = text.split(RX_1).count { it.isNotBlank() }
@@ -252,6 +254,8 @@ class ArticleTextExtractor(
         try {
             val doc = Jsoup.parse(html)
             val title = doc.selectFirst("h1")?.text().orEmpty().ifEmpty { doc.title() }
+            // Embedded X posts become cards; their text isn't part of the story's paragraphs.
+            val embeds = embeddedPosts(doc)
             val paragraphs = articleParagraphs(doc)
             val text = paragraphs.joinToString("\n\n")
             if (text.isBlank()) return null
@@ -264,10 +268,28 @@ class ArticleTextExtractor(
                     ?.takeIf { it.length > 30 },
                 author = (doc.meta("author") ?: doc.meta("article:author"))
                     ?.takeIf { it.isNotBlank() && !it.startsWith("http") && it.length < 80 },
+                embeds = embeds,
             )
         } catch (e: Exception) {
             return null
         }
+    }
+
+    /** X posts embedded in the page (removed from it), as canonical x.com links. */
+    internal fun embeddedPosts(doc: Document): List<String> {
+        val found = LinkedHashSet<String>()
+        doc.select("blockquote.twitter-tweet, blockquote.twitter-video").forEach { q ->
+            q.select("a[href]").map { it.attr("href") }.lastOrNull { news.openwire.domain.opinion.XPosts.canonical(it) != null }
+                ?.let { news.openwire.domain.opinion.XPosts.canonical(it) }?.let(found::add)
+            q.remove()
+        }
+        // Pages rendered with X's script carry the post id on the widget instead.
+        doc.select("[data-tweet-id]").forEach { e ->
+            val id = e.attr("data-tweet-id").takeIf { it.all(Char::isDigit) && it.length > 5 } ?: return@forEach
+            found += "https://x.com/i/status/$id"
+            e.remove()
+        }
+        return found.take(8)
     }
 
     /**

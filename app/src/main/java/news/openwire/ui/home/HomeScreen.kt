@@ -65,6 +65,7 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.LiveTv
+import androidx.compose.material.icons.outlined.FormatQuote
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Newspaper
@@ -127,6 +128,7 @@ private val NavTab.icon: ImageVector
         NavTab.DISCOVER -> Icons.Outlined.Search
         NavTab.AUDIO -> Icons.AutoMirrored.Outlined.VolumeUp
         NavTab.LIVE -> Icons.Outlined.LiveTv
+        NavTab.OPINION -> Icons.Outlined.FormatQuote
         NavTab.SAVED -> Icons.Outlined.BookmarkBorder
     }
 
@@ -151,6 +153,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
             onToggleSaved = { vm.toggleSaved(it) },
             onToggleLiked = { vm.toggleLiked(it) },
             onTextScale = { vm.setTextScale(it) },
+            loadPost = { app.container.xPosts.post(it) },
         )
     }
 
@@ -391,6 +394,7 @@ private fun categoryLabel(vm: HomeViewModel, tab: NavTab, topicIndex: Int): Stri
     NavTab.DISCOVER -> tr(R.string.tab_discover)
     NavTab.SAVED -> tr(R.string.tab_saved)
     NavTab.LIVE -> tr(R.string.tab_live)
+    NavTab.OPINION -> tr(R.string.tab_opinion)
 }
 
 @Composable
@@ -494,7 +498,7 @@ private fun TabFeed(
         val visible: List<Article> = when (t) {
             NavTab.TODAY, NavTab.AUDIO -> (feeds[topic.id] as? FeedResult.Success)?.articles.orEmpty()
             NavTab.SAVED -> saved
-            NavTab.LIVE -> emptyList()
+            NavTab.LIVE, NavTab.OPINION -> emptyList()
             NavTab.DISCOVER -> {
                 val byTopic = remember(feeds) {
                     feeds.mapNotNull { (id, r) -> (r as? FeedResult.Success)?.let { id to it.articles } }.toMap()
@@ -527,10 +531,29 @@ private fun TabFeed(
             )
             return@HorizontalPager
         }
+        if (t == NavTab.OPINION) {
+            val app = LocalContext.current.applicationContext as OpenWireApp
+            val headlines = remember(feeds) { feeds.values.flatMap { (it as? FeedResult.Success)?.articles.orEmpty() } }
+            news.openwire.opinion.OpinionScreen(
+                padding = padding, source = app.container.opinion,
+                appLanguage = news.openwire.domain.engine.Languages.effective(userSettings.language),
+                news = headlines,
+                followedAuthors = userSettings.followedAuthors, followedAccounts = userSettings.followedAccounts, tabs = userSettings.opinionTabs,
+                actions = remember(vm) {
+                    news.openwire.opinion.OpinionActions(
+                        openArticle = onOpen,
+                        openLink = { vm.openLink(it) },
+                        toggleAuthor = vm::toggleFollowAuthor, toggleAccount = vm::toggleFollowAccount,
+                        addTab = vm::addOpinionTab, removeTab = vm::removeOpinionTab,
+                    )
+                },
+            )
+            return@HorizontalPager
+        }
 
         val isRefreshing = when (t) {
             NavTab.DISCOVER -> refreshingIds.isNotEmpty()
-            NavTab.SAVED, NavTab.LIVE -> false
+            NavTab.SAVED, NavTab.LIVE, NavTab.OPINION -> false
             else -> topic.id in refreshingIds
         }
         androidx.compose.material3.pulltorefresh.PullToRefreshBox(
@@ -602,7 +625,7 @@ private fun TabFeed(
                         feed(visible, tr(R.string.tab_saved), ticker = false, title = tr(R.string.feed_saved_stories))
                     }
                 }
-                NavTab.LIVE -> Unit // drawn by LiveScreen above
+                NavTab.LIVE, NavTab.OPINION -> Unit // drawn by their own screens above
             }
         }
         }
@@ -728,13 +751,15 @@ private fun BottomNavPill(
     val g = Glass
     val scale by animateFloatAsState(if (compact) 0.9f else 1f, springTween(380), label = "navScale")
     val alpha by animateFloatAsState(if (compact) 0.85f else 1f, tween(300), label = "navAlpha")
+    // Six pages: tighter spacing on narrow (cover) screens so every tab fits.
+    val narrow = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 420
     Row(
         modifier = modifier
             .graphicsLayer { scaleX = scale; scaleY = scale; this.alpha = alpha }
             .glassSurface(CircleShape, fill = Color.Transparent, elevation = 16.dp)
             .frostedGlass(haze)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = if (narrow) 6.dp else 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (narrow) 1.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         NavTab.entries.forEach { tab ->
@@ -747,7 +772,7 @@ private fun BottomNavPill(
                     .clip(CircleShape)
                     .background(bg)
                     .clickable { onSelectTab(tab) }
-                    .padding(horizontal = if (active) 18.dp else 14.dp, vertical = 11.dp),
+                    .padding(horizontal = if (active) (if (narrow) 13.dp else 18.dp) else (if (narrow) 10.dp else 14.dp), vertical = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(20.dp))
@@ -756,7 +781,7 @@ private fun BottomNavPill(
                     enter = expandHorizontally(springTween(360)) + fadeIn(springTween(360)),
                     exit = shrinkHorizontally(springTween(300)) + fadeOut(tween(120)),
                 ) {
-                    Text(tab.label, style = sans(13.5.sp, FontWeight.SemiBold), color = Color.White, modifier = Modifier.padding(start = 8.dp))
+                    Text(tab.label, style = sans(13.5.sp, FontWeight.SemiBold), color = Color.White, maxLines = 1, modifier = Modifier.padding(start = if (narrow) 6.dp else 8.dp).widthIn(max = 96.dp))
                 }
             }
         }

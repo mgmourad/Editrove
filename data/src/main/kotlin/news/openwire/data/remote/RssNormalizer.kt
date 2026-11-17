@@ -56,6 +56,7 @@ class RssNormalizer(private val registry: DomainRegistry) {
             editorialRank = if (feedUrl == null) index else null,
             // Google lists the outlets running the story ("full coverage") as <li> items.
             coverage = if (isGoogle) relatedCoverage(item.description).coerceAtLeast(1) else null,
+            author = item.author,
         )
         return StrategyRouter.applyStrategy(registry, base)
     }

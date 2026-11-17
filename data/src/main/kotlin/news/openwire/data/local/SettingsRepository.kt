@@ -90,6 +90,9 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         val previousEdition: List<String>? = null,
         val previousLanguage: String? = null,
         val textScale: Float = 1f,
+        val followedAuthors: Set<String> = emptySet(),
+        val followedAccounts: Set<String> = emptySet(),
+        val opinionTabs: List<String> = emptyList(),
     ) {
         fun toSettings() = UserSettings(
             edition = LocalEdition(city, region, country),
@@ -97,6 +100,9 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
             previousEdition = previousEdition?.takeIf { it.size == 3 }?.let { LocalEdition(it[0], it[1], it[2]) },
             previousLanguage = previousLanguage,
             textScale = textScale.coerceIn(0.7f, 2f),
+            followedAuthors = followedAuthors,
+            followedAccounts = followedAccounts,
+            opinionTabs = opinionTabs,
             customTopics = customTopics.map { Topic(it.id, it.label, liveUrl = it.liveUrl, liveOnly = true, keywords = it.keywords, sources = it.sources, isCustom = true) },
             hiddenTopics = hiddenTopics,
             topicOrder = topicOrder,
@@ -138,6 +144,9 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 s.previousEdition?.let { listOf(it.city, it.region, it.country) },
                 s.previousLanguage,
                 s.textScale,
+                s.followedAuthors,
+                s.followedAccounts,
+                s.opinionTabs,
             )
         }
     }

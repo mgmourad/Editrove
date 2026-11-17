@@ -36,7 +36,7 @@ import news.openwire.domain.model.Topic
 import news.openwire.domain.model.UserSettings
 
 enum class NavTab(@androidx.annotation.StringRes private val res: Int) {
-    TODAY(R.string.tab_today), DISCOVER(R.string.tab_discover), AUDIO(R.string.tab_audio), LIVE(R.string.tab_live), SAVED(R.string.tab_saved);
+    TODAY(R.string.tab_today), DISCOVER(R.string.tab_discover), AUDIO(R.string.tab_audio), LIVE(R.string.tab_live), OPINION(R.string.tab_opinion), SAVED(R.string.tab_saved);
 
     val label: String get() = tr(res)
 }
@@ -168,6 +168,8 @@ class HomeViewModel(
             NavTab.DISCOVER -> topics.forEach { ensureFresh(it) }
             NavTab.TODAY, NavTab.AUDIO -> ensureFresh(currentTopic)
             NavTab.SAVED, NavTab.LIVE -> Unit
+            // Trending tabs there come from what every topic is covering.
+            NavTab.OPINION -> topics.forEach { ensureFresh(it) }
         }
     }
 
@@ -177,7 +179,7 @@ class HomeViewModel(
     fun refresh() {
         when (_tab.value) {
             NavTab.DISCOVER -> topics.forEach { load(it, force = true) }
-            NavTab.SAVED, NavTab.LIVE -> Unit
+            NavTab.SAVED, NavTab.LIVE, NavTab.OPINION -> Unit
             else -> load(currentTopic, force = true)
         }
     }
@@ -185,6 +187,23 @@ class HomeViewModel(
     fun setSortMode(mode: SortMode) = settingsRepo.update { it.copy(sortMode = mode) }
 
     fun setTextScale(scale: Float) = settingsRepo.update { it.copy(textScale = scale) }
+
+    // ---- Analysis & Opinion: follows and topic tabs ----
+    fun toggleFollowAuthor(name: String) = settingsRepo.update { s ->
+        val key = news.openwire.domain.opinion.OpinionCatalog.authorKey(name)
+        val existing = s.followedAuthors.firstOrNull { news.openwire.domain.opinion.OpinionCatalog.authorKey(it) == key }
+        s.copy(followedAuthors = if (existing != null) s.followedAuthors - existing else s.followedAuthors + name.trim())
+    }
+
+    fun toggleFollowAccount(handle: String) = settingsRepo.update { s ->
+        s.copy(followedAccounts = if (handle in s.followedAccounts) s.followedAccounts - handle else s.followedAccounts + handle)
+    }
+
+    fun addOpinionTab(topic: String) = settingsRepo.update { s ->
+        if (s.opinionTabs.any { it.equals(topic, true) }) s else s.copy(opinionTabs = s.opinionTabs + topic.trim())
+    }
+
+    fun removeOpinionTab(topic: String) = settingsRepo.update { s -> s.copy(opinionTabs = s.opinionTabs.filterNot { it.equals(topic, true) }) }
 
     fun openArticle(article: Article) {
         _selected.value = article

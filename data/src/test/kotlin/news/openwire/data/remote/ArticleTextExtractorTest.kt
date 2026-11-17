@@ -38,4 +38,26 @@ class ArticleTextExtractorTest {
         assertFalse(x.aboutTitle("أعربت جمهورية مصر العربية عن إدانتها واستنكارها البالغين للاعتداءات التي استهدفت مملكة البحرين", title))
         assertTrue(x.aboutTitle("Marine Le Pen presented her pension reform plan on Tuesday.", "Le Pen unveils pension reform"))
     }
+
+    @Test
+    fun embeddedXPostsAreCollectedAndLeftOutOfTheText() {
+        val html = """<html><body><article>
+            <p>The minister spoke on Tuesday about the new plan for the coast and its many towns.</p>
+            <blockquote class="twitter-tweet"><p lang="en">This is a post that should not be read as body text at all.</p>&mdash; A (@a) <a href="https://twitter.com/a/status/1234567890?ref_src=twsrc">Nov 17</a></blockquote>
+            <p>Officials said the work would start next year, after a long consultation with residents.</p>
+            </article></body></html>"""
+        val doc = Jsoup.parse(html)
+        val x = ArticleTextExtractor(okhttp3.OkHttpClient())
+        assertEquals(listOf("https://x.com/a/status/1234567890"), x.embeddedPosts(doc))
+        assertFalse(x.articleParagraphs(doc).any { it.contains("should not be read") })
+    }
+
+    @Test
+    fun xOembedIsReadIntoAPost() {
+        val body = """{"url":"https://x.com/jack/status/20","author_name":"jack","author_url":"https://x.com/jack","html":"<blockquote class=\"twitter-tweet\" data-dnt=\"true\"><p lang=\"en\" dir=\"ltr\">just setting up my twttr</p>&mdash; jack (@jack) <a href=\"https://x.com/jack/status/20?ref_src=twsrc%5Etfw\">March 21, 2006</a></blockquote>"}"""
+        val p = news.openwire.domain.opinion.XPosts.parse(body, "https://x.com/jack/status/20")!!
+        assertEquals("just setting up my twttr", p.text)
+        assertEquals("jack", p.authorHandle)
+        assertEquals("March 21, 2006", p.linkTitle)
+    }
 }

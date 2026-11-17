@@ -104,6 +104,8 @@ class ReaderActions(
     val onToggleLiked: (Article) -> Unit,
     /** Changes the article text size (kept for every article). */
     val onTextScale: (Float) -> Unit = {},
+    /** Reads a post the story embeds (X, through its official oEmbed). */
+    val loadPost: suspend (String) -> news.openwire.domain.opinion.SocialPost? = { null },
 )
 
 /** The reader's text size (1 = normal), from the settings. */
@@ -414,6 +416,10 @@ internal fun ArticleBody(
                 s.content.paragraphs.forEachIndexed { i, para ->
                     // Drop caps are a Latin-type tradition; Arabic (and Hebrew) text opens plainly.
                     if (i == 0 && !RX_RTL.containsMatchIn(para.take(40))) DropCapParagraph(para) else BodyParagraph(para)
+                    Spacer(Modifier.height(16.dp))
+                }
+                if (s.content.embeds.isNotEmpty()) {
+                    EmbeddedPosts(s.content.embeds, actions.loadPost)
                     Spacer(Modifier.height(16.dp))
                 }
                 if (s.content.partial) {

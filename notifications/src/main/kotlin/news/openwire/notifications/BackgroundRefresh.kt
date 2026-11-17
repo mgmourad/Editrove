@@ -121,9 +121,20 @@ object Notifier {
      * Topic alerts pop up on screen (heads-up). Android never lets an app raise an existing
      * channel's importance, so this is a new channel; the old silent one is removed.
      */
-    const val CHANNEL = "headlines_alerts"
-    private const val OLD_CHANNEL = "headlines"
-    const val BREAKING = "breaking"
+    const val CHANNEL = "headlines_bell"
+    /** Earlier topic-alert channels (silent default / heads-up without Editrove's tone). */
+    private val OLD_CHANNELS = listOf("headlines", "headlines_alerts")
+    const val BREAKING = "breaking_sting"
+    private const val OLD_BREAKING = "breaking"
+
+    /** A bundled sound for a notification channel (played at notification volume). */
+    fun sound(context: Context, raw: Int): android.net.Uri =
+        android.net.Uri.parse("android.resource://${context.packageName}/$raw")
+
+    val SOUND_ATTRS: android.media.AudioAttributes = android.media.AudioAttributes.Builder()
+        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
+        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .build()
 
     fun canPost(context: Context): Boolean =
         Build.VERSION.SDK_INT < 33 ||
@@ -131,11 +142,12 @@ object Notifier {
 
     fun ensureChannel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        if (nm.getNotificationChannel(OLD_CHANNEL) != null) nm.deleteNotificationChannel(OLD_CHANNEL)
+        OLD_CHANNELS.forEach { if (nm.getNotificationChannel(it) != null) nm.deleteNotificationChannel(it) }
         if (nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(
                 NotificationChannel(CHANNEL, "New headlines", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "New stories in topics you follow"
+                    setSound(sound(context, R.raw.notify_bell), SOUND_ATTRS) // Editrove's bell
                 },
             )
         }
@@ -143,10 +155,12 @@ object Notifier {
 
     fun ensureBreakingChannel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        if (nm.getNotificationChannel(OLD_BREAKING) != null) nm.deleteNotificationChannel(OLD_BREAKING)
         if (nm.getNotificationChannel(BREAKING) == null) {
             nm.createNotificationChannel(
                 NotificationChannel(BREAKING, "Breaking news", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "Breaking stories from the newsrooms you follow"
+                    setSound(sound(context, R.raw.breaking_sting), SOUND_ATTRS) // the briefing's transition sting
                 },
             )
         }

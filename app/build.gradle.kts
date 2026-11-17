@@ -18,7 +18,8 @@ android {
 
         // Static host of the published topic snapshots (SPEC §8). Override with
         // -Popenwire.dataUrl=https://example.org/ (e.g. your own GitHub Pages copy).
-        val dataUrl = (project.findProperty("openwire.dataUrl") as String?) ?: "https://ansonlai.github.io/OpenWire/"
+        // Editrove's own GitHub Pages feed (rebuilt every 30 minutes by .github/workflows/pages.yml).
+        val dataUrl = (project.findProperty("openwire.dataUrl") as String?) ?: "https://mgmourad.github.io/Editrove/"
         buildConfigField("String", "DATA_BASE_URL", "\"$dataUrl\"")
         // Self-update from GitHub Releases. Store builds (e.g. F-Droid) pass -Popenwire.selfUpdate=false.
         val selfUpdate = (project.findProperty("openwire.selfUpdate") as String?)?.toBoolean() ?: true

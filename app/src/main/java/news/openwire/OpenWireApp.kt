@@ -33,6 +33,12 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
         container = AppContainer(this)
         // Scheduling and widget sync belong to the main process only (WorkManager lives there).
         if (!isMainProcess()) return
+        // Alert channels with Editrove's sounds: the bell, and the sting for breaking news.
+        runCatching {
+            news.openwire.notifications.Notifier.ensureChannel(this)
+            news.openwire.notifications.Notifier.ensureBreakingChannel(this)
+            news.openwire.briefing.BriefingReminders.ensureChannel(this)
+        }
         // Home-screen widgets follow the briefing player and saved stories.
         appScope.launch(Dispatchers.Main) {
             container.libraryStore.saved.collect { news.openwire.widget.WidgetSync.feedsChanged(this@OpenWireApp, delayMs = 300) }

@@ -11,6 +11,5 @@
         <item name="android:colorAccent">#FB3768</item>
         <item name="android:colorPrimary">#FB3768</item>
         <item name="android:colorBackground">#181A24</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
     </style>
 </resources>

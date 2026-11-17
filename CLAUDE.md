@@ -27,8 +27,8 @@ cover-screen Bento feed with floating pill nav and slide-up reader, and an
 unfolded rail + 50/50 feed/reader layout (owner preference over the mock's 38/62).
 
 Snapshot host: `BuildConfig.DATA_BASE_URL` (Gradle property `openwire.dataUrl`).
-`openwire.news` is currently a parked page; the default points at the original
-project's GitHub Pages feed until this fork publishes its own.
+The default is Editrove's own GitHub Pages feed (`https://mgmourad.github.io/Editrove/`),
+rebuilt every 30 minutes by `.github/workflows/pages.yml`.
 
 Release signing reads `signing/keystore.properties` or
 `~/.openwire/keystore.properties` (never committed).

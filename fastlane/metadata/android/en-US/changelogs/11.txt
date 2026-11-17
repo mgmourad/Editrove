@@ -7,3 +7,5 @@ Editrove 0.7.0 Beta 4 — Full articles again, scheduled briefings
 • Notifications pop up on screen, and no longer pile in when you open the app.
 • Scheduled briefings: set a Morning, Afternoon and Evening time in Settings › Audio briefing. Tap the notification and the latest briefing plays.
 • Seven new opening cues, and "English (United States) · IOM" as the default narrator.
+• New notification sounds: a soft bell for topic alerts and scheduled briefings, and the briefing's transition sting for breaking news.
+• Editrove now reads its own news feed, refreshed every 30 minutes.

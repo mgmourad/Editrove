@@ -2,4 +2,7 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <application>
+        <receiver android:name="news.openwire.notifications.RefreshAlarmReceiver" android:exported="false" />
+    </application>
 </manifest>

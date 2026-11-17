@@ -37,6 +37,11 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
         appScope.launch(Dispatchers.Main) {
             container.libraryStore.saved.collect { news.openwire.widget.WidgetSync.feedsChanged(this@OpenWireApp, delayMs = 300) }
         }
+        // Scheduled briefings follow their settings.
+        appScope.launch {
+            container.settingsRepository.settings.map { it.briefing.slots }.distinctUntilChanged()
+                .collect { news.openwire.briefing.BriefingReminders.schedule(this@OpenWireApp, it) }
+        }
         // Keep the periodic refresh in step with the user's preferences.
         appScope.launch {
             container.settingsRepository.settings

@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import java.util.Locale
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import news.openwire.ui.theme.Glass
 
@@ -205,6 +206,11 @@ class BriefingPlayer(
         } else run()
     }
 
+    /** Waits (up to [ms]) for the text-to-speech engine after a cold start. */
+    suspend fun awaitReady(ms: Long = 6_000) {
+        kotlinx.coroutines.withTimeoutOrNull(ms) { androidx.compose.runtime.snapshotFlow { ready }.first { it } }
+    }
+
     fun toggle() = if (playing) pause() else resume()
 
     fun pause() {
@@ -351,7 +357,8 @@ class BriefingPlayer(
     private fun speak(text: String, s: Int, from: Int = 0) {
         val p = prefs()
         tts.setSpeechRate(p.speed)
-        p.voice?.let { name -> runCatching { tts.voices?.firstOrNull { it.name == name } }.getOrNull()?.let { tts.voice = it } }
+        val all = runCatching { tts.voices }.getOrNull().orEmpty()
+        (p.voice?.let { name -> all.firstOrNull { it.name == name } } ?: BriefingVoices.preferred(all))?.let { tts.voice = it }
         // Lines become separate utterances with short anchor pauses between them.
         val parsed = parseLines(text)
         val chunks = parsed.map { it.first }
@@ -526,7 +533,11 @@ class BriefingPlayer(
     companion object {
         private val MEDIA = android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC).build()
         private val SPEECH = android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build()
-        val CUES = listOf(news.openwire.R.raw.news_opening_1, news.openwire.R.raw.news_opening_2, news.openwire.R.raw.news_opening_3, news.openwire.R.raw.news_opening_4)
+        val CUES = listOf(
+            news.openwire.R.raw.news_opening_1, news.openwire.R.raw.news_opening_2, news.openwire.R.raw.news_opening_3, news.openwire.R.raw.news_opening_4,
+            news.openwire.R.raw.news_opening_5, news.openwire.R.raw.news_opening_6, news.openwire.R.raw.news_opening_7, news.openwire.R.raw.news_opening_8,
+            news.openwire.R.raw.news_opening_9, news.openwire.R.raw.news_opening_10, news.openwire.R.raw.news_opening_11,
+        )
         private val R_TRANSITION = news.openwire.R.raw.transition
         private const val SENTENCE_BREAK = "\u2029"
         /** How long the cue plays alone before the anchor comes in. */
@@ -612,3 +623,20 @@ internal fun SkipButton(icon: androidx.compose.ui.graphics.vector.ImageVector, d
 
 // Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
 private val RX_1 = Regex("(?<=[.!?])\\s+")
+
+/**
+ * The default narrator: "English (United States) · IOM" (Google's en-us-x-iom), on-device
+ * first, then its network version, then another installed US English voice; else the
+ * phone's own default.
+ */
+object BriefingVoices {
+    const val DEFAULT_TAG = "IOM"
+
+    fun preferred(voices: Collection<android.speech.tts.Voice>): android.speech.tts.Voice? {
+        val usable = voices.filter { !it.features.orEmpty().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) }
+        return usable.firstOrNull { it.name.equals("en-us-x-iom-local", true) }
+            ?: usable.firstOrNull { it.name.startsWith("en-us-x-iom", true) }
+            ?: usable.filter { it.locale.language == "en" && it.locale.country == "US" && !it.isNetworkConnectionRequired }
+                .maxByOrNull { it.quality }
+    }
+}

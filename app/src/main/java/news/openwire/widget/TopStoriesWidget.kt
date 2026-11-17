@@ -50,7 +50,7 @@ class TopStoriesWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        provideContent { TopStories() }
+        provideContent { StoriesWidget(FeedSpec("TOP", "Top Stories", refreshable = false)) }
     }
 }
 
@@ -58,22 +58,79 @@ class TopStoriesWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = TopStoriesWidget()
 }
 
+/**
+ * Topic of Choice: the same front-page layouts as Top Stories, for the one topic picked
+ * when the widget was added, titled with that topic and with a refresh button.
+ */
+class TopicNewsWidget : GlanceAppWidget() {
+    override val sizeMode = SizeMode.Exact
+
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val widgetId = androidx.glance.appwidget.GlanceAppWidgetManager(context).getAppWidgetId(id)
+        val topicId = BriefWidgets.topicFor(context, TopicWidgetReceiver::class.java, widgetId)
+        val label = WidgetData.topics(context).firstOrNull { it.id == topicId }?.label ?: "Top Stories"
+        provideContent { StoriesWidget(FeedSpec(topicId, label, refreshable = true)) }
+    }
+}
+
+class TopicWidgetReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = TopicNewsWidget()
+}
+
+/** Which topic a stories widget shows and how it's titled. */
+internal data class FeedSpec(val topicId: String, val title: String, val refreshable: Boolean) {
+    val short: String get() = if (topicId == "TOP") "TOP" else title.substringBefore(',').uppercase().let { if (it.length > 14) it.take(13) + "…" else it }
+}
+
+/** Small round refresh button (a spinner while refreshing). */
 @Composable
-private fun TopStories() {
+internal fun RefreshButton(spec: FeedSpec, onPhoto: Boolean = false) {
+    if (!spec.refreshable) return
+    val busy = spec.topicId in WidgetSignals.refreshing
+    val bg = if (onPhoto) W.photoChip else W.chip
+    Box(
+        GlanceModifier.size(28.dp).background(bg).cornerRadius(14.dp)
+            .clickable(actionRunCallback<RefreshTopicAction>(actionParametersOf(RefreshTopicAction.TOPIC to spec.topicId))),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (busy) androidx.glance.appwidget.CircularProgressIndicator(GlanceModifier.size(16.dp), color = if (onPhoto) W.white else W.textSecondary)
+        else Image(ImageProvider(R.drawable.wic_refresh), contentDescription = "Refresh", colorFilter = androidx.glance.ColorFilter.tint(if (onPhoto) W.white else W.textSecondary), modifier = GlanceModifier.size(16.dp))
+    }
+}
+
+/** Refetches a widget's topic now. */
+class RefreshTopicAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        val topic = parameters[TOPIC] ?: return
+        WidgetSignals.refreshing = WidgetSignals.refreshing + topic
+        TopicNewsWidget().update(context, glanceId)
+        try {
+            WidgetData.refreshIfStale(context, topic, maxAgeMs = 0)
+        } finally {
+            WidgetSignals.refreshing = WidgetSignals.refreshing - topic
+            WidgetSignals.feedVersion++
+            TopicNewsWidget().update(context, glanceId)
+        }
+    }
+    companion object { val TOPIC = ActionParameters.Key<String>("topic") }
+}
+
+@Composable
+private fun StoriesWidget(spec: FeedSpec) {
     val context = LocalContext.current
     val version = WidgetSignals.feedVersion
-    val stories by produceState<List<WidgetStory>?>(null, version) { value = WidgetData.stories(context, "TOP", count = 7, px = 520, photos = 7) }
+    val stories by produceState<List<WidgetStory>?>(null, version, spec.topicId) { value = WidgetData.stories(context, spec.topicId, count = 7, px = 520, photos = 7) }
     val size = LocalSize.current
     Box(GlanceModifier.fillMaxSize().background(ImageProvider(R.drawable.widget_glass)).cornerRadius(W.SHELL)) {
         val list = stories
         when {
             list == null -> Loading()
-            list.isEmpty() -> Empty("Open Editrove once to load Top Stories.")
+            list.isEmpty() -> Empty("No ${spec.title} stories yet. Open Editrove or tap refresh.", spec)
             else -> when (SizeClass.of(size)) {
-                SizeClass.COMPACT -> CompactLead(list.first())
-                SizeClass.WIDE -> WideSplit(list, size.width)
-                SizeClass.EXPANDED -> Bento(list, size.width, size.height, columns = 2)
-                SizeClass.FOLD -> Bento(list, size.width, size.height, columns = 3)
+                SizeClass.COMPACT -> CompactLead(list.first(), spec)
+                SizeClass.WIDE -> WideSplit(list, size.width, spec)
+                SizeClass.EXPANDED -> Bento(list, size.width, size.height, columns = 2, spec)
+                SizeClass.FOLD -> Bento(list, size.width, size.height, columns = 3, spec)
             }
         }
     }
@@ -85,8 +142,9 @@ internal fun Loading() {
 }
 
 @Composable
-internal fun Empty(message: String) {
+internal fun Empty(message: String, spec: FeedSpec? = null) {
     Column(GlanceModifier.fillMaxSize().padding(16.dp).clickable(actionStartActivity(WidgetData.openApp(LocalContext.current))), verticalAlignment = Alignment.CenterVertically, horizontalAlignment = Alignment.CenterHorizontally) {
+        if (spec != null) RefreshButton(spec)
         Monogram(32.dp)
         Text(message, style = sans(12.sp), modifier = GlanceModifier.padding(top = 8.dp))
     }
@@ -107,7 +165,7 @@ internal fun PhotoLayer(story: WidgetStory, radius: Dp) {
 }
 
 @Composable
-private fun CompactLead(s: WidgetStory) {
+private fun CompactLead(s: WidgetStory, spec: FeedSpec) {
     val open = actionStartActivity(WidgetData.openIntent(LocalContext.current, s.article))
     Box(GlanceModifier.fillMaxSize().clickable(open)) {
         PhotoLayer(s, W.SHELL)
@@ -115,7 +173,8 @@ private fun CompactLead(s: WidgetStory) {
             Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Monogram(24.dp)
                 Spacer(GlanceModifier.defaultWeight())
-                Pill("TOP", W.onPhoto, W.photoChip)
+                Pill(spec.short, W.onPhoto, W.photoChip)
+                if (spec.refreshable) { Spacer(GlanceModifier.width(6.dp)); RefreshButton(spec, onPhoto = true) }
             }
             Spacer(GlanceModifier.defaultWeight())
             Text(s.source, style = mono(9.sp, W.onPhoto, bold = true), maxLines = 1)
@@ -125,7 +184,7 @@ private fun CompactLead(s: WidgetStory) {
 }
 
 @Composable
-private fun WideSplit(list: List<WidgetStory>, width: Dp) {
+private fun WideSplit(list: List<WidgetStory>, width: Dp, spec: FeedSpec) {
     val ctx = LocalContext.current
     val lead = list.first()
     val heroW = (width - 24.dp - 10.dp) * 0.52f
@@ -146,8 +205,8 @@ private fun WideSplit(list: List<WidgetStory>, width: Dp) {
         Spacer(GlanceModifier.width(10.dp))
         Column(GlanceModifier.defaultWeight().fillMaxHeight()) {
             Row(GlanceModifier.fillMaxWidth().padding(start = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(editionLabel(), style = mono(10.sp, W.textSecondary, bold = true), modifier = GlanceModifier.defaultWeight(), maxLines = 1)
-                Text("●", style = mono(9.sp, W.emerald))
+                Text(if (spec.refreshable) spec.title.uppercase() else editionLabel(), style = mono(10.sp, if (spec.refreshable) W.accent else W.textSecondary, bold = true), modifier = GlanceModifier.defaultWeight(), maxLines = 1)
+                if (spec.refreshable) RefreshButton(spec) else Text("●", style = mono(9.sp, W.emerald))
             }
             list.drop(1).take(2).forEachIndexed { i, s ->
                 if (i > 0) Spacer(GlanceModifier.height(6.dp))
@@ -164,9 +223,9 @@ private fun WideSplit(list: List<WidgetStory>, width: Dp) {
 }
 
 @Composable
-private fun Bento(list: List<WidgetStory>, width: Dp, height: Dp, columns: Int) {
+private fun Bento(list: List<WidgetStory>, width: Dp, height: Dp, columns: Int, spec: FeedSpec) {
     val ctx = LocalContext.current
-    val updated = (ctx.applicationContext as OpenWireApp).container.feedState.lastUpdated("TOP")
+    val updated = (ctx.applicationContext as OpenWireApp).container.feedState.lastUpdated(spec.topicId)
     val lead = list.first()
     val body = height - 32.dp - 34.dp
     val heroH = (body * if (columns == 3) 0.5f else 0.42f).coerceIn(118.dp, 200.dp)
@@ -176,8 +235,9 @@ private fun Bento(list: List<WidgetStory>, width: Dp, height: Dp, columns: Int) 
     Column(GlanceModifier.fillMaxSize().padding(16.dp)) {
         Row(GlanceModifier.fillMaxWidth().height(26.dp), verticalAlignment = Alignment.CenterVertically) {
             Monogram(24.dp)
-            Text("  Top Stories", style = serif(16.sp), modifier = GlanceModifier.defaultWeight(), maxLines = 1)
+            Text("  ${spec.title}", style = serif(16.sp), modifier = GlanceModifier.defaultWeight(), maxLines = 1)
             if (updated > 0) Pill("Updated ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(updated))}", W.textSecondary, W.chip, size = 10.sp)
+            if (spec.refreshable) { Spacer(GlanceModifier.width(6.dp)); RefreshButton(spec) }
         }
         Spacer(GlanceModifier.height(8.dp))
         // Lead hero banner
@@ -187,7 +247,7 @@ private fun Bento(list: List<WidgetStory>, width: Dp, height: Dp, columns: Int) 
                 Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Pill(lead.category.uppercase(), W.onPhoto, W.photoChip)
                     Spacer(GlanceModifier.defaultWeight())
-                    BookmarkButton(lead.saved, bookmark(lead), tint = W.white, bg = W.photoChip)
+                    BookmarkButton(lead.saved, bookmark(lead, spec.topicId), tint = W.white, bg = W.photoChip)
                 }
                 Spacer(GlanceModifier.defaultWeight())
                 Text("${lead.source} · ${lead.age}", style = mono(9.sp, W.onPhoto, bold = true), maxLines = 1)
@@ -201,7 +261,7 @@ private fun Bento(list: List<WidgetStory>, width: Dp, height: Dp, columns: Int) 
                 for (c in 0 until columns) {
                     if (c > 0) Spacer(GlanceModifier.width(8.dp))
                     val s = cards.getOrNull(r * columns + c)
-                    Box(GlanceModifier.defaultWeight().fillMaxHeight()) { if (s != null) StoryCard(s, titleLines, photoHeight = if (cardH >= 160.dp && s.photo != null) cardH - 104.dp else 0.dp, thumb = cardH >= 112.dp) }
+                    Box(GlanceModifier.defaultWeight().fillMaxHeight()) { if (s != null) StoryCard(s, titleLines, topicId = spec.topicId, photoHeight = if (cardH >= 160.dp && s.photo != null) cardH - 104.dp else 0.dp, thumb = cardH >= 112.dp) }
                 }
             }
         }
@@ -210,7 +270,7 @@ private fun Bento(list: List<WidgetStory>, width: Dp, height: Dp, columns: Int) 
 
 /** Bento card: thumbnail, source · time, serif headline, bookmark. */
 @Composable
-private fun StoryCard(s: WidgetStory, titleLines: Int, photoHeight: Dp = 0.dp, thumb: Boolean = true) {
+private fun StoryCard(s: WidgetStory, titleLines: Int, photoHeight: Dp = 0.dp, thumb: Boolean = true, topicId: String = "TOP") {
     val ctx = LocalContext.current
     Column(
         GlanceModifier.fillMaxSize().background(ImageProvider(R.drawable.widget_card)).cornerRadius(W.CARD).padding(8.dp)
@@ -230,13 +290,13 @@ private fun StoryCard(s: WidgetStory, titleLines: Int, photoHeight: Dp = 0.dp, t
                 Text(s.source, style = mono(9.sp, W.indigo, bold = true), maxLines = 1)
                 Text(s.age, style = mono(9.sp, W.textMuted), maxLines = 1)
             }
-            BookmarkButton(s.saved, bookmark(s), diameter = 26.dp)
+            BookmarkButton(s.saved, bookmark(s, topicId), diameter = 26.dp)
         }
         Text(s.article.title, style = serif(12.5.sp), maxLines = titleLines, modifier = GlanceModifier.padding(top = 6.dp))
     }
 }
 
-private fun bookmark(s: WidgetStory) = actionRunCallback<BookmarkAction>(actionParametersOf(BookmarkAction.ID to s.article.id, BookmarkAction.TOPIC to "TOP"))
+private fun bookmark(s: WidgetStory, topicId: String) = actionRunCallback<BookmarkAction>(actionParametersOf(BookmarkAction.ID to s.article.id, BookmarkAction.TOPIC to topicId))
 
 /** Saves / unsaves a story straight from the widget (the app's Saved tab updates too). */
 class BookmarkAction : ActionCallback {

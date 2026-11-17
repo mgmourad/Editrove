@@ -57,7 +57,10 @@ import news.openwire.ui.home.mono
 import news.openwire.ui.home.sans
 import news.openwire.ui.theme.Glass
 
-private val CUE_NAMES = listOf("Headline News", "Global Desk", "Breaking", "Evening Edition")
+private val CUE_NAMES = listOf(
+    "Headline News", "Global Desk", "Breaking", "Evening Edition",
+    "Newsroom", "Bulletin", "Top of the Hour", "Wire", "Special Report", "Newsflash", "News Intro",
+)
 
 /** Settings › Audio briefing. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -94,7 +97,7 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
     fun preview(voice: Voice?) {
         tts.stop()
         tts.setSpeechRate(p.speed)
-        if (voice != null) tts.voice = voice else tts.defaultVoice?.let { tts.voice = it }
+        (voice ?: news.openwire.ui.home.BriefingVoices.preferred(runCatching { tts.voices }.getOrNull().orEmpty()) ?: tts.defaultVoice)?.let { tts.voice = it }
         tts.speak("Good evening. This is your Top Stories briefing from Editrove.", TextToSpeech.QUEUE_FLUSH, null, "preview")
     }
 
@@ -103,6 +106,38 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
             "Your briefing is read by your phone's own text-to-speech voice with a news-anchor script, an opening cue and transition stings. Nothing leaves your device.",
             style = sans(12.sp, lineHeight = 18.sp), color = g.textSecondary, modifier = Modifier.padding(horizontal = 4.dp),
         )
+
+        Section("Scheduled briefings") {
+            Text("At each time you'll get a notification. Tap it and Editrove fetches the latest Top Stories and starts playing.", style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary)
+            Spacer(Modifier.height(6.dp))
+            p.slots.forEach { slot ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(slot.kind.label, style = sans(14.sp, FontWeight.Medium), color = g.textPrimary)
+                        Text(
+                            java.time.LocalTime.of(slot.hour, slot.minute).format(java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)),
+                            style = mono(13.sp, FontWeight.SemiBold), color = if (slot.enabled) g.accentSoft else g.textSecondary,
+                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
+                                android.app.TimePickerDialog(context, news.openwire.R.style.Editrove_TimePicker, { _, h, m ->
+                                    vm.setBriefing { b -> b.copy(slots = b.slots.map { if (it.kind == slot.kind) it.copy(minuteOfDay = h * 60 + m, enabled = true) else it }) }
+                                }, slot.hour, slot.minute, android.text.format.DateFormat.is24HourFormat(context)).show()
+                            }.padding(vertical = 4.dp),
+                        )
+                    }
+                    switch(slot.enabled) { on -> vm.setBriefing { b -> b.copy(slots = b.slots.map { if (it.kind == slot.kind) it.copy(enabled = on) else it }) } }
+                }
+            }
+            if (p.slots.any { it.enabled } && !news.openwire.briefing.BriefingReminders.canExact(context)) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Briefings may arrive up to 10 minutes late. Tap to allow exact timing.",
+                    style = sans(11.sp, FontWeight.Medium), color = g.accentSoft,
+                    modifier = Modifier.clickable {
+                        runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, android.net.Uri.parse("package:${context.packageName}"))) }
+                    },
+                )
+            }
+        }
 
         Section("Detail") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -158,11 +193,11 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
                 switch(p.stings) { on -> vm.setBriefing { it.copy(stings = on) } }
             }
             Spacer(Modifier.height(6.dp))
-            Text("Music: royalty-free from Fesliyan Studios.", style = sans(10.sp), color = g.textMuted)
+            Text("Music: royalty-free from Fesliyan Studios and Pixabay.", style = sans(10.sp), color = g.textMuted)
         }
 
         Section("Voice") {
-            OptionRow("System default", null, p.voice == null, playing = false, onPreview = { preview(null) }) { vm.setBriefing { it.copy(voice = null) } }
+            OptionRow("Editrove default", "English (United States) · IOM, or the closest installed voice", p.voice == null, playing = false, onPreview = { preview(null) }) { vm.setBriefing { it.copy(voice = null) } }
             if (!ready) Text("Loading voices…", style = sans(12.sp), color = g.textSecondary, modifier = Modifier.padding(vertical = 8.dp))
             voices.forEach { v ->
                 OptionRow(voiceLabel(v), voiceDetail(v), p.voice == v.name, playing = false, onPreview = { preview(v) }) { vm.setBriefing { it.copy(voice = v.name) } }

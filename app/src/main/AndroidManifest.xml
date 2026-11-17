@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:name=".OpenWireApp"
         android:networkSecurityConfig="@xml/network_security_config"
@@ -46,6 +49,17 @@
             </intent-filter>
         </activity>
         <receiver android:name="news.openwire.update.InstallResultReceiver" android:exported="false" />
+
+        <!-- Morning / Afternoon / Evening briefing reminders. -->
+        <receiver android:name="news.openwire.briefing.BriefingReminderReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Home-screen widgets: Top Stories (Jetpack Glance); Daily Brief and Topic of Choice (RemoteViews). -->
         <activity

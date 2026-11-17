@@ -59,6 +59,8 @@ class FeedRepositoryImpl(
     private val interests: () -> List<String> = { emptyList() },
     /** A topic's cache was rewritten (home-screen widgets redraw). */
     private val onStored: (String) -> Unit = {},
+    /** news.google.com wrapper → the publisher's own URL (null if it can't be found). */
+    private val resolveLink: suspend (String) -> String? = { null },
 ) : FeedRepository {
 
     private val norm: (String) -> String = { registry.normalizeDomain(it) }
@@ -95,6 +97,33 @@ class FeedRepositoryImpl(
     private suspend fun cached(topicId: String): List<Article> =
         runCatching { dao.getByTopic(topicId).map { it.toArticle() } }.getOrDefault(emptyList())
 
+    /**
+     * Swaps Google News wrapper links for the publisher's own (and routes them around the
+     * paywall), so the reader, photos, "Continue on…" and briefings all use the real article.
+     */
+    private suspend fun withPublisherLinks(articles: List<Article>): List<Article> {
+        val wrapped = articles.take(RESOLVE_LIMIT).filter { GoogleNewsUrls.isGoogleNewsUrl(it.originalUrl) }
+        if (wrapped.isEmpty()) return articles
+        val found = coroutineScope {
+            wrapped.map { a -> async { a.id to runCatching { resolveLink(a.originalUrl!!) }.getOrNull() } }.awaitAll()
+        }.toMap()
+        if (found.values.all { it == null }) return articles
+        return articles.map { a ->
+            val url = found[a.id] ?: return@map a
+            if (GoogleNewsUrls.isGoogleNewsUrl(url)) a
+            else StrategyRouter.applyStrategy(registry, a.copy(originalUrl = url, domain = registry.normalizeDomain(url).ifEmpty { a.domain }, targetUrl = null, badge = null, status = null))
+        }
+    }
+
+    /** Emits [list] again once its Google links are swapped for publisher links (if any changed). */
+    private suspend fun FlowCollector<FeedResult>.resolveAndEmit(topicId: String, list: List<Article>, updatedAt: Long, failed: List<String> = emptyList()) {
+        val resolved = withPublisherLinks(list)
+        if (resolved != list) {
+            store(topicId, resolved)
+            emit(FeedResult.Success(resolved, fromCache = false, updatedAt = updatedAt, failedSources = failed))
+        }
+    }
+
     private suspend fun store(topicId: String, articles: List<Article>) {
         runCatching { dao.replaceTopic(topicId, articles.mapIndexed { i, a -> a.toEntity(topicId, i) }) }
         feedState?.markUpdated(topicId, clock())
@@ -117,6 +146,7 @@ class FeedRepositoryImpl(
             val ranked = if (woven === published) fresh else rank(topic, woven)
             store(topic.id, ranked)
             if (ranked !== fresh) emit(FeedResult.Success(ranked, fromCache = false, updatedAt = clock()))
+            resolveAndEmit(topic.id, ranked, clock())
         } catch (e: Exception) {
             Log.w(TAG, "Snapshot ${topic.id} failed", e)
             if (cached.isEmpty()) emit(FeedResult.Error(e.message ?: "Network error"))
@@ -238,7 +268,9 @@ class FeedRepositoryImpl(
             return
         }
         store(topic.id, woven)
-        emit(FeedResult.Success(woven, fromCache = false, updatedAt = clock(), failedSources = results.filter { it.error != null }.map { it.source.name }))
+        val failedNames = results.filter { it.error != null }.map { it.source.name }
+        emit(FeedResult.Success(woven, fromCache = false, updatedAt = clock(), failedSources = failedNames))
+        resolveAndEmit(topic.id, woven, clock(), failedNames)
     }
 
     override suspend fun verifyFeed(url: String): FeedCheck = try {
@@ -258,5 +290,9 @@ class FeedRepositoryImpl(
         FeedCheck(ok = false, error = e.message ?: "Unable to retrieve headlines.")
     }
 
-    private companion object { const val TAG = "Editrove" }
+    private companion object {
+        const val TAG = "Editrove"
+        /** Google links resolved per refresh (the stories people actually see). */
+        const val RESOLVE_LIMIT = 40
+    }
 }

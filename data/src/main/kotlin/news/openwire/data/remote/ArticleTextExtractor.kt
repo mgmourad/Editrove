@@ -3,6 +3,7 @@ package news.openwire.data.remote
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -208,6 +209,37 @@ class ArticleTextExtractor(
         return BOILERPLATE.any { it in l }
     }
 
+    private val previews = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /**
+     * A short opening for a feed card: the publisher's standfirst, else the story's first
+     * paragraph. One plain page fetch (no browser render or archive race), cached.
+     */
+    suspend fun preview(link: String, title: String): String? {
+        previews[link]?.let { return it.ifEmpty { null } }
+        val url = if (news.openwire.domain.engine.GoogleNewsUrls.isGoogleNewsUrl(link)) resolveLink(link) ?: return null else link
+        fun pick(c: ArticleContent?) = (listOfNotNull(c?.description) + c?.paragraphs?.take(3).orEmpty())
+            .map { it.trim() }
+            .firstOrNull { it.length > 40 && news.openwire.domain.engine.FeedWeaver.calculateTitleSimilarity(it, title) < 0.7 && aboutTitle(it, title) }
+        // A plain fetch first; pages built by scripts get the reader's full extraction.
+        val text = pick(withTimeoutOrNull(8_000) { extractFrom(url) }) ?: pick(withTimeoutOrNull(20_000) { extract(url) })
+        previews[link] = text.orEmpty()
+        return text
+    }
+
+    /**
+     * True when [text] is about the headline: it shares at least two of the headline's
+     * significant words (one for very short headlines). Pages read without scripts sometimes
+     * offer another story's opening (a "most read" box), and a card must never show that.
+     */
+    internal fun aboutTitle(text: String, title: String): Boolean {
+        fun words(t: String) = RX_WORDS.findAll(t.lowercase()).map { it.value }.filter { it.length >= 4 }.toSet()
+        val head = words(title)
+        if (head.isEmpty()) return false
+        val shared = head.count { w -> w in words(text) || words(text).any { it.startsWith(w.take(5)) && w.length >= 5 } }
+        return shared >= if (head.size < 4) 1 else 2
+    }
+
     private suspend fun extractFrom(url: String): ArticleContent? = withContext(Dispatchers.IO) {
         try {
             get(url)?.let { parse(it) }
@@ -333,3 +365,5 @@ private val DATELINE = Regex("\\b[A-Z][A-Z .,'’-]{2,40}\\s*\\([^)]{2,40}\\)\\s
 private val ARTICLE_BODY = Regex("\"articleBody\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
 private val SENTENCE = Regex("(?<=[.!?])\\s+(?=[A-Z\"“])")
 private val PARA_BREAK = Regex("\\n\\s*\\n|\\n")
+
+private val RX_WORDS = Regex("\\p{L}+")

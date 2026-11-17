@@ -380,4 +380,9 @@
     <string name="region_german">En el mundo germanohablante</string>
     <string name="region_spanish">En el mundo hispanohablante</string>
     <string name="region_hint">Canales y agencias que cubren toda la región. Se suman a la portada e Internacional cuando escriben en el idioma de Editrove.</string>
+    <string name="voice_ready">Hay una voz en %1$s lista para tus resúmenes.</string>
+    <string name="voice_downloading">Descargando una voz en %1$s para tus resúmenes…</string>
+    <string name="voice_missing">Aún no hay ninguna voz en %1$s instalada.</string>
+    <string name="voice_unsupported">El motor de voz no tiene voz en %1$s.</string>
+    <string name="voice_install">Instalar voz</string>
 </resources>

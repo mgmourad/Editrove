@@ -46,6 +46,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
+import news.openwire.domain.engine.FeedWeaver
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -623,9 +625,17 @@ fun LeadStoryCard(
                         style = serif(30.sp, FontWeight.Bold, lineHeight = 34.sp, tracking = (-0.01).em),
                         color = g.textPrimary, maxLines = 5, overflow = TextOverflow.Ellipsis,
                     )
-                    article.summary?.takeIf { it.isNotBlank() }?.let {
-                        Spacer(Modifier.height(10.dp))
-                        Text(it, style = sans(14.sp, lineHeight = 21.sp), color = g.textSecondary, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                    // The feed's excerpt, or (Google items carry none) the story's opening from its page.
+                    val excerpt = article.summary?.takeIf { it.isNotBlank() && FeedWeaver.calculateTitleSimilarity(it, article.title) < 0.7 }
+                    val loader = LocalArticlePreview.current
+                    val opening by produceState(excerpt, article.id) {
+                        if (value == null && loader != null) value = runCatching { loader(article) }.getOrNull()
+                    }
+                    androidx.compose.animation.AnimatedVisibility(opening != null, enter = androidx.compose.animation.fadeIn()) {
+                        Column {
+                            Spacer(Modifier.height(10.dp))
+                            Text(opening.orEmpty(), style = sans(14.sp, lineHeight = 21.sp), color = g.textSecondary, maxLines = 6, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                     article.coverageLine(3)?.let {
                         Spacer(Modifier.height(10.dp))
@@ -729,6 +739,9 @@ fun BentoCard(
 }
 
 /** Resolves missing lead photos from the article page (js/imageService.js). */
+/** Loads a story's opening lines for cards whose feed gave no excerpt. */
+val LocalArticlePreview = androidx.compose.runtime.staticCompositionLocalOf<(suspend (Article) -> String?)?> { null }
+
 val LocalImageResolver = androidx.compose.runtime.staticCompositionLocalOf<news.openwire.data.remote.ImageResolver?> { null }
 
 private val GrayscaleFilter = androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) })

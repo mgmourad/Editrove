@@ -373,7 +373,8 @@ internal fun ArticleBody(
                     }
                 }
                 s.content.paragraphs.forEachIndexed { i, para ->
-                    if (i == 0) DropCapParagraph(para) else BodyParagraph(para)
+                    // Drop caps are a Latin-type tradition; Arabic (and Hebrew) text opens plainly.
+                    if (i == 0 && !RX_RTL.containsMatchIn(para.take(40))) DropCapParagraph(para) else BodyParagraph(para)
                     Spacer(Modifier.height(16.dp))
                 }
                 if (s.content.partial) {
@@ -608,3 +609,5 @@ internal fun rememberNarrator(context: Context): Narrator {
 
 // Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
 private val RX_1 = Regex("(?<=[.!?])\\s+")
+
+private val RX_RTL = Regex("[\\u0590-\\u08FF]")

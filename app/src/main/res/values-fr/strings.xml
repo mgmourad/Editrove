@@ -380,4 +380,9 @@
     <string name="region_german">Dans le monde germanophone</string>
     <string name="region_spanish">Dans le monde hispanophone</string>
     <string name="region_hint">Chaînes et agences qui couvrent toute la région. Elles rejoignent la une et International lorsqu’elles écrivent dans la langue d’Editrove.</string>
+    <string name="voice_ready">Une voix %1$s est prête pour vos briefs.</string>
+    <string name="voice_downloading">Téléchargement d’une voix %1$s pour vos briefs…</string>
+    <string name="voice_missing">Aucune voix %1$s n’est encore installée.</string>
+    <string name="voice_unsupported">Le moteur vocal n’a pas de voix %1$s.</string>
+    <string name="voice_install">Installer la voix</string>
 </resources>

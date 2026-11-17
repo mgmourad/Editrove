@@ -146,7 +146,9 @@ class BriefingPlayer(
     /** The language the current briefing is read in. */
     private var lang: String = "en"
 
-    private val tts: TextToSpeech = TextToSpeech(app) { status -> ready = status == TextToSpeech.SUCCESS }.apply {
+    // Google's engine when installed: it holds the default narrator and downloadable voices
+    // in every language (the phone's default may be another maker's engine).
+    private val tts: TextToSpeech = TextToSpeech(app, { status -> ready = status == TextToSpeech.SUCCESS }, news.openwire.i18n.VoiceSetup.engine(app)).apply {
         setAudioAttributes(SPEECH)
         setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {

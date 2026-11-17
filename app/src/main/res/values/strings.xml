@@ -382,4 +382,9 @@
     <string name="region_german">Across the German-speaking world</string>
     <string name="region_spanish">Across the Spanish-speaking world</string>
     <string name="region_hint">Channels and agencies that cover the whole region. They join Top Stories and International when they write in Editrove\'s language.</string>
+    <string name="voice_ready">A %1$s voice is ready for your briefings.</string>
+    <string name="voice_downloading">Downloading a %1$s voice for your briefings…</string>
+    <string name="voice_missing">No %1$s voice is installed yet.</string>
+    <string name="voice_unsupported">The speech engine has no %1$s voice.</string>
+    <string name="voice_install">Install voice</string>
 </resources>

@@ -75,7 +75,20 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
 
     // A private engine for listing voices and previews.
     var ready by remember { mutableStateOf(false) }
-    val tts = remember { TextToSpeech(context.applicationContext) { ready = it == TextToSpeech.SUCCESS } }
+    val tts = remember { TextToSpeech(context.applicationContext, { ready = it == TextToSpeech.SUCCESS }, news.openwire.i18n.VoiceSetup.engine(context)) }
+    // A voice in Editrove's language: fetched automatically when the engine has one to download.
+    val appLang = news.openwire.domain.engine.Languages.effective(s.language)
+    var voiceState by remember { mutableStateOf<news.openwire.i18n.VoiceSetup.State?>(null) }
+    var voiceCheck by remember { mutableIntStateOf(0) }
+    LaunchedEffect(appLang, voiceCheck) {
+        if (appLang == "en") return@LaunchedEffect
+        voiceState = news.openwire.i18n.VoiceSetup.ensure(context, appLang, s.edition.country)
+        // While it downloads, look again now and then.
+        while (voiceState == news.openwire.i18n.VoiceSetup.State.DOWNLOADING) {
+            delay(5_000)
+            voiceState = news.openwire.i18n.VoiceSetup.ensure(context, appLang, s.edition.country)
+        }
+    }
     var cuePlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var cuePlaying by remember { mutableIntStateOf(0) }
     DisposableEffect(Unit) { onDispose { tts.stop(); tts.shutdown(); cuePlayer?.release() } }
@@ -99,8 +112,13 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
     fun preview(voice: Voice?) {
         tts.stop()
         tts.setSpeechRate(p.speed)
-        (voice ?: news.openwire.ui.home.BriefingVoices.preferred(runCatching { tts.voices }.getOrNull().orEmpty()) ?: tts.defaultVoice)?.let { tts.voice = it }
-        tts.speak("Good evening. This is your Top Stories briefing from Editrove.", TextToSpeech.QUEUE_FLUSH, null, "preview")
+        val lang = voice?.locale?.language ?: appLang
+        (voice ?: news.openwire.ui.home.BriefingVoices.preferred(runCatching { tts.voices }.getOrNull().orEmpty(), lang) ?: tts.defaultVoice)?.let { tts.voice = it }
+        val sample = news.openwire.domain.engine.BriefingScript.intro(
+            news.openwire.domain.engine.Languages.topicName("TOP", lang) ?: "Top Stories", 8,
+            news.openwire.domain.model.BriefingDetail.HEADLINES, java.time.LocalDateTime.now(), lang,
+        )
+        tts.speak(sample, TextToSpeech.QUEUE_FLUSH, null, "preview")
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -199,6 +217,24 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
         }
 
         Section(tr(R.string.voice)) {
+            voiceState?.let { st ->
+                val name = news.openwire.domain.engine.Languages.of(appLang)?.nativeName ?: appLang
+                val (msg, action) = when (st) {
+                    news.openwire.i18n.VoiceSetup.State.READY -> tr(R.string.voice_ready, name) to null
+                    news.openwire.i18n.VoiceSetup.State.DOWNLOADING -> tr(R.string.voice_downloading, name) to null
+                    news.openwire.i18n.VoiceSetup.State.MISSING -> tr(R.string.voice_missing, name) to tr(R.string.voice_install)
+                    news.openwire.i18n.VoiceSetup.State.UNSUPPORTED -> tr(R.string.voice_unsupported, name) to tr(R.string.voice_install)
+                }
+                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(msg, style = sans(12.sp, FontWeight.Medium, lineHeight = 17.sp), color = if (st == news.openwire.i18n.VoiceSetup.State.READY) g.textSecondary else g.accentSoft, modifier = Modifier.weight(1f))
+                    if (action != null) Text(
+                        action, style = sans(12.sp, FontWeight.SemiBold), color = g.textPrimary,
+                        modifier = Modifier.padding(start = 8.dp).clip(CircleShape).background(g.chipFill)
+                            .clickable { runCatching { context.startActivity(news.openwire.i18n.VoiceSetup.installIntent()) }; voiceCheck++ }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                    )
+                }
+            }
             OptionRow(tr(R.string.voice_default), tr(R.string.voice_default_hint), p.voice == null, playing = false, onPreview = { preview(null) }) { vm.setBriefing { it.copy(voice = null) } }
             if (!ready) Text(tr(R.string.loading_voices), style = sans(12.sp), color = g.textSecondary, modifier = Modifier.padding(vertical = 8.dp))
             voices.forEach { v ->

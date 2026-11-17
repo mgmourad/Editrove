@@ -380,4 +380,9 @@
     <string name="region_german">Im deutschsprachigen Raum</string>
     <string name="region_spanish">In der spanischsprachigen Welt</string>
     <string name="region_hint">Sender und Agenturen, die die ganze Region abdecken. Sie erscheinen in den Topmeldungen und unter International, wenn sie in der Sprache von Editrove schreiben.</string>
+    <string name="voice_ready">Eine Stimme auf %1$s ist für deine Briefings bereit.</string>
+    <string name="voice_downloading">Eine Stimme auf %1$s wird für deine Briefings geladen…</string>
+    <string name="voice_missing">Noch keine Stimme auf %1$s installiert.</string>
+    <string name="voice_unsupported">Die Sprachausgabe hat keine Stimme auf %1$s.</string>
+    <string name="voice_install">Stimme installieren</string>
 </resources>

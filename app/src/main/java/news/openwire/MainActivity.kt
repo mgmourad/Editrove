@@ -69,6 +69,15 @@ class MainActivity : ComponentActivity() {
         news.openwire.i18n.AppLocale.systemChoice(this)?.let { sys ->
             if (sys != container.settingsRepository.settings.value.language) container.settingsRepository.update { it.copy(language = sys) }
         }
+        // Editrove in another language: make sure the briefing has a voice in it (fetched once).
+        container.settingsRepository.settings.value.let { st ->
+            val lang = news.openwire.domain.engine.Languages.effective(st.language)
+            val prefs = getSharedPreferences("voice_setup", MODE_PRIVATE)
+            if (lang != "en" && !prefs.getBoolean(lang, false)) lifecycleScope.launch {
+                val state = news.openwire.i18n.VoiceSetup.ensure(this@MainActivity, lang, st.edition.country)
+                if (state == news.openwire.i18n.VoiceSetup.State.READY) prefs.edit().putBoolean(lang, true).apply()
+            }
+        }
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val mode by vm.themeMode.collectAsState()

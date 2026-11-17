@@ -29,4 +29,13 @@ class ArticleTextExtractorTest {
         assertTrue(ps.first().startsWith("WASHINGTON (DC News Now) — Service for Amtrak"))
         assertFalse(ps.any { it.contains("Nexstar") || it.contains("Related:") || it.contains("Menu and sections") })
     }
+
+    @Test
+    fun previewMustBeAboutTheHeadline() {
+        val x = ArticleTextExtractor(okhttp3.OkHttpClient())
+        val title = "مصير طاقم ناقلة مجهول بعد هجوم ثان بمضيق هرمز"
+        assertTrue(x.aboutTitle("قالت هيئة عمليات التجارة البحرية البريطانية إن مصير طاقم ناقلة تعرضت لهجوم ثان أثناء عبورها مضيق هرمز لا يزال مجهولا", title))
+        assertFalse(x.aboutTitle("أعربت جمهورية مصر العربية عن إدانتها واستنكارها البالغين للاعتداءات التي استهدفت مملكة البحرين", title))
+        assertTrue(x.aboutTitle("Marine Le Pen presented her pension reform plan on Tuesday.", "Le Pen unveils pension reform"))
+    }
 }

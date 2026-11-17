@@ -306,10 +306,13 @@ fun LazyGridScope.feedItems(
     archive: Map<String, ArchiveState> = emptyMap(),
     /** Full view: magazine lead card and multi-column grid with feature cards. */
     magazine: Boolean = false,
+    /** Business tab: the market-watch bar under the LIVE ticker. */
+    marketWatch: Boolean = false,
 ) {
     if (articles.isEmpty()) return
     fun state(a: Article) = a.originalUrl?.let { archive[it] }
     if (showTicker) fullRow("ticker") { LiveTicker(articles, onOpen) }
+    if (showTicker && marketWatch) fullRow("markets") { MarketBar() }
     val hero = articles.first()
     fullRow("hero-${hero.id}") {
         if (magazine) LeadStoryCard(

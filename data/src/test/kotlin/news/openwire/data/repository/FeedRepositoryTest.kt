@@ -29,7 +29,7 @@ class FeedRepositoryTest {
         }
     }
 
-    private class FakeArticleDao : ArticleDao {
+    internal class FakeArticleDao : ArticleDao {
         val store = mutableMapOf<String, List<ArticleEntity>>()
         override suspend fun getByTopic(topicId: String): List<ArticleEntity> = store[topicId] ?: emptyList()
         override suspend fun upsertAll(articles: List<ArticleEntity>) {
@@ -93,5 +93,21 @@ class FeedRepositoryTest {
     fun liveOnlyTopicReturnsEmpty() = runTest {
         val results = repo(FakeNewsRemote()).observeTopic(topic(snapshotFile = null, liveOnly = true)).toList()
         assertTrue(results.last() is FeedResult.Empty)
+    }
+
+    @Test
+    fun disablingOneSourceKeepsTheRestOfThePublishedTopic() = runTest {
+        val remote = FakeNewsRemote(
+            listOf(
+                ArticleDto(id = "a", title = "Film festival opens in Venice", domain = "variety.com", originalUrl = "https://variety.com/a"),
+                ArticleDto(id = "b", title = "Album tops the charts again", domain = "billboard.com", originalUrl = "https://billboard.com/b", feedUrl = "http://127.0.0.1:9/billboard.rss"),
+                ArticleDto(id = "c", title = "Studio announces sequel", domain = "deadline.com", originalUrl = "https://deadline.com/c"),
+            ),
+        )
+        val off = news.openwire.domain.model.FeedSource("billboard", "Billboard", "http://127.0.0.1:9/billboard.rss", "billboard.com", listOf("ENTERTAINMENT"))
+        val settings = news.openwire.domain.model.UserSettings(disabledSources = setOf(news.openwire.domain.engine.SourceLibrary.sourceKey(off)))
+        val repo = FeedRepositoryImpl(remote, GoogleNewsRssSource(), RssNormalizer(DomainRegistry()), FakeArticleDao(), settings = { settings }, catalog = { listOf(off) })
+        val last = repo.observeTopic(Topic("ENTERTAINMENT", "Entertainment", snapshotFile = "news_entertainment.json"), force = true).toList().last() as FeedResult.Success
+        assertEquals(setOf("a", "c"), last.articles.map { it.id }.toSet())
     }
 }

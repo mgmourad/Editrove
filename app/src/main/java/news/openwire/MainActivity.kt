@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
                     settingsRepo = container.settingsRepository,
                     registry = container.domainRegistry,
                     archiveLookup = { container.archiveFor(it) },
+                    resolveLink = { container.googleLinks.resolve(it) },
                 )
             }
         }

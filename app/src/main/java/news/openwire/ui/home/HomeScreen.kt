@@ -194,7 +194,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
     val briefing = rememberBriefingPlayer()
     val userSettings by vm.settings.collectAsState()
 
-    CompositionLocalProvider(LocalImageResolver provides app.container.imageResolver, LocalLogoResolver provides app.container.logoResolver, LocalBriefingPlayer provides briefing) {
+    CompositionLocalProvider(LocalImageResolver provides app.container.imageResolver, LocalLogoResolver provides app.container.logoResolver, LocalMarkets provides app.container.markets, LocalBriefingPlayer provides briefing) {
     SharedTransitionLayout {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= ExpandedBreakpoint
@@ -527,6 +527,7 @@ private fun TabFeed(
                 selectedId = ui.selectedId, savedIds = ui.savedIds, likedIds = ui.likedIds,
                 onOpen = onOpen, onToggleSaved = { vm.toggleSaved(it) }, onToggleLiked = { vm.toggleLiked(it) },
                 showTicker = ticker, sectionTitle = title, magazine = magazine,
+                marketWatch = ticker && topic.id == "BUSINESS",
             )
             when (t) {
                 NavTab.TODAY, NavTab.AUDIO -> {

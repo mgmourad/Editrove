@@ -3,6 +3,8 @@ package news.openwire.data.remote
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
@@ -74,8 +76,20 @@ class ArticleTextExtractor(
     private val resolveLink: suspend (String) -> String? = { null },
     /** Loads a page the way a browser does (for sites that refuse plain HTTP clients). */
     private val renderPage: suspend (String) -> String? = { null },
+    /** True for hard/metered-paywall publishers (from the paywall registry). */
+    private val isPaywalled: (String) -> Boolean = { false },
+    /** Logs each extraction's source, size and time (diagnostics). */
+    private val diagnostics: Boolean = false,
 ) {
     private companion object {
+        const val MOBILE_UA = "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
+        const val DESKTOP_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+        /** Longest the reader waits for a complete article before showing the best partial. */
+        const val BUDGET_MS = 20_000L
+        /** A paywalled publisher page at least this long is the full article, not a teaser. */
+        const val PAYWALL_FULL_CHARS = 2_500
+        /** How long archives get once a paywall teaser is in hand. */
+        const val TEASER_GRACE_MS = 6_000L
         /** Site chrome that leaks into `<p>` tags (comment prompts, newsletter and cookie banners…). */
         val BOILERPLATE = listOf(
             "commenting policy", "sign up for", "newsletter", "subscribe to", "all rights reserved",
@@ -92,25 +106,80 @@ class ArticleTextExtractor(
         )
     }
 
-    private fun complete(c: ArticleContent?): Boolean =
-        c != null && c.text.length >= 900 && c.paragraphs.size >= 4 &&
-            PAYWALL_HINTS.none { c.text.lowercase().contains(it) }
+    private fun complete(c: ArticleContent?, paywalled: Boolean = true): Boolean {
+        if (c == null || PAYWALL_HINTS.any { c.text.lowercase().contains(it) }) return false
+        // Paywalled sites tease a few paragraphs, so they need a full-length text; anywhere
+        // else a short article is simply short — don't make the reader wait on archives.
+        return if (paywalled) c.text.length >= 900 && c.paragraphs.size >= 4 else c.text.length >= 350 && c.paragraphs.size >= 2
+    }
 
-    suspend fun extract(link: String): ArticleContent? {
+    /** Paywalled/blocked domains: archives start right away instead of after the publisher fails. */
+    private val archiveFirst: (String) -> Boolean = isPaywalled
+
+    /**
+     * Every source races at once — the publisher, a browser render (blocked or script-built
+     * pages), the Wayback Machine and archive.today — and the first complete article wins.
+     * If none is complete within [BUDGET_MS], the longest partial text is returned.
+     */
+    suspend fun extract(link: String): ArticleContent? = kotlinx.coroutines.coroutineScope {
+        val started = System.currentTimeMillis()
         // Google News wrappers carry no article: read the publisher's page instead.
-        val url = if (news.openwire.domain.engine.GoogleNewsUrls.isGoogleNewsUrl(link)) resolveLink(link) ?: return null else link
-        val fetched = extractFrom(url)?.copy(via = TextSource.PUBLISHER, viaUrl = url)
-        if (complete(fetched)) return fetched
-        // Blocked or script-built pages: read what a browser would show.
-        val rendered = if (fetched != null && fetched.text.length >= 600) null
-        else runCatching { renderPage(url) }.getOrNull()?.let { parse(it) }?.copy(via = TextSource.PUBLISHER, viaUrl = url)
-        val direct = listOfNotNull(fetched, rendered).maxByOrNull { it.text.length }
-        if (complete(direct)) return direct
-        val wayback = waybackSnapshot(url)?.let { snap -> extractFrom(snap.second)?.copy(via = TextSource.WAYBACK, viaUrl = snap.first) }
-        if (complete(wayback)) return wayback.mergeMeta(direct)
-        val archiveToday = extractFrom("https://archive.ph/newest/$url")?.copy(via = TextSource.ARCHIVE_TODAY, viaUrl = "https://archive.ph/newest/$url")
-        if (complete(archiveToday)) return archiveToday.mergeMeta(direct)
-        return listOfNotNull(direct, wayback, archiveToday).maxByOrNull { it.text.length }?.copy(partial = true)
+        val url = if (news.openwire.domain.engine.GoogleNewsUrls.isGoogleNewsUrl(link)) {
+            resolveLink(link) ?: run {
+                if (diagnostics) android.util.Log.i("EditroveReader", "${System.currentTimeMillis() - started}ms UNRESOLVED ${link.take(90)}")
+                return@coroutineScope null
+            }
+        } else link
+        val paywalled = runCatching { archiveFirst(url) }.getOrDefault(false)
+        val results = kotlinx.coroutines.channels.Channel<ArticleContent?>(capacity = 8)
+        val jobs = mutableListOf<kotlinx.coroutines.Job>()
+        fun race(delayMs: Long = 0, block: suspend () -> ArticleContent?) {
+            jobs += this@coroutineScope.launch {
+                if (delayMs > 0) kotlinx.coroutines.delay(delayMs)
+                results.send(runCatching { block() }.getOrNull())
+            }
+        }
+        val publisher = this@coroutineScope.async { extractFrom(url)?.copy(via = TextSource.PUBLISHER, viaUrl = url) }
+        race { publisher.await() }
+        // Browser render when the plain fetch is refused or thin (France 24, script-built pages).
+        race {
+            val p = publisher.await()
+            if (p != null && p.text.length >= 600) null
+            else renderPage(url)?.let { parse(it) }?.copy(via = TextSource.PUBLISHER, viaUrl = url)
+        }
+        // Archives: immediately for paywalled sites, otherwise only if the publisher is slow.
+        val archiveDelay = if (paywalled) 0L else 4_000L
+        race(archiveDelay) {
+            if (!paywalled && complete(publisher.await(), false)) null
+            else waybackSnapshot(url)?.let { snap -> extractFrom(snap.second)?.copy(via = TextSource.WAYBACK, viaUrl = snap.first) }
+        }
+        race(archiveDelay) {
+            if (!paywalled && complete(publisher.await(), false)) null
+            else extractFrom("https://archive.ph/newest/$url")?.copy(via = TextSource.ARCHIVE_TODAY, viaUrl = "https://archive.ph/newest/$url")
+        }
+        val got = mutableListOf<ArticleContent>()
+        var winner: ArticleContent? = null
+        var deadline = started + BUDGET_MS
+        var pending = jobs.size
+        while (pending > 0 && winner == null) {
+            val left = deadline - System.currentTimeMillis()
+            if (left <= 0) break
+            val r = kotlinx.coroutines.withTimeoutOrNull(left) { results.receive() } ?: if (System.currentTimeMillis() >= deadline) break else { pending--; continue }
+            pending--
+            got += r
+            // A paywalled publisher's own page is usually a teaser: it only counts when it is
+            // clearly the whole piece; otherwise give the archives a few more seconds, then stop.
+            val ok = if (paywalled && r.via == TextSource.PUBLISHER) complete(r) && r.text.length >= PAYWALL_FULL_CHARS else complete(r, paywalled || r.via != TextSource.PUBLISHER)
+            if (ok) winner = r
+            else if (paywalled && r.via == TextSource.PUBLISHER && r.text.length >= 300) deadline = minOf(deadline, System.currentTimeMillis() + TEASER_GRACE_MS)
+        }
+        jobs.forEach { it.cancel() }
+        publisher.cancel()
+        val meta = got.firstOrNull { it.via == TextSource.PUBLISHER }
+        val out = winner?.let { if (it.via == TextSource.PUBLISHER) it else it.mergeMeta(meta) }
+            ?: got.maxByOrNull { it.text.length }?.let { (if (it.via == TextSource.PUBLISHER) it else it.mergeMeta(meta))?.copy(partial = true) }
+        if (diagnostics) android.util.Log.i("EditroveReader", "${System.currentTimeMillis() - started}ms ${out?.via ?: "NONE"} ${out?.text?.length ?: 0}ch partial=${out?.partial} paywalled=$paywalled ${url.take(90)}")
+        out
     }
 
     /** Keeps the publisher's own deck/byline/photo when the text came from an archive. */
@@ -180,17 +249,44 @@ class ArticleTextExtractor(
         fun pText(e: org.jsoup.nodes.Element) = e.select("p").sumOf { p -> p.text().length.takeIf { it > 40 } ?: 0 }
         val total = pText(doc.body() ?: doc).coerceAtLeast(1)
         doc.select(CHROME).filter { pText(it) < total * 0.25 }.forEach { it.remove() }
-        val candidates = doc.select("article, [itemprop=articleBody], main, section, div")
-        val best = candidates.maxByOrNull { el ->
-            el.children().filter { it.tagName() == "p" }.sumOf { p -> p.text().length.takeIf { it > 40 } ?: 0 }
-        }?.takeIf { el -> el.children().count { it.tagName() == "p" } >= 2 }
-        val source = best?.select("p")?.takeIf { it.size >= 2 } ?: doc.select("p")
         val siteName = doc.meta("og:site_name")
-        return source.map { it.text().trim() }
+        // Reader-mode scoring: each paragraph credits its parent fully and its grandparent by
+        // half, so stories split across many small blocks still find their common container.
+        val scores = HashMap<org.jsoup.nodes.Element, Double>()
+        for (p in doc.select("p")) {
+            val len = p.text().length
+            if (len <= 40) continue
+            val score = 1.0 + minOf(len / 100.0, 3.0) + p.text().count { it == ',' } * 0.2
+            p.parent()?.let { scores[it] = (scores[it] ?: 0.0) + score }
+            p.parent()?.parent()?.let { scores[it] = (scores[it] ?: 0.0) + score / 2 }
+        }
+        val best = scores.maxByOrNull { it.value }?.key
+        val inBest = best?.select("p").orEmpty()
+        val source = if (inBest.size >= 3 && pText(best!!) >= total * 0.4) inBest else doc.select("p")
+        val fromParagraphs = source.map { it.text().trim() }
             .map { stripBanner(it, siteName) }
             .filter { it.length > 40 && !isBoilerplate(it) }
             .distinct()
-            .take(30)
+            .take(40)
+        // Many publishers also put the full text in their structured data (JSON-LD articleBody).
+        val fromJsonLd = jsonLdBody(doc)
+        return if (fromJsonLd.sumOf { it.length } > fromParagraphs.sumOf { it.length } * 1.3) fromJsonLd else fromParagraphs
+    }
+
+    /** The article text from JSON-LD `articleBody`, split into paragraphs. */
+    private fun jsonLdBody(doc: Document): List<String> {
+        val body = doc.select("script[type=application/ld+json]").asSequence()
+            .mapNotNull { s -> ARTICLE_BODY.find(s.data())?.groupValues?.get(1) }
+            .maxByOrNull { it.length } ?: return emptyList()
+        val text = runCatching { kotlinx.serialization.json.Json.decodeFromString<String>("\"$body\"") }.getOrDefault(body)
+        val clean = Jsoup.parse(text).text().takeIf { '<' in text } ?: text
+        val parts = clean.split(PARA_BREAK).map { it.trim() }.filter { it.length > 40 }
+        val paras = if (parts.size >= 3) parts else {
+            // One long block: regroup sentences into paragraphs of ~3.
+            val sentences = clean.split(SENTENCE).map { it.trim() }.filter { it.isNotEmpty() }
+            sentences.chunked(3).map { it.joinToString(" ") }.filter { it.length > 40 }
+        }
+        return paras.filter { !isBoilerplate(it) }.take(40)
     }
 
     /** "DC News Now | DC, Virginia… Live WASHINGTON (DC News Now) — Service…" → from the dateline on. */
@@ -206,9 +302,17 @@ class ArticleTextExtractor(
             ?.attr("content")?.trim()?.takeIf { it.isNotEmpty() }
 
     private fun get(url: String): String? {
+        fetch(url, MOBILE_UA)?.let { return it }
+        // Some sites refuse phone-style requests but serve a desktop browser.
+        return fetch(url, DESKTOP_UA)
+    }
+
+    private fun fetch(url: String, ua: String): String? {
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Mobile Safari/537.36")
+            .header("User-Agent", ua)
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header("Accept-Language", "en-US,en;q=0.9")
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return null
@@ -226,3 +330,6 @@ private const val CHROME = "nav, header, footer, aside, form, script, style, nos
     "[class*=footer], [id*=footer], [class*=sidebar], [class*=breadcrumb], [class*=cookie], [class*=subscribe], [aria-hidden=true]"
 /** A wire-style dateline: "WASHINGTON (DC News Now) —" or "LONDON (Reuters) -". */
 private val DATELINE = Regex("\\b[A-Z][A-Z .,'’-]{2,40}\\s*\\([^)]{2,40}\\)\\s*[—–-]")
+private val ARTICLE_BODY = Regex("\"articleBody\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
+private val SENTENCE = Regex("(?<=[.!?])\\s+(?=[A-Z\"“])")
+private val PARA_BREAK = Regex("\\n\\s*\\n|\\n")

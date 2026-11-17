@@ -50,6 +50,8 @@ data class UserSettings(
     val breakingEnabled: Boolean = false,
     /** Newsrooms watched for breaking news (keys from BreakingNews.OUTLETS). */
     val breakingOutlets: Set<String> = news.openwire.domain.engine.BreakingNews.DEFAULT_KEYS,
+    /** Real-time breaking alerts over a kept-open connection (opt-in, off by default). */
+    val realtimeAlerts: Boolean = false,
     /** Audio briefing voice, speed, length, detail and sound design. */
     val briefing: BriefingPrefs = BriefingPrefs(),
 )

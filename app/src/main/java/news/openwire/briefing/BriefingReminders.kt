@@ -129,7 +129,11 @@ class BriefingReminderReceiver : BroadcastReceiver() {
         val slots = (context.applicationContext as OpenWireApp).container.settingsRepository.settings.value.briefing.slots
         when (intent.action) {
             Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_TIME_CHANGED, "android.intent.action.TIME_SET", Intent.ACTION_TIMEZONE_CHANGED,
-            AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED, Intent.ACTION_MY_PACKAGE_REPLACED -> Unit
+            AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED, Intent.ACTION_MY_PACKAGE_REPLACED ->
+                // After a restart or an update, real-time alerts come back on if they were on.
+                if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+                    news.openwire.realtime.RealtimeAlertService.sync(context, (context.applicationContext as OpenWireApp).container.settingsRepository.settings.value)
+                }
             else -> BriefingReminders.kindOf(intent)?.let { k -> if (slots.any { it.kind == k && it.enabled }) BriefingReminders.notify(context, k) }
         }
         BriefingReminders.schedule(context, slots)

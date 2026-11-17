@@ -832,6 +832,19 @@ private fun NotificationsPage(vm: SettingsViewModel) {
                     tr(R.string.breaking_checked, refreshLabel(s.refreshMinutes, long = true)),
                     style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary,
                 )
+                Spacer(Modifier.height(12.dp))
+                Divider()
+                SwitchRow(tr(R.string.rt_title), tr(R.string.rt_sub), s.realtimeAlerts) { vm.setRealtimeAlerts(it) }
+                // What keeping a connection open means, said plainly before (and while) it's on.
+                Column(
+                    Modifier.fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(12.dp))
+                        .background(Amber400.copy(alpha = 0.10f)).border(1.dp, Amber400.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                ) {
+                    Text(tr(R.string.rt_disclaimer_title), style = sans(12.sp, FontWeight.SemiBold), color = Glass.textPrimary)
+                    Spacer(Modifier.height(4.dp))
+                    Text(tr(R.string.rt_disclaimer), style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary)
+                }
             }
         }
         Section {

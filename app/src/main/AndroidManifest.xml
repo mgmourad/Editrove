@@ -7,6 +7,8 @@
     <!-- Audio briefing keeps playing in the background / on the lock screen. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Opt-in real-time breaking alerts keep one connection open while switched on. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Self-update from GitHub Releases (user-initiated or opted-in automatic installs). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -114,6 +116,15 @@
             android:name="news.openwire.ui.home.BriefingService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <!-- Real-time breaking alerts (opt-in): one kept-open connection to Bluesky's public stream. -->
+        <service
+            android:name="news.openwire.realtime.RealtimeAlertService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Real-time breaking-news alerts: a user-enabled connection to a public news stream, shown with a permanent notification." />
+        </service>
         <!-- Live TV and radio: keeps playing in the background, with lock-screen controls. -->
         <service
             android:name="news.openwire.live.LivePlaybackService"

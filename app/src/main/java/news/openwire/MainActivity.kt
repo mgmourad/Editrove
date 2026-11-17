@@ -75,6 +75,10 @@ class MainActivity : ComponentActivity() {
             // …and select it for the briefing (the standard voice for the language).
             lifecycleScope.launch { news.openwire.i18n.VoiceSetup.adopt(this@MainActivity, container.settingsRepository) }
         }
+        // Real-time alerts follow their switch (started from here, while the app is in front).
+        lifecycleScope.launch {
+            container.settingsRepository.settings.collect { st -> news.openwire.realtime.RealtimeAlertService.sync(this@MainActivity, st) }
+        }
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val mode by vm.themeMode.collectAsState()

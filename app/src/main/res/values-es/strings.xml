@@ -438,4 +438,14 @@
     <string name="op_on_bluesky">En Bluesky</string>
     <string name="op_pieces">%1$d textos recientes</string>
     <string name="op_searching">Buscando…</string>
+    <string name="rt_title">Alertas en tiempo real (beta)</string>
+    <string name="rt_sub">Alertas a los pocos segundos de que un medio publique una noticia de última hora, en lugar de esperar a la siguiente actualización.</string>
+    <string name="rt_disclaimer_title">Antes de activarlo</string>
+    <string name="rt_disclaimer">Editrove mantiene una conexión abierta con el flujo público de Bluesky y solo escucha las publicaciones de los medios vigilados (AP, Reuters, AFP, los medios que elegiste y los de tu idioma). No se envía nada sobre ti y Editrove no tiene servidor. Android muestra una notificación silenciosa permanente mientras funciona, y usa algo más de batería y datos. Los canales árabes aún no están en Bluesky, así que su última hora llega en cada actualización.</string>
+    <string name="rt_channel">Alertas en tiempo real</string>
+    <string name="rt_channel_desc">La conexión abierta para la última hora</string>
+    <string name="rt_running_title">Alertas en tiempo real activadas</string>
+    <string name="rt_running_text">Vigilando %1$d medios</string>
+    <string name="rt_connecting">Conectando…</string>
+    <string name="rt_turn_off">Desactivar</string>
 </resources>

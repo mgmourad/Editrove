@@ -438,4 +438,14 @@
     <string name="op_on_bluesky">Auf Bluesky</string>
     <string name="op_pieces">%1$d neue Texte</string>
     <string name="op_searching">Suche…</string>
+    <string name="rt_title">Echtzeit-Hinweise (Beta)</string>
+    <string name="rt_sub">Hinweise Sekunden nachdem eine Redaktion eine Eilmeldung bringt, statt bei der nächsten Aktualisierung.</string>
+    <string name="rt_disclaimer_title">Bevor du das einschaltest</string>
+    <string name="rt_disclaimer">Editrove hält eine Verbindung zum öffentlichen Bluesky-Stream offen und hört nur auf Beiträge der beobachteten Redaktionen (AP, Reuters, AFP, deine gewählten Medien und Redaktionen in deiner Sprache). Nichts über dich wird gesendet, und Editrove hat keinen Server. Android zeigt währenddessen eine dauerhafte, stille Benachrichtigung; es braucht etwas mehr Akku und Daten. Arabische Sender sind noch nicht auf Bluesky, ihre Eilmeldungen kommen weiterhin bei jeder Aktualisierung.</string>
+    <string name="rt_channel">Echtzeit-Hinweise</string>
+    <string name="rt_channel_desc">Die offene Verbindung für Eilmeldungen</string>
+    <string name="rt_running_title">Echtzeit-Hinweise sind an</string>
+    <string name="rt_running_text">%1$d Redaktionen werden beobachtet</string>
+    <string name="rt_connecting">Verbinde…</string>
+    <string name="rt_turn_off">Ausschalten</string>
 </resources>

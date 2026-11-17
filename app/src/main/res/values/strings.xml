@@ -440,4 +440,14 @@
     <string name="op_on_bluesky">On Bluesky</string>
     <string name="op_pieces">%1$d recent pieces</string>
     <string name="op_searching">Searching…</string>
+    <string name="rt_title">Real-time alerts (beta)</string>
+    <string name="rt_sub">Alerts within seconds of a newsroom breaking a story, instead of at the next refresh.</string>
+    <string name="rt_disclaimer_title">Before you turn this on</string>
+    <string name="rt_disclaimer">Editrove keeps one connection open to Bluesky’s public stream and listens only to the watched newsrooms’ posts (AP, Reuters, AFP, your chosen outlets, and newsrooms in your language). Nothing about you is sent, and there is no Editrove server. Android shows a permanent, silent notification while it runs, and it uses a little more battery and data. Arabic channels aren’t on Bluesky yet, so their breaking news still arrives at each refresh.</string>
+    <string name="rt_channel">Real-time alerts</string>
+    <string name="rt_channel_desc">The kept-open connection for breaking news</string>
+    <string name="rt_running_title">Real-time alerts are on</string>
+    <string name="rt_running_text">Watching %1$d newsrooms for breaking news</string>
+    <string name="rt_connecting">Connecting…</string>
+    <string name="rt_turn_off">Turn off</string>
 </resources>

@@ -282,6 +282,8 @@ class SettingsViewModel(
     fun setPersonalize(on: Boolean) = settingsRepo.update { it.copy(personalize = on) }
     fun setRefreshMinutes(m: Int) = settingsRepo.update { it.copy(refreshMinutes = news.openwire.domain.engine.validRefresh(m)) }
     fun setBreakingEnabled(on: Boolean) = settingsRepo.update { it.copy(breakingEnabled = on) }
+
+    fun setRealtimeAlerts(on: Boolean) = settingsRepo.update { it.copy(realtimeAlerts = on) }
     fun toggleBreakingOutlet(key: String) = settingsRepo.update { s ->
         s.copy(breakingOutlets = if (key in s.breakingOutlets) s.breakingOutlets - key else s.breakingOutlets + key)
     }

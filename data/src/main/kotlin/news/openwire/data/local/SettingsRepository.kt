@@ -93,6 +93,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         val followedAuthors: Set<String> = emptySet(),
         val followedAccounts: Set<String> = emptySet(),
         val opinionTabs: List<String> = emptyList(),
+        val realtimeAlerts: Boolean = false,
     ) {
         fun toSettings() = UserSettings(
             edition = LocalEdition(city, region, country),
@@ -103,6 +104,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
             followedAuthors = followedAuthors,
             followedAccounts = followedAccounts,
             opinionTabs = opinionTabs,
+            realtimeAlerts = realtimeAlerts,
             customTopics = customTopics.map { Topic(it.id, it.label, liveUrl = it.liveUrl, liveOnly = true, keywords = it.keywords, sources = it.sources, isCustom = true) },
             hiddenTopics = hiddenTopics,
             topicOrder = topicOrder,
@@ -147,6 +149,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 s.followedAuthors,
                 s.followedAccounts,
                 s.opinionTabs,
+                s.realtimeAlerts,
             )
         }
     }

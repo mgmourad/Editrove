@@ -86,10 +86,10 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     override suspend fun getForegroundInfo(): androidx.work.ForegroundInfo {
         val nm = applicationContext.getSystemService(NotificationManager::class.java)
         if (nm?.getNotificationChannel("refresh") == null) {
-            nm?.createNotificationChannel(NotificationChannel("refresh", "Background refresh", NotificationManager.IMPORTANCE_MIN))
+            nm?.createNotificationChannel(NotificationChannel("refresh", applicationContext.getString(R.string.n_refresh_channel), NotificationManager.IMPORTANCE_MIN))
         }
         val n = NotificationCompat.Builder(applicationContext, "refresh")
-            .setSmallIcon(R.drawable.ic_stat_openwire).setContentTitle("Updating news").setSilent(true).build()
+            .setSmallIcon(R.drawable.ic_stat_openwire).setContentTitle(applicationContext.getString(R.string.n_updating)).setSilent(true).build()
         return androidx.work.ForegroundInfo(4302, n)
     }
 
@@ -146,10 +146,11 @@ object Notifier {
     fun ensureChannel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         OLD_CHANNELS.forEach { if (nm.getNotificationChannel(it) != null) nm.deleteNotificationChannel(it) }
-        if (nm.getNotificationChannel(CHANNEL) == null) {
+        // Created again each time so its name follows Editrove's language (the sound stays as set).
+        run {
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "New headlines", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "New stories in topics you follow"
+                NotificationChannel(CHANNEL, context.getString(R.string.n_headlines_channel), NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = context.getString(R.string.n_headlines_channel_desc)
                     setSound(sound(context, R.raw.notify_bell), SOUND_ATTRS) // Editrove's bell
                 },
             )
@@ -159,10 +160,10 @@ object Notifier {
     fun ensureBreakingChannel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         if (nm.getNotificationChannel(OLD_BREAKING) != null) nm.deleteNotificationChannel(OLD_BREAKING)
-        if (nm.getNotificationChannel(BREAKING) == null) {
+        run {
             nm.createNotificationChannel(
-                NotificationChannel(BREAKING, "Breaking news", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Breaking stories from the newsrooms you follow"
+                NotificationChannel(BREAKING, context.getString(R.string.n_breaking_channel), NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = context.getString(R.string.n_breaking_channel_desc)
                     setSound(sound(context, R.raw.breaking_sting), SOUND_ATTRS) // the briefing's transition sting
                 },
             )
@@ -180,11 +181,11 @@ object Notifier {
     fun postSummary(context: Context, updates: List<TopicUpdate>) {
         if (!canPost(context)) return
         val total = updates.sumOf { it.headlines.size }
-        val style = NotificationCompat.InboxStyle().setSummaryText("$total new stories")
+        val style = NotificationCompat.InboxStyle().setSummaryText(context.getString(R.string.n_new_stories, total))
         updates.forEach { style.addLine("${it.topicLabel}: ${it.headlines.first().title}") }
         val n = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_openwire)
-            .setContentTitle("${updates.size} topics have new stories")
+            .setContentTitle(context.getString(R.string.n_topics_have_news, updates.size))
             .setContentText(updates.joinToString(" · ") { it.topicLabel })
             .setStyle(style)
             .setGroup(GROUP).setGroupSummary(true)
@@ -207,13 +208,13 @@ object Notifier {
         }
         val b = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_openwire)
-            .setContentTitle(if (more == 0) update.topicLabel else "${update.topicLabel} · ${update.headlines.size} new stories")
+            .setContentTitle(if (more == 0) update.topicLabel else context.getString(R.string.n_topic_new, update.topicLabel, update.headlines.size))
             .setContentText(first.title)
             .setStyle(
                 NotificationCompat.BigTextStyle()
                     .setBigContentTitle(update.topicLabel)
                     .bigText(expanded)
-                    .also { if (more > 0) it.setSummaryText("+$more more") },
+                    .also { if (more > 0) it.setSummaryText(context.getString(R.string.n_more, more)) },
             )
             .setContentIntent(open)
             .setAutoCancel(true)
@@ -222,7 +223,7 @@ object Notifier {
             .setGroup(GROUP)
             .setOnlyAlertOnce(true)
             .also { if (quiet) it.setSilent(true) }
-        if (more > 0) b.addAction(0, "See all ${update.headlines.size}", all)
+        if (more > 0) b.addAction(0, context.getString(R.string.n_see_all, update.headlines.size), all)
         val n = b.build()
         try {
             NotificationManagerCompat.from(context).notify(update.topicId.hashCode(), n)
@@ -239,7 +240,7 @@ object Notifier {
         val pending = PendingIntent.getActivity(context, alert.key.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val n = NotificationCompat.Builder(context, BREAKING)
             .setSmallIcon(R.drawable.ic_stat_openwire)
-            .setContentTitle("Breaking" + (h.source?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""))
+            .setContentTitle(context.getString(R.string.n_breaking) + (h.source?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""))
             .setContentText(h.title)
             .setStyle(NotificationCompat.BigTextStyle().bigText(h.title))
             .setPriority(NotificationCompat.PRIORITY_HIGH)

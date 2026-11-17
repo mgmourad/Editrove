@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import news.openwire.i18n.tr
+import news.openwire.i18n.text
+import news.openwire.R
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -112,11 +115,22 @@ fun Article.coverageLine(names: Int = 2): String? {
     if (alsoCoveredBy.isEmpty()) return null
     val shown = alsoCoveredBy.take(names).joinToString(", ")
     val more = alsoCoveredBy.size - names
-    return "Also covered by $shown" + if (more > 0) " +$more" else ""
+    return tr(R.string.also_covered, shown) + if (more > 0) " +$more" else ""
 }
 
 /** Paywall badge from the routing engine, shown where the mock shows read time. */
-fun Article.badgeLabel(): String? = badge?.takeIf { it.isNotBlank() } ?: status?.replaceFirstChar { it.uppercase() }
+fun Article.badgeLabel(): String? {
+    val raw = badge?.takeIf { it.isNotBlank() } ?: status?.replaceFirstChar { it.uppercase() } ?: return null
+    // Service names stay as they are; the plain words are translated.
+    return when (raw) {
+        "Free" -> tr(R.string.badge_free)
+        "Locked" -> tr(R.string.badge_locked)
+        "Archive" -> tr(R.string.badge_archive)
+        "Bypassed" -> tr(R.string.badge_bypassed)
+        "Open source" -> tr(R.string.badge_open_source)
+        else -> raw
+    }
+}
 
 // ---- Masthead + category pills ----------------------------------------------
 
@@ -125,7 +139,7 @@ fun Article.badgeLabel(): String? = badge?.takeIf { it.isNotBlank() } ?: status?
 fun Masthead(edition: String, onEdition: () -> Unit, onSettings: () -> Unit, modifier: Modifier = Modifier) {
     val g = Glass
     val date = remember {
-        LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE • MMM d", Locale.ENGLISH)).uppercase()
+        LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE • MMM d", Locale.getDefault())).uppercase()
     }
     Row(
         modifier = modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 16.dp),
@@ -160,7 +174,7 @@ fun Masthead(edition: String, onEdition: () -> Unit, onSettings: () -> Unit, mod
             contentAlignment = Alignment.Center,
         ) {
             androidx.compose.material3.Icon(
-                androidx.compose.material.icons.Icons.Outlined.Settings, contentDescription = "Settings",
+                androidx.compose.material.icons.Icons.Outlined.Settings, contentDescription = tr(R.string.settings),
                 tint = g.textPrimary, modifier = Modifier.size(16.dp),
             )
         }
@@ -188,15 +202,15 @@ fun FeedControls(
                 val bg by animateColorAsState(if (active) g.glassElevated else Color.Transparent, tween(240, easing = SpringEasing), label = "sortBg")
                 Box(
                     Modifier.clip(CircleShape).background(bg).clickable { onSort(m) }.padding(horizontal = 10.dp, vertical = 5.dp),
-                ) { Text(m.label, style = sans(11.sp, if (active) FontWeight.SemiBold else FontWeight.Medium), color = if (active) g.textPrimary else g.textSecondary) }
+                ) { Text(m.text, style = sans(11.sp, if (active) FontWeight.SemiBold else FontWeight.Medium), color = if (active) g.textPrimary else g.textSecondary) }
             }
         }
         Spacer(Modifier.weight(1f))
         val label = when {
-            refreshing -> "Refreshing…"
-            updatedAt > 0 -> "Updated " + NewsProcessor.formatRelativeTime(updatedAt)
-            else -> "Saved copy"
-        } + if (failed.isNotEmpty() && !refreshing) " · ${failed.size} source${if (failed.size > 1) "s" else ""} offline" else ""
+            refreshing -> tr(R.string.status_refreshing)
+            updatedAt > 0 -> tr(R.string.status_updated, NewsProcessor.formatRelativeTime(updatedAt))
+            else -> tr(R.string.status_saved_copy)
+        } + if (failed.isNotEmpty() && !refreshing) " · " + tr(if (failed.size > 1) R.string.status_offline_many else R.string.status_offline_one, failed.size) else ""
         Row(
             Modifier.clip(CircleShape).clickable(enabled = !refreshing, onClick = onRefresh).padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -206,7 +220,7 @@ fun FeedControls(
             val spin = rememberInfiniteTransition(label = "spin")
             val angle by spin.animateFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "a")
             androidx.compose.material3.Icon(
-                androidx.compose.material.icons.Icons.Filled.Refresh, contentDescription = "Refresh",
+                androidx.compose.material.icons.Icons.Filled.Refresh, contentDescription = tr(R.string.action_refresh),
                 tint = g.accentSoft, modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = if (refreshing) angle else 0f },
             )
         }
@@ -303,7 +317,7 @@ fun LazyGridScope.feedItems(
     onToggleSaved: (Article) -> Unit,
     onToggleLiked: (Article) -> Unit,
     showTicker: Boolean = true,
-    sectionTitle: String = "Bento Dispatch",
+    sectionTitle: String = tr(R.string.feed_bento),
     archive: Map<String, ArchiveState> = emptyMap(),
     /** Full view: magazine lead card and multi-column grid with feature cards. */
     magazine: Boolean = false,
@@ -346,7 +360,7 @@ fun LazyGridScope.feedItems(
                     color = Glass.textPrimary.copy(alpha = 0.6f),
                     modifier = Modifier.weight(1f),
                 )
-                Text("${rest.size} Curated Reads", style = sans(11.sp, FontWeight.Medium), color = Glass.accentSoft)
+                Text(tr(R.string.curated_reads, rest.size), style = sans(11.sp, FontWeight.Medium), color = Glass.accentSoft)
             }
         }
     }
@@ -473,7 +487,7 @@ private fun LivePill(pulsing: Boolean) {
             Box(Modifier.size(6.dp).clip(CircleShape).background(g.accent))
         }
         Spacer(Modifier.width(6.dp))
-        Text("LIVE", style = mono(10.sp, FontWeight.SemiBold, 0.1.em), color = g.accentSoft)
+        Text(tr(R.string.live), style = mono(10.sp, FontWeight.SemiBold, 0.1.em), color = g.accentSoft)
     }
 }
 

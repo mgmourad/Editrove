@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Spring
@@ -208,12 +210,12 @@ fun SpringToggle(
         ToggleKind.LIKE -> Triple(
             if (active) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
             if (active) Glass.accent else inactiveTint,
-            if (active) "Unlike" else "Like",
+            tr(if (active) R.string.cd_unlike else R.string.cd_like),
         )
         ToggleKind.BOOKMARK -> Triple(
             if (active) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
             if (active) Amber400 else inactiveTint,
-            if (active) "Remove from saved" else "Save story",
+            tr(if (active) R.string.cd_unsave else R.string.cd_save),
         )
     }
     Box(
@@ -263,13 +265,13 @@ fun ShareButton(
                 val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
                     .putExtra(android.content.Intent.EXTRA_TEXT, shareText(article))
                     .putExtra(android.content.Intent.EXTRA_SUBJECT, article.title)
-                context.startActivity(android.content.Intent.createChooser(send, "Share story"))
+                context.startActivity(android.content.Intent.createChooser(send, tr(R.string.share_story)))
             }
             .padding(padding),
         contentAlignment = Alignment.Center,
     ) {
         androidx.compose.material3.Icon(
-            androidx.compose.material.icons.Icons.Outlined.Share, contentDescription = "Share story",
+            androidx.compose.material.icons.Icons.Outlined.Share, contentDescription = tr(R.string.share_story),
             tint = tint, modifier = Modifier.size(18.dp),
         )
     }

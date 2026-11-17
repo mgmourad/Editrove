@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -141,6 +143,9 @@ class BriefingPlayer(
         .setOnAudioFocusChangeListener { change -> if (change == android.media.AudioManager.AUDIOFOCUS_LOSS || change == android.media.AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) scope.launch { pause() } }
         .build()
 
+    /** The language the current briefing is read in. */
+    private var lang: String = "en"
+
     private val tts: TextToSpeech = TextToSpeech(app) { status -> ready = status == TextToSpeech.SUCCESS }.apply {
         setAudioAttributes(SPEECH)
         setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -179,15 +184,20 @@ class BriefingPlayer(
         detail = p.detail
         // Every story in a briefing is a different story: no second outlet's take on one already read.
         stories = news.openwire.domain.engine.StoryIdentity.distinct(articles, p.count, normalizeDomain)
-        title = "$topicLabel briefing"
+        // The anchor speaks the stories' language: Editrove's own, unless the stories are in another
+        // script (an Arabic national tab while the app is in English).
+        lang = news.openwire.domain.engine.Languages.effective(null).let { app ->
+            if (app != "ar" && stories.count { RX_ARABIC.containsMatchIn(it.title) } * 2 > stories.size) "ar" else app
+        }
+        title = tr(R.string.briefing_title, topicLabel)
         content.clear()
         val built = mutableListOf<Pair<Seg, Int>>()
-        built += Seg.Speech(news.openwire.domain.engine.BriefingScript.intro(topicLabel, stories.size, detail, java.time.LocalDateTime.now())) to -1
+        built += Seg.Speech(news.openwire.domain.engine.BriefingScript.intro(topicLabel, stories.size, detail, java.time.LocalDateTime.now(), lang)) to -1
         stories.indices.forEach { i ->
             if (i > 0 && p.stings) built += Seg.Sting to i
             built += Seg.Story(i) to i
         }
-        built += Seg.Speech(news.openwire.domain.engine.BriefingScript.outro(topicLabel)) to stories.size
+        built += Seg.Speech(news.openwire.domain.engine.BriefingScript.outro(topicLabel, lang)) to stories.size
         segs = built.map { it.first }.toMutableList()
         segStory = built.map { it.second }.toMutableList()
         pos = 0
@@ -276,9 +286,9 @@ class BriefingPlayer(
         storyIndex = k
         storyTitle = stories.getOrNull(k)?.title
         progress = when {
-            k < 0 -> "Opening"
-            k >= stories.size -> "Sign-off"
-            else -> "Story ${k + 1} of ${stories.size}"
+            k < 0 -> tr(R.string.briefing_opening)
+            k >= stories.size -> tr(R.string.briefing_signoff)
+            else -> tr(R.string.briefing_story_of, k + 1, stories.size)
         }
         notifyChange()
     }
@@ -346,6 +356,7 @@ class BriefingPlayer(
                             } else emptyList(),
                         ),
                         detail,
+                        lang,
                     )
                     segs[pos] = Seg.Speech(lines.joinToString(SENTENCE_BREAK))
                     run()
@@ -358,7 +369,8 @@ class BriefingPlayer(
         val p = prefs()
         tts.setSpeechRate(p.speed)
         val all = runCatching { tts.voices }.getOrNull().orEmpty()
-        (p.voice?.let { name -> all.firstOrNull { it.name == name } } ?: BriefingVoices.preferred(all))?.let { tts.voice = it }
+        (p.voice?.let { name -> all.firstOrNull { it.name == name && it.locale.language == lang } } ?: BriefingVoices.preferred(all, lang))
+            ?.let { tts.voice = it } ?: run { tts.language = Locale(lang) }
         // Lines become separate utterances with short anchor pauses between them.
         val parsed = parseLines(text)
         val chunks = parsed.map { it.first }
@@ -581,7 +593,7 @@ fun FloatingPlayerPill(player: BriefingPlayer, haze: HazeState?, modifier: Modif
             .padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SkipButton(Icons.Filled.SkipPrevious, "Previous story") { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); player.skipPrevious() }
+        SkipButton(Icons.Filled.SkipPrevious, tr(R.string.previous_story)) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); player.skipPrevious() }
         Box(
             Modifier.glowShadow(g.accent, 10.dp).size(40.dp).clip(CircleShape).background(g.accent)
                 .clickable { haptics.performHapticFeedback(HapticFeedbackType.LongPress); player.toggle() },
@@ -589,14 +601,14 @@ fun FloatingPlayerPill(player: BriefingPlayer, haze: HazeState?, modifier: Modif
         ) {
             Icon(
                 if (player.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = if (player.playing) "Pause briefing" else "Play briefing",
+                contentDescription = tr(if (player.playing) R.string.cd_pause_briefing else R.string.briefing_play),
                 tint = Color.White, modifier = Modifier.size(20.dp),
             )
         }
-        SkipButton(Icons.Filled.SkipNext, "Next story") { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); player.skipNext() }
+        SkipButton(Icons.Filled.SkipNext, tr(R.string.next_story)) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); player.skipNext() }
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
-            Text(("AUDIO BRIEFING  ·  " + player.progress.uppercase()).trimEnd(' ', '·'), style = mono(9.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, maxLines = 1)
+            Text((tr(R.string.audio_briefing_kicker) + "  ·  " + player.progress.uppercase()).trimEnd(' ', '·'), style = mono(9.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, maxLines = 1)
             Text(
                 player.storyTitle ?: listOf(player.title.orEmpty(), player.progress).filter { it.isNotBlank() }.joinToString("  ·  "),
                 style = sans(13.sp, FontWeight.SemiBold), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -608,7 +620,7 @@ fun FloatingPlayerPill(player: BriefingPlayer, haze: HazeState?, modifier: Modif
         Box(
             Modifier.size(32.dp).clip(CircleShape).clickable { player.stop() },
             contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Filled.Close, contentDescription = "Close player", tint = g.textSecondary, modifier = Modifier.size(18.dp)) }
+        ) { Icon(Icons.Filled.Close, contentDescription = tr(R.string.cd_close_player), tint = g.textSecondary, modifier = Modifier.size(18.dp)) }
     }
 }
 
@@ -623,6 +635,7 @@ internal fun SkipButton(icon: androidx.compose.ui.graphics.vector.ImageVector, d
 
 // Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.
 private val RX_1 = Regex("(?<=[.!?])\\s+")
+private val RX_ARABIC = Regex("[\\u0600-\\u06FF]")
 
 /**
  * The default narrator: "English (United States) · IOM" (Google's en-us-x-iom), on-device
@@ -632,8 +645,13 @@ private val RX_1 = Regex("(?<=[.!?])\\s+")
 object BriefingVoices {
     const val DEFAULT_TAG = "IOM"
 
-    fun preferred(voices: Collection<android.speech.tts.Voice>): android.speech.tts.Voice? {
+    fun preferred(voices: Collection<android.speech.tts.Voice>, lang: String = "en"): android.speech.tts.Voice? {
         val usable = voices.filter { !it.features.orEmpty().contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) }
+        if (lang != "en") {
+            // Another language: its best installed voice, on-device first.
+            val own = usable.filter { it.locale.language == lang }
+            return own.filter { !it.isNetworkConnectionRequired }.maxByOrNull { it.quality } ?: own.maxByOrNull { it.quality }
+        }
         return usable.firstOrNull { it.name.equals("en-us-x-iom-local", true) }
             ?: usable.firstOrNull { it.name.startsWith("en-us-x-iom", true) }
             ?: usable.filter { it.locale.language == "en" && it.locale.country == "US" && !it.isNetworkConnectionRequired }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.settings
 
+import news.openwire.i18n.tr
+import news.openwire.i18n.text
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -82,6 +84,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.res.stringResource
+import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.outlined.MyLocation
+import kotlinx.coroutines.launch
+import news.openwire.R
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -117,10 +125,13 @@ import news.openwire.ui.theme.Amber400
 import news.openwire.ui.theme.Emerald400
 import news.openwire.ui.theme.Glass
 
-private enum class Page(val title: String) {
-    HOME("Settings"), EDITION("Edition"), TOPICS("Topics"), ADD_TOPIC("New topic"), SOURCES("Sources"),
-    ADD_SOURCE("Add a source"), RULES("Paywall rules"), NOTIFICATIONS("Notifications & refresh"),
-    APPEARANCE("Appearance"), BRIEFING("Audio briefing"), BACKUP("Backup & restore"), UPDATES("Updates & changelog"), ABOUT("About Editrove"),
+private enum class Page(@androidx.annotation.StringRes private val res: Int) {
+    HOME(R.string.settings), EDITION(R.string.edition), LANGUAGE(R.string.language), TOPICS(R.string.topics), ADD_TOPIC(R.string.new_topic), SOURCES(R.string.sources),
+    ADD_SOURCE(R.string.add_source), RULES(R.string.paywall_rules), NOTIFICATIONS(R.string.notifications_refresh),
+    APPEARANCE(R.string.appearance), BRIEFING(R.string.audio_briefing), BACKUP(R.string.backup_restore), UPDATES(R.string.updates_changelog), ABOUT(R.string.about_editrove),
+    ;
+
+    val title: String get() = tr(res)
 }
 
 /**
@@ -164,12 +175,14 @@ fun SettingsScreen(
         message?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show(); vm.consumeMessage() }
     }
 
+    val offer by vm.languageOffer.collectAsState()
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(g.deviceBg)) {
         Row(
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RoundIcon(if (page == Page.HOME) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack, if (page == Page.HOME) "Close settings" else "Back", back)
+            RoundIcon(if (page == Page.HOME) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack, tr(if (page == Page.HOME) R.string.cd_close_settings else R.string.cd_back), back)
             Spacer(Modifier.width(12.dp))
             AnimatedContent(page.title, transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) }, label = "title") {
                 Text(it, style = serif(24.sp, FontWeight.Bold), color = g.textPrimary)
@@ -195,6 +208,7 @@ fun SettingsScreen(
                     when (p) {
                         Page.HOME -> homePage(vm, themeMode, onOpenLink) { page = it }
                         Page.EDITION -> item { EditionPage(vm) }
+                        Page.LANGUAGE -> item { LanguagePage(vm) }
                         Page.TOPICS -> topicsPage(vm) { page = Page.ADD_TOPIC }
                         Page.ADD_TOPIC -> item { AddTopicPage(vm) { page = Page.TOPICS } }
                         Page.SOURCES -> sourcesPage(vm) { page = Page.ADD_SOURCE }
@@ -221,6 +235,17 @@ fun SettingsScreen(
             }
         }
     }
+    offer?.let { o ->
+        val s by vm.settings.collectAsState()
+        val activity = context.findActivity()
+        LanguageOfferDialog(
+            offer = o,
+            current = news.openwire.domain.engine.Languages.of(news.openwire.domain.engine.Languages.effective(s.language))!!,
+            onSwitch = { vm.setLanguage(o.code); activity?.let { news.openwire.i18n.AppLocale.apply(it, o.code) } },
+            onKeep = vm::dismissLanguageOffer,
+        )
+    }
+    }
 }
 
 // ---- Home ---------------------------------------------------------------------------
@@ -232,39 +257,47 @@ private fun LazyListScope.homePage(vm: SettingsViewModel, themeMode: ThemeMode, 
         val library by vm.library.collectAsState()
         val rules by vm.rules.collectAsState()
         Section {
-            NavRow(Icons.Outlined.LocationOn, "Edition", s.edition.displayName + " · " + TopicRegistry.country(s.edition.country).name) { go(Page.EDITION) }
+            NavRow(Icons.Outlined.LocationOn, tr(R.string.edition), s.edition.displayName + " · " + countryName(s.edition.country)) { go(Page.EDITION) }
             Divider()
-            NavRow(Icons.Outlined.ViewList, "Topics", "${topics.count { it.isVisible }} shown · ${s.customTopics.size} custom") { go(Page.TOPICS) }
+            val lang = news.openwire.domain.engine.Languages.of(news.openwire.domain.engine.Languages.effective(s.language))!!
+            // Always says "Language" in English too, so the way back is findable in any language.
+            NavRow(
+                Icons.Outlined.Translate,
+                stringResource(R.string.language).let { if (lang.code == "en") it else "$it · Language" },
+                if (s.language.isEmpty()) stringResource(R.string.language_phone, lang.nativeName) else lang.nativeName,
+            ) { go(Page.LANGUAGE) }
             Divider()
-            NavRow(Icons.Outlined.RssFeed, "Sources", "${library.count { it.enabled }} of ${library.size} enabled") { go(Page.SOURCES) }
+            NavRow(Icons.Outlined.ViewList, tr(R.string.topics), tr(R.string.topics_summary, topics.count { it.isVisible }, s.customTopics.size)) { go(Page.TOPICS) }
             Divider()
-            NavRow(Icons.Outlined.Lock, "Paywall rules", "${rules.size} publishers · ${rules.values.count { it.isCustom }} customized") { go(Page.RULES) }
+            NavRow(Icons.Outlined.RssFeed, tr(R.string.sources), tr(R.string.sources_summary, library.count { it.enabled }, library.size)) { go(Page.SOURCES) }
+            Divider()
+            NavRow(Icons.Outlined.Lock, tr(R.string.paywall_rules), tr(R.string.rules_summary, rules.size, rules.values.count { it.isCustom })) { go(Page.RULES) }
         }
     }
     item {
         val s by vm.settings.collectAsState()
         Section {
-            NavRow(Icons.Outlined.Notifications, "Notifications & refresh", if (s.notificationsEnabled) "On for ${s.notifyTopics.size} topics" else "Off") { go(Page.NOTIFICATIONS) }
+            NavRow(Icons.Outlined.Notifications, tr(R.string.notifications_refresh), if (s.notificationsEnabled) tr(R.string.notify_on_for, s.notifyTopics.size) else tr(R.string.off)) { go(Page.NOTIFICATIONS) }
             Divider()
-            NavRow(Icons.Outlined.GraphicEq, "Audio briefing", "${s.briefing.detail.label} · ${s.briefing.count} stories · ${s.briefing.speed}×") { go(Page.BRIEFING) }
+            NavRow(Icons.Outlined.GraphicEq, tr(R.string.audio_briefing), tr(R.string.briefing_summary, s.briefing.detail.text, s.briefing.count, s.briefing.speed.toString())) { go(Page.BRIEFING) }
             Divider()
-            NavRow(Icons.Outlined.Palette, "Appearance", "${themeLabel(themeMode)} · ${s.sortMode.label} order") { go(Page.APPEARANCE) }
+            NavRow(Icons.Outlined.Palette, tr(R.string.appearance), tr(R.string.appearance_summary, themeLabel(themeMode), s.sortMode.text)) { go(Page.APPEARANCE) }
         }
     }
     item {
         Section {
-            NavRow(Icons.Outlined.Link, "Open a link", "Paste any article URL — routed around its paywall") { onOpenLink() }
+            NavRow(Icons.Outlined.Link, tr(R.string.open_a_link), tr(R.string.open_a_link_sub)) { onOpenLink() }
             Divider()
-            NavRow(Icons.Outlined.Save, "Backup & restore", "Export, import (incl. the original OpenWire web app)") { go(Page.BACKUP) }
+            NavRow(Icons.Outlined.Save, tr(R.string.backup_restore), tr(R.string.backup_sub)) { go(Page.BACKUP) }
             Divider()
-            NavRow(Icons.Outlined.SystemUpdate, "Updates & changelog", "Version ${news.openwire.BuildConfig.VERSION_NAME} · what's new") { go(Page.UPDATES) }
+            NavRow(Icons.Outlined.SystemUpdate, tr(R.string.updates_changelog), tr(R.string.updates_sub, news.openwire.BuildConfig.VERSION_NAME)) { go(Page.UPDATES) }
             Divider()
-            NavRow(Icons.Outlined.Info, "About Editrove", "Open source · no ads · no tracking") { go(Page.ABOUT) }
+            NavRow(Icons.Outlined.Info, tr(R.string.about_editrove), tr(R.string.about_sub)) { go(Page.ABOUT) }
         }
     }
 }
 
-private fun themeLabel(m: ThemeMode) = when (m) { ThemeMode.SYSTEM -> "System"; ThemeMode.DARK -> "Black Glass"; ThemeMode.LIGHT -> "Editorial Paper" }
+private fun themeLabel(m: ThemeMode) = when (m) { ThemeMode.SYSTEM -> tr(R.string.theme_system); ThemeMode.DARK -> tr(R.string.theme_dark); ThemeMode.LIGHT -> tr(R.string.theme_light) }
 
 // ---- Edition --------------------------------------------------------------------------
 
@@ -275,40 +308,134 @@ private fun EditionPage(vm: SettingsViewModel) {
     var city by rememberSaveable { mutableStateOf(s.edition.city) }
     var region by rememberSaveable { mutableStateOf(s.edition.region) }
     var country by rememberSaveable { mutableStateOf(s.edition.country) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var locating by remember { mutableStateOf(false) }
+    val detect: () -> Unit = {
+        scope.launch {
+            locating = true
+            when (val r = news.openwire.i18n.LocationDetector.detect(context)) {
+                is news.openwire.i18n.LocationDetector.Result.Found -> {
+                    city = r.edition.city; region = r.edition.region; country = r.edition.country
+                    vm.setEdition(city, region, country)
+                    if (!r.supportedCountry) Toast.makeText(context, tr(R.string.location_unsupported), Toast.LENGTH_LONG).show()
+                }
+                news.openwire.i18n.LocationDetector.Result.NoFix ->
+                    Toast.makeText(context, tr(R.string.location_failed), Toast.LENGTH_LONG).show()
+            }
+            locating = false
+        }
+    }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) detect() else Toast.makeText(context, tr(R.string.location_denied), Toast.LENGTH_LONG).show()
+    }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Hint("Your edition sets the national topic and your local topic. Other places use live Google News in the right language and region.")
+        Hint(stringResource(R.string.edition_hint))
+        val prev = s.previousEdition
+        if (prev != null && (prev != s.edition || (s.previousLanguage != null && s.previousLanguage != s.language))) {
+            val prevLang = news.openwire.domain.engine.Languages.of(news.openwire.domain.engine.Languages.effective(s.previousLanguage))!!
+            val activity = context.findActivity()
+            SecondaryButton(stringResource(R.string.edition_return, prev.displayName, prevLang.nativeName)) {
+                val lang = vm.restorePrevious()
+                city = prev.city; region = prev.region; country = prev.country
+                if (lang != null && activity != null) news.openwire.i18n.AppLocale.apply(activity, lang)
+            }
+        }
+        PrimaryButton(stringResource(if (locating) R.string.location_finding else R.string.location_use), Icons.Outlined.MyLocation) {
+            if (locating) return@PrimaryButton
+            val granted = ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (granted) detect() else permission.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
+        Hint(stringResource(R.string.location_privacy))
         Section {
-            Label("Quick picks")
+            Label(stringResource(R.string.edition_quick_picks))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
                     Triple("Washington, D.C.", "District of Columbia", "US"), Triple("New York", "New York", "US"),
                     Triple("Seattle", "Washington", "US"), Triple("San Francisco", "California", "US"),
                     Triple("London", "England", "GB"), Triple("Toronto", "Ontario", "CA"), Triple("Vancouver", "British Columbia", "CA"),
                     Triple("Sydney", "New South Wales", "AU"), Triple("Dublin", "Leinster", "IE"), Triple("Dubai", "Dubai", "AE"),
+                    Triple("Cairo", "Cairo", "EG"), Triple("Riyadh", "Riyadh", "SA"), Triple("Paris", "Île-de-France", "FR"),
+                    Triple("Berlin", "Berlin", "DE"), Triple("Madrid", "Madrid", "ES"), Triple("Mexico City", "CDMX", "MX"),
                 ).forEach { (c, r, k) ->
                     Chip(c, selected = city == c && country == k) { city = c; region = r; country = k }
                 }
             }
         }
         Section {
-            Field("City", city, { city = it })
+            Field(stringResource(R.string.edition_city), city, { city = it })
             Spacer(Modifier.height(10.dp))
-            Field("Region / state / province", region, { region = it })
+            Field(stringResource(R.string.edition_region), region, { region = it })
             Spacer(Modifier.height(14.dp))
-            Label("Country (news language & region)")
+            Label(stringResource(R.string.edition_country))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TopicRegistry.COUNTRIES.forEach { c -> Chip(c.name, selected = country == c.code) { country = c.code } }
+                TopicRegistry.COUNTRIES.forEach { c -> Chip(countryName(c.code), selected = country == c.code) { country = c.code } }
             }
         }
-        PrimaryButton("Use this edition") { vm.setEdition(city, region, country) }
+        PrimaryButton(stringResource(R.string.edition_use)) { vm.setEdition(city, region, country) }
+        val suggestions = news.openwire.domain.engine.LocalSources.forCountry(s.edition.country)
+        if (suggestions.isNotEmpty()) {
+            Section {
+                Label(stringResource(R.string.edition_local_sources, countryName(s.edition.country)))
+                Hint(stringResource(R.string.edition_local_sources_hint))
+                Spacer(Modifier.height(6.dp))
+                suggestions.forEachIndexed { i, sug ->
+                    if (i > 0) Divider()
+                    SwitchRow(sug.name, news.openwire.domain.engine.Languages.of(sug.language)?.nativeName ?: sug.language, s.customFeeds.any { it.url == sug.url }) {
+                        vm.toggleLocalSource(sug, it)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A country's name in the app's language ("Egypt", "مصر", "Égypte"). */
+@Composable
+private fun countryName(code: String): String {
+    val lang = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    return java.util.Locale("", code).getDisplayCountry(lang).ifBlank { TopicRegistry.country(code).name }
+}
+
+// ---- Language -----------------------------------------------------------------------------
+
+@Composable
+private fun LanguagePage(vm: SettingsViewModel) {
+    val s by vm.settings.collectAsState()
+    val activity = LocalContext.current.findActivity()
+    val pick: (String) -> Unit = { tag -> if (tag != s.language) { vm.setLanguage(tag); activity?.let { news.openwire.i18n.AppLocale.apply(it, tag) } } }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Hint(stringResource(R.string.language_hint))
+        Section {
+            val phone = news.openwire.domain.engine.Languages.of(android.content.res.Resources.getSystem().configuration.locales[0].language)
+            SelectRow(stringResource(R.string.language_system), phone?.nativeName ?: "English", s.language.isEmpty()) { pick("") }
+            news.openwire.domain.engine.Languages.ALL.forEach { l ->
+                Divider()
+                SelectRow(l.nativeName, l.englishName, s.language == l.code) { pick(l.code) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SelectRow(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = sans(15.sp, FontWeight.Medium), color = Glass.textPrimary)
+            Text(subtitle, style = sans(12.sp), color = Glass.textSecondary)
+        }
+        CheckDot(selected)
     }
 }
 
 // ---- Topics -----------------------------------------------------------------------------
 
 private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit) {
-    item { Hint("Reorder with the arrows, hide topics you don't read, and tap the bell to get a local notification when new stories land.") }
-    item { PrimaryButton("New topic from keywords or sources", Icons.Filled.Add, onAdd) }
+    item { Hint(tr(R.string.topics_hint)) }
+    item { PrimaryButton(tr(R.string.topics_new_button), Icons.Filled.Add, onAdd) }
     item {
         val topics by vm.allTopics.collectAsState()
         val s by vm.settings.collectAsState()
@@ -320,28 +447,28 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit) {
                         Text(t.label, style = sans(14.sp, FontWeight.SemiBold), color = if (t.isVisible) Glass.textPrimary else Glass.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             when {
-                                t.isCustom && t.keywords.isNotEmpty() -> "Keywords: " + t.keywords.joinToString()
-                                t.isCustom -> "${t.sources.size} sources"
-                                t.liveOnly -> "Live · Google News"
-                                else -> "Published snapshot"
+                                t.isCustom && t.keywords.isNotEmpty() -> tr(R.string.topic_keywords, t.keywords.joinToString())
+                                t.isCustom -> tr(R.string.topic_sources, t.sources.size)
+                                t.liveOnly -> tr(R.string.topic_live)
+                                else -> tr(R.string.topic_snapshot)
                             },
                             style = sans(11.sp), color = Glass.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    SmallIcon(Icons.Filled.KeyboardArrowUp, "Move up", enabled = i > 0) { vm.moveTopic(t.id, up = true) }
-                    SmallIcon(Icons.Filled.KeyboardArrowDown, "Move down", enabled = i < topics.lastIndex) { vm.moveTopic(t.id, up = false) }
+                    SmallIcon(Icons.Filled.KeyboardArrowUp, tr(R.string.cd_move_up), enabled = i > 0) { vm.moveTopic(t.id, up = true) }
+                    SmallIcon(Icons.Filled.KeyboardArrowDown, tr(R.string.cd_move_down), enabled = i < topics.lastIndex) { vm.moveTopic(t.id, up = false) }
                     val notify = t.id in s.notifyTopics
                     SmallIcon(
                         if (notify) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsNone,
-                        if (notify) "Stop notifications" else "Notify me", tint = if (notify) Glass.accent else null,
+                        tr(if (notify) R.string.cd_stop_notify else R.string.cd_notify_me), tint = if (notify) Glass.accent else null,
                     ) { vm.setNotifyTopic(t.id, !notify) }
-                    if (t.isCustom) SmallIcon(Icons.Outlined.Delete, "Delete topic") { vm.deleteTopic(t.id) }
+                    if (t.isCustom) SmallIcon(Icons.Outlined.Delete, tr(R.string.cd_delete_topic)) { vm.deleteTopic(t.id) }
                     GlassSwitch(t.isVisible) { vm.setTopicVisible(t.id, it) }
                 }
             }
         }
     }
-    item { TextButton("Reset topics & edition to defaults") { vm.resetTopics() } }
+    item { TextButton(tr(R.string.topics_reset)) { vm.resetTopics() } }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -353,19 +480,19 @@ private fun AddTopicPage(vm: SettingsViewModel, onDone: () -> Unit) {
     var filter by rememberSaveable { mutableStateOf("") }
     val library by vm.library.collectAsState()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Hint("Keywords search Google News and also filter your chosen sources by headline and excerpt. Pick sources only to build a topic from specific publishers.")
+        Hint(tr(R.string.add_topic_hint))
         val ideas by vm.keywordIdeas.collectAsState()
         // Presets matching what's typed ("Middle E" → Middle East with Iran, Israel, Lebanon, …).
         val matches = remember(name) { news.openwire.domain.engine.TopicPresets.suggest(name) }
         val exact = matches.firstOrNull { it.name.equals(name.trim(), ignoreCase = true) }
         Section {
-            Label("Popular topics")
+            Label(tr(R.string.popular_topics))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 news.openwire.domain.engine.TopicPresets.POPULAR.forEach { p -> Chip(p.name, selected = name == p.name) { name = p.name; keywords = p.keywordText; vm.clearKeywordIdeas() } }
             }
         }
         Section {
-            Field("Topic name", name, { name = it; vm.clearKeywordIdeas() }, placeholder = "e.g. Middle East")
+            Field(tr(R.string.topic_name), name, { name = it; vm.clearKeywordIdeas() }, placeholder = tr(R.string.topic_name_eg))
             if (matches.isNotEmpty() && exact?.keywordText != keywords) {
                 Spacer(Modifier.height(6.dp))
                 matches.forEach { p ->
@@ -380,14 +507,14 @@ private fun AddTopicPage(vm: SettingsViewModel, onDone: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Field("Keywords (comma-separated)", keywords, { keywords = it }, placeholder = "e.g. Iran, Israel, Lebanon, Yemen")
+            Field(tr(R.string.keywords_field), keywords, { keywords = it }, placeholder = tr(R.string.keywords_eg))
             // Not a preset: offer keywords drawn from today's headlines about it.
             if (name.trim().length >= 3 && exact == null) {
                 Spacer(Modifier.height(10.dp))
                 when (val i = ideas) {
-                    is KeywordIdeas.Loading -> Text("Reading the latest “${i.topic}” headlines…", style = sans(12.sp), color = Glass.textSecondary)
+                    is KeywordIdeas.Loading -> Text(tr(R.string.ideas_loading, i.topic), style = sans(12.sp), color = Glass.textSecondary)
                     is KeywordIdeas.Ready -> {
-                        Text("From today's “${i.topic}” headlines. Tap to add:", style = sans(11.sp), color = Glass.textSecondary)
+                        Text(tr(R.string.ideas_found, i.topic), style = sans(11.sp), color = Glass.textSecondary)
                         Spacer(Modifier.height(6.dp))
                         val current = TopicRegistry.parseCommaKeywords(keywords).map { it.lowercase() }.toSet()
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -399,14 +526,14 @@ private fun AddTopicPage(vm: SettingsViewModel, onDone: () -> Unit) {
                             }
                         }
                     }
-                    is KeywordIdeas.Failed -> Text("Couldn't find enough headlines for “${i.topic}”. Add keywords by hand.", style = sans(12.sp), color = Glass.textSecondary)
-                    KeywordIdeas.Idle -> Chip("Suggest keywords from the news", selected = false) { vm.suggestKeywords(name) }
+                    is KeywordIdeas.Failed -> Text(tr(R.string.ideas_failed, i.topic), style = sans(12.sp), color = Glass.textSecondary)
+                    KeywordIdeas.Idle -> Chip(tr(R.string.ideas_suggest), selected = false) { vm.suggestKeywords(name) }
                 }
             }
         }
         Section {
-            Label("Sources (optional) · ${chosen.size} selected")
-            Field("Filter sources", filter, { filter = it })
+            Label(tr(R.string.sources_optional, chosen.size))
+            Field(tr(R.string.filter_sources), filter, { filter = it })
             Spacer(Modifier.height(6.dp))
             library.filter { !it.isPrimary && (filter.isBlank() || it.name.contains(filter, true) || it.domain.contains(filter, true)) }
                 .take(if (filter.isBlank()) 40 else 80)
@@ -423,18 +550,18 @@ private fun AddTopicPage(vm: SettingsViewModel, onDone: () -> Unit) {
                     }
                 }
         }
-        PrimaryButton("Create topic") { if (vm.addTopic(name, keywords, chosen.toList())) onDone() }
+        PrimaryButton(tr(R.string.create_topic)) { if (vm.addTopic(name, keywords, chosen.toList())) onDone() }
     }
 }
 
 // ---- Sources ------------------------------------------------------------------------------
 
 private fun LazyListScope.sourcesPage(vm: SettingsViewModel, onAdd: () -> Unit) {
-    item { Hint("Direct publisher feeds are woven into topics with a fair share each. Switch off anything you'd rather not read.") }
+    item { Hint(tr(R.string.sources_hint)) }
     item {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.weight(1f)) { PrimaryButton("Add a source", Icons.Filled.Add, onAdd) }
-            Box(Modifier.weight(1f)) { SecondaryButton("Check enabled feeds") { vm.checkEnabledFeeds() } }
+            Box(Modifier.weight(1f)) { PrimaryButton(tr(R.string.add_source), Icons.Filled.Add, onAdd) }
+            Box(Modifier.weight(1f)) { SecondaryButton(tr(R.string.check_feeds)) { vm.checkEnabledFeeds() } }
         }
     }
     item {
@@ -442,7 +569,7 @@ private fun LazyListScope.sourcesPage(vm: SettingsViewModel, onAdd: () -> Unit) 
         val library by vm.library.collectAsState()
         val checks by vm.checks.collectAsState()
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Field("Search sources", filter, { filter = it })
+            Field(tr(R.string.search_sources), filter, { filter = it })
             SourceLibrary.groupSources(library, filter).forEach { group ->
                 Section {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -451,7 +578,7 @@ private fun LazyListScope.sourcesPage(vm: SettingsViewModel, onAdd: () -> Unit) 
                         Spacer(Modifier.width(8.dp))
                         GlassSwitch(group.all.all { it.enabled }) { vm.setGroupEnabled(group.all, it) }
                     }
-                    listOf("News aggregators" to group.aggregators, "Individual news feeds" to group.publishers).forEach { (title, list) ->
+                    listOf(tr(R.string.aggregators) to group.aggregators, tr(R.string.individual_feeds) to group.publishers).forEach { (title, list) ->
                         if (list.isEmpty()) return@forEach
                         Spacer(Modifier.height(8.dp))
                         Text(title, style = sans(11.sp, FontWeight.Medium), color = Glass.textSecondary)
@@ -461,7 +588,7 @@ private fun LazyListScope.sourcesPage(vm: SettingsViewModel, onAdd: () -> Unit) 
             }
         }
     }
-    item { TextButton("Reset sources to defaults") { vm.resetSources() } }
+    item { TextButton(tr(R.string.sources_reset)) { vm.resetSources() } }
 }
 
 @Composable
@@ -472,10 +599,10 @@ private fun SourceRow(src: FeedSource, check: news.openwire.data.repository.Feed
         Column(Modifier.weight(1f)) {
             Text(src.name, style = sans(13.sp, FontWeight.Medium), color = if (src.enabled) Glass.textPrimary else Glass.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val detail = when {
-                checking && check == null -> "Checking…"
-                check?.ok == true -> "✓ ${check.count} stories" + (check.newestAt?.let { " · newest ${NewsProcessor.formatRelativeTime(it)}" } ?: "") + if (check.stale) " · stale" else ""
+                checking && check == null -> tr(R.string.checking)
+                check?.ok == true -> "✓ " + tr(R.string.check_stories, check.count) + (check.newestAt?.let { " · " + tr(R.string.check_newest, NewsProcessor.formatRelativeTime(it)) } ?: "") + if (check.stale) " · " + tr(R.string.check_stale) else ""
                 check != null -> "✗ ${check.error}"
-                else -> listOfNotNull(src.domain.ifEmpty { null }, src.access, if (src.isCustom) "Your source" else null).joinToString(" · ")
+                else -> listOfNotNull(src.domain.ifEmpty { null }, src.access, if (src.isCustom) tr(R.string.your_source) else null).joinToString(" · ")
             }
             Text(
                 detail, style = sans(11.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -483,7 +610,7 @@ private fun SourceRow(src: FeedSource, check: news.openwire.data.repository.Feed
             )
         }
         if (checking && check == null) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Glass.accent)
-        if (src.isCustom) SmallIcon(Icons.Outlined.Delete, "Remove source") { vm.deleteSource(src.id) }
+        if (src.isCustom) SmallIcon(Icons.Outlined.Delete, tr(R.string.cd_remove_source)) { vm.deleteSource(src.id) }
         GlassSwitch(src.enabled) { vm.setSourceEnabled(src, it) }
     }
 }
@@ -498,22 +625,22 @@ private fun AddSourcePage(vm: SettingsViewModel, onDone: () -> Unit) {
     val chosen = remember { mutableStateListOf<String>() }
     val topics by vm.allTopics.collectAsState()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Hint("Paste any RSS or Atom feed. Editrove reads it directly on your phone — no converter services.")
+        Hint(tr(R.string.add_source_hint))
         Section {
-            Field("Name (optional)", name, { name = it }, placeholder = "e.g. Polygon")
+            Field(tr(R.string.name_optional), name, { name = it }, placeholder = "e.g. Polygon")
             Spacer(Modifier.height(10.dp))
-            Field("Feed URL", url, { url = it }, placeholder = "https://www.polygon.com/rss/index.xml", keyboard = KeyboardType.Uri)
+            Field(tr(R.string.feed_url), url, { url = it }, placeholder = "https://www.polygon.com/rss/index.xml", keyboard = KeyboardType.Uri)
         }
         Section {
-            Label("Weave into topics")
+            Label(tr(R.string.weave_into))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 topics.forEach { t -> Chip(t.label, selected = t.id in chosen) { if (t.id in chosen) chosen.remove(t.id) else chosen.add(t.id) } }
             }
             Spacer(Modifier.height(14.dp))
-            Label("Fair share: up to $quota stories per refresh")
+            Label(tr(R.string.fair_share, quota))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { (7..10).forEach { q -> Chip("$q", selected = quota == q) { quota = q } } }
         }
-        PrimaryButton(if (busy) "Checking the feed…" else "Verify & add") {
+        PrimaryButton(tr(if (busy) R.string.checking_feed else R.string.verify_add)) {
             if (busy) return@PrimaryButton
             busy = true
             vm.addSource(name, url, chosen.toList(), quota) { ok -> busy = false; if (ok) onDone() }
@@ -524,7 +651,7 @@ private fun AddSourcePage(vm: SettingsViewModel, onDone: () -> Unit) {
 // ---- Paywall rules -------------------------------------------------------------------------
 
 private fun LazyListScope.rulesPage(vm: SettingsViewModel) {
-    item { Hint("Each publisher is routed by a strategy. Hard paywalls use archive snapshots; if none exists the headline is greyed out and locked.") }
+    item { Hint(tr(R.string.rules_hint)) }
     item {
         val s by vm.settings.collectAsState()
         val status by vm.serviceStatus.collectAsState()
@@ -532,10 +659,10 @@ private fun LazyListScope.rulesPage(vm: SettingsViewModel) {
         Section {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("READER SERVICES", style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = Glass.textSecondary)
-                    Text("If one is down, changed or switched off, Editrove falls back to the next — then to archive snapshots.", style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary)
+                    Text(tr(R.string.reader_services), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = Glass.textSecondary)
+                    Text(tr(R.string.reader_services_hint), style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary)
                 }
-                SmallIcon(androidx.compose.material.icons.Icons.Filled.Refresh, "Check services") { vm.checkServices() }
+                SmallIcon(androidx.compose.material.icons.Icons.Filled.Refresh, tr(R.string.cd_check_services)) { vm.checkServices() }
             }
             news.openwire.domain.engine.BypassServices.ALL.forEach { svc ->
                 Divider()
@@ -552,10 +679,10 @@ private fun LazyListScope.rulesPage(vm: SettingsViewModel) {
                         Text(svc.name, style = sans(14.sp, FontWeight.Medium), color = if (enabled) Glass.textPrimary else Glass.textMuted)
                         Text(
                             when {
-                                !enabled -> "Switched off — skipped when routing"
-                                st == null -> if (status.containsKey(svc.strategy)) "Checking…" else svc.homeUrl
-                                st.up -> "Reachable" + (st.code?.let { " · HTTP $it" } ?: "")
-                                else -> "Unavailable · ${st.error}"
+                                !enabled -> tr(R.string.svc_off)
+                                st == null -> if (status.containsKey(svc.strategy)) tr(R.string.checking) else svc.homeUrl
+                                st.up -> tr(R.string.svc_reachable) + (st.code?.let { " · HTTP $it" } ?: "")
+                                else -> tr(R.string.svc_unavailable, st.error.orEmpty())
                             },
                             style = sans(11.sp), color = Glass.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
@@ -569,12 +696,12 @@ private fun LazyListScope.rulesPage(vm: SettingsViewModel) {
         var domain by rememberSaveable { mutableStateOf("") }
         var strategy by rememberSaveable { mutableStateOf(Strategy.SMRY) }
         Section {
-            Label("Add or override a publisher")
-            Field("Domain", domain, { domain = it }, placeholder = "e.g. economist.com", keyboard = KeyboardType.Uri)
+            Label(tr(R.string.rule_add))
+            Field(tr(R.string.domain), domain, { domain = it }, placeholder = "e.g. economist.com", keyboard = KeyboardType.Uri)
             Spacer(Modifier.height(10.dp))
             StrategyPicker(strategy) { strategy = it }
             Spacer(Modifier.height(12.dp))
-            PrimaryButton("Save rule") { vm.setRule(domain, strategy); domain = "" }
+            PrimaryButton(tr(R.string.rule_save)) { vm.setRule(domain, strategy); domain = "" }
         }
     }
     item {
@@ -582,7 +709,7 @@ private fun LazyListScope.rulesPage(vm: SettingsViewModel) {
         var editing by remember { mutableStateOf<String?>(null) }
         val rules by vm.rules.collectAsState()
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Field("Search publishers", filter, { filter = it })
+            Field(tr(R.string.search_publishers), filter, { filter = it })
             Section {
                 val list = rules.values.filter { filter.isBlank() || it.domain.contains(filter, true) || it.label.orEmpty().contains(filter, true) }
                     .sortedWith(compareByDescending<news.openwire.domain.model.DomainRule> { it.isCustom }.thenBy { it.label ?: it.domain })
@@ -594,14 +721,14 @@ private fun LazyListScope.rulesPage(vm: SettingsViewModel) {
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(r.label?.takeIf { it.isNotBlank() } ?: r.domain, style = sans(13.sp, FontWeight.Medium), color = Glass.textPrimary, maxLines = 1)
-                                Text(r.domain + (r.paywall?.let { " · $it paywall" } ?: ""), style = sans(11.sp), color = Glass.textSecondary, maxLines = 1)
+                                Text(r.domain + (r.paywall?.let { " · " + tr(R.string.paywall_kind, it) } ?: ""), style = sans(11.sp), color = Glass.textSecondary, maxLines = 1)
                             }
                             StrategyBadge(r.strategy, r.isCustom)
                         }
                         AnimatedVisibility(editing == r.domain, enter = expandVertically(springTween(300)) + fadeIn(), exit = shrinkVertically(springTween(250)) + fadeOut()) {
                             Column(Modifier.padding(top = 10.dp)) {
                                 StrategyPicker(r.strategy) { vm.setRule(r.domain, it) }
-                                if (r.isCustom) { Spacer(Modifier.height(8.dp)); TextButton("Reset to default") { vm.resetRule(r.domain) } }
+                                if (r.isCustom) { Spacer(Modifier.height(8.dp)); TextButton(tr(R.string.rule_reset)) { vm.resetRule(r.domain) } }
                             }
                         }
                     }
@@ -609,7 +736,7 @@ private fun LazyListScope.rulesPage(vm: SettingsViewModel) {
             }
         }
     }
-    item { TextButton("Reset all paywall rules") { vm.resetAllRules() } }
+    item { TextButton(tr(R.string.rules_reset_all)) { vm.resetAllRules() } }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -621,7 +748,7 @@ private fun StrategyPicker(current: Strategy, onPick: (Strategy) -> Unit) {
 }
 
 private fun strategyLabel(s: Strategy) = when (s) {
-    Strategy.DIRECT -> "Direct"; Strategy.SMRY -> "SMRY"; Strategy.REMOVEPAYWALL -> "RemovePaywall"; Strategy.UNWALL -> "UnWall"
+    Strategy.DIRECT -> tr(R.string.strategy_direct); Strategy.SMRY -> "SMRY"; Strategy.REMOVEPAYWALL -> "RemovePaywall"; Strategy.UNWALL -> "UnWall"
     Strategy.FREEDIUM -> "Freedium"; Strategy.READER -> "Reader"; Strategy.ARCHIVE_IS -> "Archive.is"; Strategy.WAYBACK -> "Wayback"
 }
 
@@ -643,54 +770,52 @@ private fun NotificationsPage(vm: SettingsViewModel) {
     val topics by vm.allTopics.collectAsState()
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         vm.setNotificationsEnabled(granted)
-        if (!granted) Toast.makeText(context, "Notifications are blocked for Editrove in system settings.", Toast.LENGTH_LONG).show()
+        if (!granted) Toast.makeText(context, tr(R.string.notify_blocked), Toast.LENGTH_LONG).show()
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Hint("Notifications are generated on your phone — Editrove has no server and no push. Every topic is off until you opt in.")
+        Hint(tr(R.string.notify_hint))
         Section {
-            SwitchRow("Notifications", "Master switch for new-headline alerts", s.notificationsEnabled) { on ->
+            SwitchRow(tr(R.string.notifications), tr(R.string.notify_master), s.notificationsEnabled) { on ->
                 if (on && Build.VERSION.SDK_INT >= 33 &&
                     ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
                 ) permission.launch(Manifest.permission.POST_NOTIFICATIONS) else vm.setNotificationsEnabled(on)
             }
             Divider()
-            SwitchRow("Background refresh", "Refresh feeds and home-screen widgets ${refreshLabel(s.refreshMinutes, long = true)}, so the app opens fresh", s.backgroundRefresh) { vm.setBackgroundRefresh(it) }
+            SwitchRow(tr(R.string.bg_refresh), tr(R.string.bg_refresh_sub, refreshLabel(s.refreshMinutes, long = true)), s.backgroundRefresh) { vm.setBackgroundRefresh(it) }
         }
         Section {
-            Label("Refresh every")
+            Label(tr(R.string.refresh_every))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 news.openwire.domain.engine.REFRESH_CHOICES.forEach { m -> Chip(refreshLabel(m), selected = m == s.refreshMinutes) { vm.setRefreshMinutes(m) } }
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "How often Editrove updates feeds, widgets, topic alerts and breaking news in the background. " +
-                    "More frequent refreshes keep everything newer but use more battery and data. " +
-                    "Android may stretch the interval when battery saver is on or the phone is idle.",
+                tr(R.string.refresh_hint),
                 style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary,
             )
         }
         Section {
-            Label("Breaking news")
+            Label(tr(R.string.breaking_news))
             SwitchRow(
-                "Breaking news alerts",
-                "Heads-up alerts when a newsroom you follow breaks a story: labelled “Breaking”, or minutes old and already carried by many outlets. Separate from topic alerts.",
+                tr(R.string.breaking_alerts),
+                tr(R.string.breaking_alerts_sub),
                 s.breakingEnabled, enabled = s.notificationsEnabled,
             ) { vm.setBreakingEnabled(it) }
             if (s.breakingEnabled) {
                 Spacer(Modifier.height(10.dp))
-                Label("Watch these newsrooms · ${s.breakingOutlets.size}")
+                Label(tr(R.string.breaking_watch, s.breakingOutlets.size))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     news.openwire.domain.engine.BreakingNews.OUTLETS.forEach { o -> Chip(o.name, selected = o.key in s.breakingOutlets) { vm.toggleBreakingOutlet(o.key) } }
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Checked on every background refresh (${refreshLabel(s.refreshMinutes, long = true)}). For faster alerts, refresh every 15 or 30 minutes.",
+                    tr(R.string.breaking_checked, refreshLabel(s.refreshMinutes, long = true)),
                     style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary,
                 )
             }
         }
         Section {
-            Label("Notify me about")
+            Label(tr(R.string.notify_about))
             topics.filter { it.isVisible }.forEachIndexed { i, t ->
                 if (i > 0) Divider()
                 SwitchRow(t.label, null, t.id in s.notifyTopics, enabled = s.notificationsEnabled) { vm.setNotifyTopic(t.id, it) }
@@ -700,9 +825,9 @@ private fun NotificationsPage(vm: SettingsViewModel) {
 }
 
 private fun refreshLabel(minutes: Int, long: Boolean = false): String = when {
-    minutes < 60 -> if (long) "every $minutes minutes" else "$minutes min"
-    minutes == 60 -> if (long) "about once an hour" else "1 hour"
-    else -> if (long) "every ${minutes / 60} hours" else "${minutes / 60} hours"
+    minutes < 60 -> if (long) tr(R.string.every_minutes, minutes) else tr(R.string.n_min, minutes)
+    minutes == 60 -> if (long) tr(R.string.once_an_hour) else tr(R.string.one_hour)
+    else -> if (long) tr(R.string.every_hours, minutes / 60) else tr(R.string.n_hours, minutes / 60)
 }
 
 // ---- Appearance --------------------------------------------------------------------------------
@@ -713,36 +838,36 @@ private fun AppearancePage(vm: SettingsViewModel, themeMode: ThemeMode, onTheme:
     val s by vm.settings.collectAsState()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Section {
-            Label("Theme")
+            Label(tr(R.string.theme))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { ThemeMode.entries.forEach { m -> Chip(themeLabel(m), selected = m == themeMode) { onTheme(m) } } }
         }
         Section {
-            Label("Unfolded & tablet layout")
+            Label(tr(R.string.unfolded_layout))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                news.openwire.domain.model.UnfoldedLayout.entries.forEach { m -> Chip(m.label, selected = m == s.unfoldedLayout) { vm.setUnfoldedLayout(m) } }
+                news.openwire.domain.model.UnfoldedLayout.entries.forEach { m -> Chip(m.text, selected = m == s.unfoldedLayout) { vm.setUnfoldedLayout(m) } }
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "Split view keeps the feed and the story side by side. Full view uses the whole screen for each page, and stories open as full pages.",
+                tr(R.string.layout_hint),
                 style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary,
             )
         }
         Section {
-            Label("Feed order")
+            Label(tr(R.string.feed_order))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SortMode.entries.forEach { m -> Chip(m.label, selected = m == s.sortMode) { vm.setSortMode(m) } }
+                SortMode.entries.forEach { m -> Chip(m.text, selected = m == s.sortMode) { vm.setSortMode(m) } }
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "Curated leads with the stories editors placed highest and the most outlets are covering, weighted for freshness and source quality. Newest and Oldest sort by time.",
+                tr(R.string.order_hint),
                 style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary,
             )
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Tune to my reading", style = sans(14.sp, FontWeight.SemiBold), color = Glass.textPrimary)
+                    Text(tr(R.string.tune), style = sans(14.sp, FontWeight.SemiBold), color = Glass.textPrimary)
                     Text(
-                        "Gently favour outlets you save and like. Worked out on this device; nothing is sent anywhere.",
+                        tr(R.string.tune_sub),
                         style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary,
                     )
                 }
@@ -761,27 +886,27 @@ private fun BackupPage(vm: SettingsViewModel) {
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(vm.exportJson().toByteArray()) } }
-            .onSuccess { Toast.makeText(context, "Settings exported.", Toast.LENGTH_SHORT).show() }
-            .onFailure { Toast.makeText(context, "Couldn't save the file.", Toast.LENGTH_SHORT).show() }
+            .onSuccess { Toast.makeText(context, tr(R.string.exported), Toast.LENGTH_SHORT).show() }
+            .onFailure { Toast.makeText(context, tr(R.string.save_failed), Toast.LENGTH_SHORT).show() }
     }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
         val text = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() } }.getOrNull()
-        if (text == null) Toast.makeText(context, "Couldn't read the file.", Toast.LENGTH_SHORT).show() else vm.importJson(text)
+        if (text == null) Toast.makeText(context, tr(R.string.read_failed), Toast.LENGTH_SHORT).show() else vm.importJson(text)
     }
     var confirmReset by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Hint("One JSON file with your topics, edition, sources and paywall rules. It also imports backups exported from the OpenWire web app.")
-        PrimaryButton("Export settings") { exporter.launch("openwire_settings_${LocalDate.now()}.json") }
-        SecondaryButton("Import settings") { importer.launch(arrayOf("application/json", "text/plain", "*/*")) }
+        Hint(tr(R.string.backup_hint))
+        PrimaryButton(tr(R.string.export_settings)) { exporter.launch("openwire_settings_${LocalDate.now()}.json") }
+        SecondaryButton(tr(R.string.import_settings)) { importer.launch(arrayOf("application/json", "text/plain", "*/*")) }
         Spacer(Modifier.height(8.dp))
-        if (!confirmReset) TextButton("Reset everything to defaults") { confirmReset = true }
+        if (!confirmReset) TextButton(tr(R.string.reset_everything)) { confirmReset = true }
         else Section {
-            Text("Reset topics, edition, sources, paywall rules and preferences? Saved stories are kept.", style = sans(13.sp, lineHeight = 19.sp), color = Glass.textPrimary)
+            Text(tr(R.string.reset_confirm), style = sans(13.sp, lineHeight = 19.sp), color = Glass.textPrimary)
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.weight(1f)) { SecondaryButton("Cancel") { confirmReset = false } }
-                Box(Modifier.weight(1f)) { PrimaryButton("Reset") { vm.resetEverything(); confirmReset = false } }
+                Box(Modifier.weight(1f)) { SecondaryButton(tr(R.string.action_cancel)) { confirmReset = false } }
+                Box(Modifier.weight(1f)) { PrimaryButton(tr(R.string.reset)) { vm.resetEverything(); confirmReset = false } }
             }
         }
     }
@@ -796,25 +921,25 @@ private fun AboutPage() {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Section {
             Text("Editrove", style = serif(28.sp, FontWeight.Bold), color = Glass.textPrimary)
-            Text("Version $version", style = mono(11.sp), color = Glass.textSecondary)
+            Text(tr(R.string.version, version), style = mono(11.sp), color = Glass.textSecondary)
             Spacer(Modifier.height(10.dp))
             Text(
-                "A fast, ad-free and tracking-free news reader with a paywall-routing engine. No accounts, no analytics, no server of its own — your settings and saved stories never leave this device.",
+                tr(R.string.about_body),
                 style = sans(13.sp, lineHeight = 20.sp), color = Glass.textPrimary,
             )
         }
         Section {
-            Label("Credits")
+            Label(tr(R.string.credits))
             Text(
-                "Editrove — editorial judgment meets a trove of stories. Editrove began as a fork of the original OpenWire web app by Anson Lai, whose paywall engine, source catalog and feed pipeline it ports and builds on.",
+                tr(R.string.credits_body),
                 style = sans(13.sp, lineHeight = 20.sp), color = Glass.textPrimary,
             )
             Spacer(Modifier.height(10.dp))
-            Text("Typefaces: Newsreader, Inter and JetBrains Mono (SIL Open Font License). Briefing music: royalty-free from Fesliyan Studios (fesliyanstudios.com).", style = sans(12.sp, lineHeight = 18.sp), color = Glass.textSecondary)
+            Text(tr(R.string.credits_type), style = sans(12.sp, lineHeight = 18.sp), color = Glass.textSecondary)
         }
         Section {
-            Label("License")
-            Text("Free software under the GNU Affero General Public License v3.0. Source code: github.com/mgmourad/Editrove", style = sans(13.sp, lineHeight = 20.sp), color = Glass.textPrimary)
+            Label(tr(R.string.license))
+            Text(tr(R.string.license_body), style = sans(13.sp, lineHeight = 20.sp), color = Glass.textPrimary)
         }
     }
 }

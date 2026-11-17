@@ -7,6 +7,11 @@ package news.openwire.domain.model
  */
 data class UserSettings(
     val edition: LocalEdition = LocalEdition.DEFAULT,
+    /** Editrove's language ("" = the phone's). Also picks the language topic feeds read in. */
+    val language: String = "",
+    /** Edition and language before the last switch, for a one-tap way back. */
+    val previousEdition: LocalEdition? = null,
+    val previousLanguage: String? = null,
     val customTopics: List<Topic> = emptyList(),
     val hiddenTopics: Set<String> = emptySet(),
     /** Topic ids in display order; null = default order. */

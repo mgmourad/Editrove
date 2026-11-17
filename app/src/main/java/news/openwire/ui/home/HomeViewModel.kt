@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
@@ -33,7 +35,11 @@ import news.openwire.domain.model.SortMode
 import news.openwire.domain.model.Topic
 import news.openwire.domain.model.UserSettings
 
-enum class NavTab(val label: String) { TODAY("Today"), DISCOVER("Discover"), AUDIO("Audio"), SAVED("Saved") }
+enum class NavTab(@androidx.annotation.StringRes private val res: Int) {
+    TODAY(R.string.tab_today), DISCOVER(R.string.tab_discover), AUDIO(R.string.tab_audio), SAVED(R.string.tab_saved);
+
+    val label: String get() = tr(res)
+}
 
 /** Hard-paywall archive availability for a story (SPEC §6.2 grey-out). */
 sealed interface ArchiveState {
@@ -62,7 +68,7 @@ class HomeViewModel(
     val settings: StateFlow<UserSettings> = settingsRepo.settings
 
     /** All topics (ordered, with visibility) for the current settings. */
-    private fun allTopicsFor(s: UserSettings) = TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder)
+    private fun allTopicsFor(s: UserSettings) = TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder, s.language)
 
     val topicsState: StateFlow<List<Topic>> = settings
         .map { s -> allTopicsFor(s).filter { it.isVisible } }
@@ -218,7 +224,7 @@ class HomeViewModel(
     fun openLink(text: String?, subject: String? = null, title: String? = null): Boolean {
         val url = SharedUrl.extract(text, subject)
         if (url.isEmpty()) {
-            _messages.trySend("That doesn't look like a web link.")
+            _messages.trySend(tr(R.string.msg_not_a_link))
             return false
         }
         val domain = registry.normalizeDomain(url)

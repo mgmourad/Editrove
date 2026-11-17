@@ -193,14 +193,17 @@ class FeedRepositoryImpl(
         if (cached.isNotEmpty()) emit(FeedResult.Success(cached, fromCache = true, updatedAt = feedState?.lastUpdated(topic.id) ?: 0L, refreshing = true))
 
         val primaryUrl = topic.liveUrl?.takeIf { "google_news" !in s.disabledSources || !it.contains("news.google.com") }
-        val feeds = SourceLibrary.feedsForTopic(topic, catalog(), s.customFeeds, s.disabledSources)
+        // A topic read in another language (Arabic, French…) keeps to that language: the built-in
+        // catalog and the published snapshot are English, so only the reader's own sources join it.
+        val foreign = news.openwire.domain.engine.Languages.feedLanguage(topic.liveUrl)?.let { it != "en" } == true
+        val feeds = SourceLibrary.feedsForTopic(topic, catalog(), s.customFeeds, s.disabledSources).filter { !foreign || it.isCustom }
         val configs = buildList {
             if (primaryUrl != null) add(SourceLibrary.GOOGLE_NEWS.copy(url = primaryUrl, name = if (primaryUrl.contains("news.google.com")) "Google News" else topic.label))
             addAll(feeds)
         }.distinctBy { it.url }
         // A built-in topic whose sources were edited still leads with its published front page,
         // minus stories from the sources the reader switched off.
-        val snapshotOk = topic.snapshotFile != null && !topic.isCustom
+        val snapshotOk = topic.snapshotFile != null && !topic.isCustom && !foreign
         suspend fun loadPublished(): List<Article> =
             // Without the stories of switched-off feeds (the snapshot records each story's feed).
             runCatching { remote.fetchTopic(topic.snapshotFile!!).mapIndexed { i, d -> d.toArticle(rank = i) } }.getOrDefault(emptyList())

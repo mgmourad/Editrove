@@ -30,6 +30,7 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        news.openwire.i18n.L10n.init(this)
         container = AppContainer(this)
         // Scheduling and widget sync belong to the main process only (WorkManager lives there).
         if (!isMainProcess()) return
@@ -67,7 +68,7 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
         object : BackgroundRefresher {
             override suspend fun refresh(): List<TopicUpdate> {
                 val s = container.settingsRepository.settings.value
-                val topics = TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder)
+                val topics = TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder, s.language)
                     .filter { it.isVisible && (s.backgroundRefresh || it.id in s.notifyTopics) }
                 val updates = mutableListOf<TopicUpdate>()
                 val now = System.currentTimeMillis()

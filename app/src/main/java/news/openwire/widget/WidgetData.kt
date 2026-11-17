@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.widget
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -40,7 +42,7 @@ object WidgetData {
     /** The user's visible topics, in their order. */
     fun topics(context: Context): List<Topic> {
         val s = container(context).settingsRepository.settings.value
-        return TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder).filter { it.isVisible }
+        return TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder, s.language).filter { it.isVisible }
     }
 
     /** Topics the Topic widget cycles through (Top Stories has its own widget; Latest isn't a topic). */
@@ -141,23 +143,23 @@ object WidgetData {
         }
 
     private val SECTIONS = listOf(
-        "Politics" to Regex("\\b(Trump|Biden|Senate|Congress|House|election|White House|governor|Supreme Court|lawmakers?|Democrats?|Republicans?|GOP)\\b", RegexOption.IGNORE_CASE),
-        "World" to Regex("\\b(Iran|Israel|Gaza|Ukraine|Russia|China|NATO|Xi|Putin|Zelensky|Europe|EU|UN|Japan|India|Korea|Mexico|Canada)\\b", RegexOption.IGNORE_CASE),
-        "Markets" to Regex("\\b(stocks?|markets?|Fed|economy|inflation|tariffs?|Nvidia|earnings|rates?|Wall Street|jobs)\\b", RegexOption.IGNORE_CASE),
-        "Tech" to Regex("\\b(AI|Apple|Google|Microsoft|OpenAI|chips?|software|iPhone|Android|Meta|Tesla)\\b"),
-        "Science" to Regex("\\b(NASA|space|climate|study|scientists?|species|planet|vaccine|health)\\b", RegexOption.IGNORE_CASE),
-        "U.S." to Regex("\\b(NTSB|FBI|police|court|judge|shooting|crash|collision|flights?|airport|FAA|National Guard|immigration|ICE)\\b", RegexOption.IGNORE_CASE),
-        "Weather" to Regex("\\b(storm|hurricane|waves|flood|wildfire|earthquake|snow|heat)\\b", RegexOption.IGNORE_CASE),
+        R.string.sec_politics to Regex("\\b(Trump|Biden|Senate|Congress|House|election|White House|governor|Supreme Court|lawmakers?|Democrats?|Republicans?|GOP)\\b", RegexOption.IGNORE_CASE),
+        R.string.sec_world to Regex("\\b(Iran|Israel|Gaza|Ukraine|Russia|China|NATO|Xi|Putin|Zelensky|Europe|EU|UN|Japan|India|Korea|Mexico|Canada)\\b", RegexOption.IGNORE_CASE),
+        R.string.sec_markets to Regex("\\b(stocks?|markets?|Fed|economy|inflation|tariffs?|Nvidia|earnings|rates?|Wall Street|jobs)\\b", RegexOption.IGNORE_CASE),
+        R.string.sec_tech to Regex("\\b(AI|Apple|Google|Microsoft|OpenAI|chips?|software|iPhone|Android|Meta|Tesla)\\b"),
+        R.string.sec_science to Regex("\\b(NASA|space|climate|study|scientists?|species|planet|vaccine|health)\\b", RegexOption.IGNORE_CASE),
+        R.string.sec_us to Regex("\\b(NTSB|FBI|police|court|judge|shooting|crash|collision|flights?|airport|FAA|National Guard|immigration|ICE)\\b", RegexOption.IGNORE_CASE),
+        R.string.sec_weather to Regex("\\b(storm|hurricane|waves|flood|wildfire|earthquake|snow|heat)\\b", RegexOption.IGNORE_CASE),
     )
 
     /** A short section label for category pills. */
     fun category(a: Article): String {
         val kind = news.openwire.domain.engine.FeedRanker.kind(a, null)
         return when (kind) {
-            news.openwire.domain.engine.FeedRanker.Kind.SPORTS -> "Sports"
-            news.openwire.domain.engine.FeedRanker.Kind.ENTERTAINMENT -> "Culture"
-            news.openwire.domain.engine.FeedRanker.Kind.LIFESTYLE -> "Life"
-            else -> SECTIONS.firstOrNull { it.second.containsMatchIn(a.title) }?.first ?: "Top story"
+            news.openwire.domain.engine.FeedRanker.Kind.SPORTS -> tr(R.string.sec_sports)
+            news.openwire.domain.engine.FeedRanker.Kind.ENTERTAINMENT -> tr(R.string.sec_culture)
+            news.openwire.domain.engine.FeedRanker.Kind.LIFESTYLE -> tr(R.string.sec_life)
+            else -> SECTIONS.firstOrNull { it.second.containsMatchIn(a.title) }?.first?.let { tr(it) } ?: tr(R.string.sec_top)
         }
     }
 }

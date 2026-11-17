@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -127,7 +129,7 @@ fun ReaderPane(
     ) { a ->
         if (a == null) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Select a story", style = sans(13.sp), color = Glass.textSecondary)
+                Text(tr(R.string.reader_select), style = sans(13.sp), color = Glass.textSecondary)
             }
         } else {
             val scroll = rememberScrollState()
@@ -183,7 +185,7 @@ fun ReaderSheet(
                 ) {
                     Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, tint = g.textPrimary, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("Back to Feed", style = sans(12.sp, FontWeight.SemiBold), color = g.textPrimary)
+                    Text(tr(R.string.reader_back), style = sans(12.sp, FontWeight.SemiBold), color = g.textPrimary)
                 }
                 Spacer(Modifier.weight(1f))
                 SpringToggle(liked, ToggleKind.LIKE, { actions.onToggleLiked(article) }, background = g.chipFill, padding = 8.dp)
@@ -257,14 +259,14 @@ internal fun ArticleBody(
                     .padding(horizontal = 12.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Read on ${service.name}", style = mono(10.sp, FontWeight.SemiBold, 0.06.em), color = g.indigo)
+                Text(tr(R.string.reader_read_on, service.name), style = mono(10.sp, FontWeight.SemiBold, 0.06.em), color = g.indigo)
                 Spacer(Modifier.width(4.dp))
                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = g.indigo, modifier = Modifier.size(12.dp))
             }
         }
 
         // Editorial serif headline
-        Text(article.title.ifBlank { content?.title?.takeIf { it.isNotBlank() } ?: article.source ?: article.domain ?: "Article" }, style = serif(28.sp, FontWeight.Bold, lineHeight = 32.sp, tracking = (-0.01).em), color = g.textPrimary)
+        Text(article.title.ifBlank { content?.title?.takeIf { it.isNotBlank() } ?: article.source ?: article.domain ?: tr(R.string.reader_article) }, style = serif(28.sp, FontWeight.Bold, lineHeight = 32.sp, tracking = (-0.01).em), color = g.textPrimary)
         Spacer(Modifier.height(12.dp))
 
         // Story grouping: who else is running this story
@@ -303,7 +305,7 @@ internal fun ArticleBody(
                     .border(1.dp, g.hairline, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
             ) {
                 Text(
-                    content?.let { "${it.readMinutes} min read" } ?: "— min read",
+                    content?.let { tr(R.string.reader_minutes, it.readMinutes) } ?: tr(R.string.reader_minutes_unknown),
                     style = mono(11.sp, tracking = 0.sp), color = g.textPrimary.copy(alpha = 0.6f),
                 )
             }
@@ -318,8 +320,8 @@ internal fun ArticleBody(
         androidx.compose.animation.AnimatedVisibility(keyPoints.isNotEmpty(), enter = androidx.compose.animation.expandVertically(springTween(420)) + androidx.compose.animation.fadeIn()) {
             GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), contentPadding = PaddingValues(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("SUMMARY", style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = g.accentSoft, modifier = Modifier.weight(1f))
-                    Text("Key points · on this device", style = sans(10.sp), color = g.textSecondary)
+                    Text(tr(R.string.reader_summary), style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = g.accentSoft, modifier = Modifier.weight(1f))
+                    Text(tr(R.string.reader_key_points), style = sans(10.sp), color = g.textSecondary)
                 }
                 keyPoints.forEach { point ->
                     Row(Modifier.padding(top = 10.dp)) {
@@ -341,7 +343,7 @@ internal fun ArticleBody(
                     .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
             ) { ArticleImage(article.copy(imageUrl = img), Modifier.fillMaxSize(), logoSize = 72.dp) }
             Text(
-                "PHOTOGRAPHY // ${article.publication()}",
+                tr(R.string.reader_photo, article.publication()),
                 style = mono(10.sp, tracking = 0.05.em),
                 color = g.textPrimary.copy(alpha = 0.5f),
                 textAlign = TextAlign.End,
@@ -353,8 +355,8 @@ internal fun ArticleBody(
         when (val s = state) {
             BodyState.Loading -> BodySkeleton()
             BodyState.Failed -> Text(
-                if (service != null) "This publisher blocks in-app reading and no archive copy exists yet. Read it on ${service.name} below — it opens in your browser."
-                else "The full text couldn't be loaded in the reader. Open it below — Editrove will route around the paywall where it can.",
+                if (service != null) tr(R.string.reader_blocked_service, service.name)
+                else tr(R.string.reader_failed),
                 style = sans(14.sp, lineHeight = 22.sp),
                 color = g.textSecondary,
             )
@@ -376,7 +378,7 @@ internal fun ArticleBody(
                 }
                 if (s.content.partial) {
                     Text(
-                        "This is the free preview — the rest is behind the paywall and no archive copy has the full text yet. Use the button below to open it through a reader service.",
+                        tr(R.string.reader_preview),
                         style = sans(13.sp, lineHeight = 20.sp), color = g.textSecondary,
                     )
                     Spacer(Modifier.height(12.dp))
@@ -384,7 +386,7 @@ internal fun ArticleBody(
                 if (s.content.via != news.openwire.data.remote.TextSource.PUBLISHER) {
                     val viaUrl = s.content.viaUrl
                     Text(
-                        "Text via ${s.content.via.label} ↗",
+                        tr(R.string.reader_text_via, s.content.via.label),
                         style = mono(10.sp, tracking = 0.06.em), color = g.textPrimary.copy(alpha = 0.55f),
                         modifier = Modifier.clip(CircleShape).clickable(enabled = viaUrl != null) {
                             viaUrl?.let { androidx.browser.customtabs.CustomTabsIntent.Builder().build().launchUrl(context, android.net.Uri.parse(it)) }
@@ -399,14 +401,14 @@ internal fun ArticleBody(
             actions.router.open(actions.scope, context, article) {
                 android.widget.Toast.makeText(
                     context,
-                    "No archived copy of this story yet — it stays locked behind the paywall.",
+                    tr(R.string.reader_locked),
                     android.widget.Toast.LENGTH_LONG,
                 ).show()
             }
         }, contentPadding = PaddingValues(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    service?.let { "Read on ${it.name}" } ?: "Continue on ${article.source ?: "publisher site"}",
+                    service?.let { tr(R.string.reader_read_on, it.name) } ?: tr(R.string.reader_continue, article.source ?: tr(R.string.reader_publisher_site)),
                     style = sans(13.sp, FontWeight.SemiBold), color = g.accentSoft, modifier = Modifier.weight(1f),
                 )
                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = g.accentSoft, modifier = Modifier.size(16.dp))
@@ -495,7 +497,7 @@ private fun AudioBriefingCard(article: Article, content: ArticleContent?) {
             ) {
                 Icon(
                     if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (playing) "Pause briefing" else "Play briefing",
+                    contentDescription = tr(if (playing) R.string.cd_pause_briefing else R.string.briefing_play),
                     tint = Color.White,
                     modifier = Modifier.size(18.dp),
                 )
@@ -504,7 +506,7 @@ private fun AudioBriefingCard(article: Article, content: ArticleContent?) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Listen to Narrated Briefing",
+                        tr(R.string.reader_listen),
                         style = sans(11.sp, FontWeight.SemiBold), color = g.textPrimary,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                     )
@@ -522,7 +524,7 @@ private fun AudioBriefingCard(article: Article, content: ArticleContent?) {
 
 private fun buildNarration(article: Article, content: ArticleContent?): String = buildString {
     append(article.title).append(". ")
-    article.source?.let { append("From ").append(it).append(". ") }
+    article.source?.let { append(tr(R.string.narration_from, it)).append(" ") }
     content?.description?.let { append(it).append(" ") }
     content?.text?.let { append(it) }
 }

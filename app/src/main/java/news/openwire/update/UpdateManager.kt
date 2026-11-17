@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.update
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -85,7 +87,7 @@ class UpdateManager(
                 prefs.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
                 if (newest == null) UpdateState.UpToDate(System.currentTimeMillis()) else UpdateState.Available(newest)
             } catch (e: Exception) {
-                UpdateState.Failed(e.message ?: "Couldn't reach GitHub.")
+                UpdateState.Failed(e.message ?: tr(R.string.upd_unreachable))
             }
             (_state.value as? UpdateState.Available)?.let { if (settings.settings.value.autoInstallUpdates && canInstall) install(it.release) }
         }
@@ -97,7 +99,7 @@ class UpdateManager(
         Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     fun install(release: ReleaseInfo) {
-        if (!canInstall) { _state.value = UpdateState.Failed("Debug builds can't install release updates. Install the APK from GitHub instead.", release); return }
+        if (!canInstall) { _state.value = UpdateState.Failed(tr(R.string.upd_debug), release); return }
         if (!canRequestInstalls()) { _state.value = UpdateState.NeedsPermission(release); return }
         job?.cancel()
         job = scope.launch {
@@ -108,7 +110,7 @@ class UpdateManager(
                 _state.value = UpdateState.Installing(release)
                 withContext(Dispatchers.IO) { commit(file, release) }
             } catch (e: Exception) {
-                _state.value = UpdateState.Failed(e.message ?: "The update couldn't be installed.", release)
+                _state.value = UpdateState.Failed(e.message ?: tr(R.string.upd_failed), release)
             }
         }
     }
@@ -138,7 +140,7 @@ class UpdateManager(
         _state.value = when (status) {
             PackageInstaller.STATUS_SUCCESS -> UpdateState.UpToDate(System.currentTimeMillis())
             PackageInstaller.STATUS_FAILURE_ABORTED -> release?.let { UpdateState.Available(it) } ?: UpdateState.Idle
-            else -> UpdateState.Failed(message ?: "The update couldn't be installed.", release)
+            else -> UpdateState.Failed(message ?: tr(R.string.upd_failed), release)
         }
     }
 

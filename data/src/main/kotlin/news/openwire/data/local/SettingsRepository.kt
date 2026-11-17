@@ -86,9 +86,15 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         val breakingEnabled: Boolean = false,
         val breakingOutlets: Set<String>? = null,
         val briefingSlots: String? = null,
+        val language: String = "",
+        val previousEdition: List<String>? = null,
+        val previousLanguage: String? = null,
     ) {
         fun toSettings() = UserSettings(
             edition = LocalEdition(city, region, country),
+            language = language,
+            previousEdition = previousEdition?.takeIf { it.size == 3 }?.let { LocalEdition(it[0], it[1], it[2]) },
+            previousLanguage = previousLanguage,
             customTopics = customTopics.map { Topic(it.id, it.label, liveUrl = it.liveUrl, liveOnly = true, keywords = it.keywords, sources = it.sources, isCustom = true) },
             hiddenTopics = hiddenTopics,
             topicOrder = topicOrder,
@@ -126,6 +132,9 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 s.briefing.voice, s.briefing.speed, s.briefing.count, s.briefing.detail.name, s.briefing.openingCue, s.briefing.stings,
                 s.personalize, s.refreshMinutes, s.breakingEnabled, s.breakingOutlets,
                 news.openwire.domain.model.BriefingSlot.encode(s.briefing.slots),
+                s.language,
+                s.previousEdition?.let { listOf(it.city, it.region, it.country) },
+                s.previousLanguage,
             )
         }
     }

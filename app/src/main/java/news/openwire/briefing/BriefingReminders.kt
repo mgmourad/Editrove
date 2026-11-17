@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.briefing
 
+import news.openwire.i18n.tr
+import news.openwire.i18n.text
 import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -71,10 +73,10 @@ object BriefingReminders {
     fun ensureChannel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         if (nm.getNotificationChannel(OLD_CHANNEL) != null) nm.deleteNotificationChannel(OLD_CHANNEL)
-        if (nm.getNotificationChannel(CHANNEL) == null) {
+        run {
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Scheduled briefings", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Your Morning, Afternoon and Evening audio briefings"
+                NotificationChannel(CHANNEL, tr(R.string.briefing_reminders_channel), NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = tr(R.string.briefing_reminders_desc)
                     setSound(
                         news.openwire.notifications.Notifier.sound(context, news.openwire.notifications.R.raw.notify_bell),
                         news.openwire.notifications.Notifier.SOUND_ATTRS,
@@ -96,19 +98,19 @@ object BriefingReminders {
         val play = PendingIntent.getForegroundService(
             context, 4420 + kind.ordinal,
             Intent(context, BriefingService::class.java).setAction(BriefingService.ACTION_PLAY_TOPIC)
-                .putExtra(BriefingService.EXTRA_TOPIC, "TOP").putExtra(BriefingService.EXTRA_LABEL, "Top Stories"),
+                .putExtra(BriefingService.EXTRA_TOPIC, "TOP").putExtra(BriefingService.EXTRA_LABEL, news.openwire.domain.engine.Languages.topicName("TOP", news.openwire.domain.engine.Languages.effective(null))),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val n = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(news.openwire.notifications.R.drawable.ic_stat_openwire)
             .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.briefing_art))
-            .setContentTitle("Your ${kind.label} is ready")
-            .setContentText("Tap to hear today's top stories, freshly updated.")
+            .setContentTitle(tr(R.string.briefing_ready, kind.text))
+            .setContentText(tr(R.string.briefing_ready_body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(open)
             .setAutoCancel(true)
-            .addAction(0, "Play now", play)
+            .addAction(0, tr(R.string.action_play_now), play)
             .build()
         if (!news.openwire.notifications.Notifier.canPost(context)) return
         try {

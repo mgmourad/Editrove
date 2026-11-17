@@ -104,18 +104,11 @@ object NewsProcessor {
     }
 
     /** Formats epoch millis as a relative time string ("5m ago", "Yesterday", ...). */
-    fun formatRelativeTime(epochMillis: Long?, now: Long = System.currentTimeMillis()): String {
+    fun formatRelativeTime(epochMillis: Long?, now: Long = System.currentTimeMillis(), lang: String = Languages.effective(null)): String {
         if (epochMillis == null) return ""
-        val diffSeconds = (now - epochMillis) / 1000
-        if (diffSeconds < 60) return "Just now"
-        val diffMinutes = diffSeconds / 60
-        if (diffMinutes < 60) return "${diffMinutes}m ago"
-        val diffHours = diffMinutes / 60
-        if (diffHours < 24) return "${diffHours}h ago"
-        val diffDays = diffHours / 24
-        if (diffDays == 1L) return "Yesterday"
-        if (diffDays < 7) return "${diffDays}d ago"
-        return MONTH_DAY.withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(epochMillis))
+        val minutes = (now - epochMillis) / 60_000
+        if (minutes < 7 * 24 * 60) return Languages.relativeTime(lang, minutes.coerceAtLeast(0))
+        return MONTH_DAY.withLocale(java.util.Locale(lang)).withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(epochMillis))
     }
 }
 

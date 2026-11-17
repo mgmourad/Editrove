@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.settings
 
+import news.openwire.i18n.tr
+import news.openwire.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import java.time.Instant
@@ -48,7 +50,7 @@ class SettingsViewModel(
     val allTopics: StateFlow<List<Topic>> = settings.map(::topicsFor)
         .stateIn(viewModelScope, SharingStarted.Eagerly, topicsFor(settings.value))
 
-    private fun topicsFor(s: UserSettings) = TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder)
+    private fun topicsFor(s: UserSettings) = TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder, s.language)
 
     /** Google News + catalog + user feeds, with enabled state. */
     val library: StateFlow<List<FeedSource>> = settings.map(::libraryFor)
@@ -73,9 +75,49 @@ class SettingsViewModel(
     fun setEdition(city: String, region: String, country: String) {
         val c = city.trim()
         val r = region.trim().ifEmpty { c }
-        if (c.isEmpty()) { _message.value = "Enter a city or region."; return }
-        settingsRepo.update { it.copy(edition = LocalEdition(c, r, TopicRegistry.country(country).code)) }
-        _message.value = "Edition set to ${LocalEdition(c, r).displayName}."
+        if (c.isEmpty()) { _message.value = tr(R.string.msg_enter_city); return }
+        val next = LocalEdition(c, r, TopicRegistry.country(country).code)
+        settingsRepo.update { s ->
+            if (s.edition == next) s
+            else s.copy(edition = next, previousEdition = s.edition, previousLanguage = s.previousLanguage ?: s.language)
+        }
+        _message.value = tr(R.string.msg_edition_set, next.displayName)
+        offerLanguageFor(next.country)
+    }
+
+    private val _languageOffer = MutableStateFlow<news.openwire.domain.engine.Languages.Language?>(null)
+    /** A language worth offering after moving to an edition that reads in it. */
+    val languageOffer: StateFlow<news.openwire.domain.engine.Languages.Language?> = _languageOffer.asStateFlow()
+    fun dismissLanguageOffer() { _languageOffer.value = null }
+
+    private fun offerLanguageFor(country: String) {
+        val lang = news.openwire.domain.engine.Languages.forCountry(country) ?: return
+        if (lang.code != news.openwire.domain.engine.Languages.effective(settings.value.language)) _languageOffer.value = lang
+    }
+
+    /** Records Editrove's language ("" = the phone's); the screen applies it to Android. */
+    fun setLanguage(tag: String) {
+        _languageOffer.value = null
+        settingsRepo.update { s ->
+            if (s.language == tag) s else s.copy(language = tag, previousLanguage = s.language, previousEdition = s.previousEdition ?: s.edition)
+        }
+    }
+
+    /** Back to the edition and language from before the last switch. */
+    fun restorePrevious(): String? {
+        val s = settings.value
+        val lang = s.previousLanguage
+        settingsRepo.update { it.copy(edition = s.previousEdition ?: it.edition, language = lang ?: it.language, previousEdition = null, previousLanguage = null) }
+        _message.value = tr(R.string.msg_back_to, (s.previousEdition ?: s.edition).displayName)
+        return lang
+    }
+
+    /** Adds or removes a suggested local newsroom. */
+    fun toggleLocalSource(sug: news.openwire.domain.engine.LocalSources.Suggestion, on: Boolean) = settingsRepo.update { s ->
+        if (on) {
+            if (s.customFeeds.any { it.url == sug.url }) s
+            else s.copy(customFeeds = s.customFeeds + news.openwire.domain.engine.LocalSources.toFeed(sug, s.edition.country, news.openwire.domain.engine.Languages.effective(s.language), clock()))
+        } else s.copy(customFeeds = s.customFeeds.filterNot { it.url == sug.url })
     }
 
     // ---- Topics ----
@@ -86,7 +128,7 @@ class SettingsViewModel(
 
     fun setTopicVisible(id: String, visible: Boolean) = settingsRepo.update { s ->
         if (!visible && topicsFor(s).count { it.isVisible } <= 1) {
-            _message.value = "At least one topic must stay visible."
+            _message.value = tr(R.string.msg_one_visible)
             s
         } else s.copy(hiddenTopics = if (visible) s.hiddenTopics - id else s.hiddenTopics + id)
     }
@@ -115,7 +157,7 @@ class SettingsViewModel(
     fun addTopic(label: String, keywords: String, sources: List<String>): Boolean = try {
         val topic = TopicRegistry.newCustomTopic(label, TopicRegistry.parseCommaKeywords(keywords), sources, settings.value.edition, clock())
         settingsRepo.update { s -> s.copy(customTopics = s.customTopics + topic, topicOrder = s.topicOrder?.plus(topic.id)) }
-        _message.value = "Added “${topic.label}”."
+        _message.value = tr(R.string.msg_added_topic, topic.label)
         true
     } catch (e: IllegalArgumentException) {
         _message.value = e.message
@@ -152,12 +194,12 @@ class SettingsViewModel(
             val clean = url.trim()
             try { SourceLibrary.validateFeedUrl(clean) } catch (e: IllegalArgumentException) { _message.value = e.message; onDone(false); return@launch }
             val check = repository.verifyFeed(clean)
-            if (!check.ok) { _message.value = "Couldn't read that feed: ${check.error ?: "no stories"}"; onDone(false); return@launch }
+            if (!check.ok) { _message.value = tr(R.string.msg_feed_failed, check.error ?: tr(R.string.no_stories)); onDone(false); return@launch }
             try {
                 settingsRepo.update { s ->
                     s.copy(customFeeds = SourceLibrary.addCustomFeed(s.customFeeds, name.ifBlank { check.title.orEmpty() }, clean, topics, quota, clock()))
                 }
-                _message.value = "Added ${name.ifBlank { check.title ?: clean }} (${check.count} stories)."
+                _message.value = tr(R.string.msg_added_feed, name.ifBlank { check.title ?: clean }, check.count)
                 onDone(true)
             } catch (e: IllegalArgumentException) {
                 _message.value = e.message
@@ -183,7 +225,7 @@ class SettingsViewModel(
                 }
             }.awaitAll()
             val failed = _checks.value.values.count { it?.ok == false }
-            _message.value = if (failed == 0) "All ${targets.size} enabled feeds are working." else "$failed of ${targets.size} feeds failed."
+            _message.value = if (failed == 0) tr(R.string.msg_feeds_ok, targets.size) else tr(R.string.msg_feeds_failed, failed, targets.size)
         }
     }
 
@@ -191,7 +233,7 @@ class SettingsViewModel(
 
     fun setRule(domain: String, strategy: Strategy, label: String = "") {
         val d = registry.normalizeDomain(domain.trim())
-        if (d.isEmpty()) { _message.value = "Enter a domain such as nytimes.com."; return }
+        if (d.isEmpty()) { _message.value = tr(R.string.msg_enter_domain); return }
         registry.setDomainRule(d, strategy, "custom", label.ifBlank { registry.getRule(d).label.orEmpty() })
         _rules.value = registry.getAllRules()
     }
@@ -258,7 +300,7 @@ class SettingsViewModel(
             settingsRepo.replace(r.settings)
             r.paywallRules.forEach { (d, rule) -> registry.setDomainRule(d, rule.strategy, rule.paywall ?: "custom", rule.label.orEmpty()) }
             _rules.value = registry.getAllRules()
-            _message.value = (listOf("Settings imported.") + r.notes).joinToString(" ")
+            _message.value = (listOf(tr(R.string.msg_imported)) + r.notes).joinToString(" ")
         } catch (e: IllegalArgumentException) {
             _message.value = e.message
         }
@@ -267,7 +309,7 @@ class SettingsViewModel(
     fun resetEverything() {
         settingsRepo.replace(UserSettings())
         resetAllRules()
-        _message.value = "Everything is back to the defaults."
+        _message.value = tr(R.string.msg_reset_all)
     }
 }
 

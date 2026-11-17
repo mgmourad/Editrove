@@ -59,9 +59,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun attachBaseContext(newBase: android.content.Context) = super.attachBaseContext(news.openwire.i18n.AppLocale.wrap(newBase))
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        news.openwire.i18n.L10n.init(this)
+        // A language picked in the phone's own per-app setting becomes Editrove's too.
+        news.openwire.i18n.AppLocale.systemChoice(this)?.let { sys ->
+            if (sys != container.settingsRepository.settings.value.language) container.settingsRepository.update { it.copy(language = sys) }
+        }
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val mode by vm.themeMode.collectAsState()

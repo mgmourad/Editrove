@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.widget
 
+import news.openwire.i18n.tr
+import news.openwire.i18n.text
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -67,7 +69,7 @@ object BriefWidgets {
         scope.launch {
             val topicId = topicFor(app, provider, id)
             val topic = WidgetData.topics(app).firstOrNull { it.id == topicId }
-            val label = topic?.label ?: "Top Stories"
+            val label = topic?.label ?: tr(R.string.widget_top_label)
             val norm: (String) -> String = { (app as OpenWireApp).container.domainRegistry.normalizeDomain(it) }
             val prefs = (app as OpenWireApp).container.settingsRepository.settings.value.briefing
             val cached = withContext(Dispatchers.Default) { StoryIdentity.distinct(WidgetData.articles(app, topicId), prefs.count, norm) }
@@ -117,11 +119,11 @@ object BriefWidgets {
 
         // Header: label, refresh (Topic widget), detail · speed pill (tap cycles the speed).
         val speed = "%.2g".format(prefs.speed).trimEnd('0').trimEnd('.') + "×"
-        val speedText = if (compact) speed else "${prefs.detail.label} · $speed"
+        val speedText = if (compact) speed else "${prefs.detail.text} · $speed"
         text(R.id.brief_speed_text, speedText, WidgetText.Face.SANS_MEDIUM, 11f, (160 * d).toInt())
         val headerSpace = content - ((if (showRefresh) 34 else 0) + 40 + speedText.length * 7) * d
-        val headerBase = if (showRefresh) label.uppercase() else if (compact) "BRIEFING" else "AUDIO BRIEFING"
-        val headerProgress = if ((short || compact) && mine && player.storyIndex in 0 until count) " · ${player.storyIndex + 1} OF $count" else ""
+        val headerBase = if (showRefresh) label.uppercase() else if (compact) tr(R.string.briefing_short) else tr(R.string.audio_briefing_kicker)
+        val headerProgress = if ((short || compact) && mine && player.storyIndex in 0 until count) " · " + tr(R.string.n_of_m, player.storyIndex + 1, count) else ""
         text(R.id.brief_label, headerBase + headerProgress, WidgetText.Face.MONO_SEMIBOLD, 10f, headerSpace.toInt().coerceAtLeast((60 * d).toInt()), tracking = 0.16f)
         v.setOnClickPendingIntent(R.id.brief_speed, broadcast(context, provider, ACTION_SPEED, id))
         val busy = id in refreshing
@@ -131,18 +133,18 @@ object BriefWidgets {
 
         // Title and subtitle, as in the app (Newsreader 22/26, Inter 12/18 at 60%).
         val title = when {
-            count == 0 -> "$label briefing"
-            prefs.detail == BriefingDetail.HEADLINES -> "$label in $count headlines"
-            prefs.detail == BriefingDetail.SUMMARIES -> "$label: $count stories, summarised"
-            else -> "$label: $count stories in full"
+            count == 0 -> tr(R.string.briefing_title, label)
+            prefs.detail == BriefingDetail.HEADLINES -> tr(R.string.briefing_card_headlines, label, count)
+            prefs.detail == BriefingDetail.SUMMARIES -> tr(R.string.briefing_card_summaries, label, count)
+            else -> tr(R.string.briefing_card_full, label, count)
         }
         if (compact) text(R.id.brief_title, title, WidgetText.Face.SERIF_BOLD, 17f, content, lines = 2, lineHeight = 20f)
         else text(R.id.brief_title, title, WidgetText.Face.SERIF_BOLD, 22f, content, lines = 2, lineHeight = 26f)
         if (!compact) {
             val sub = when {
-                mine && player.progress.isNotBlank() -> player.progress + if (playing) " · playing" else " · paused"
-                count == 0 -> "Open Editrove once to load ${label.lowercase()}."
-                else -> "Read by your on-device voice like a news broadcast — nothing leaves your phone."
+                mine && player.progress.isNotBlank() -> player.progress + " · " + tr(if (playing) R.string.state_playing else R.string.state_paused)
+                count == 0 -> tr(R.string.widget_open_once, label)
+                else -> tr(R.string.briefing_card_body)
             }
             // Short widgets keep the subtitle to one line so the controls never get squeezed.
             if (short) v.setViewVisibility(R.id.brief_sub, View.GONE)
@@ -154,8 +156,8 @@ object BriefWidgets {
 
         // Play pill and transport (previous / −15 / +15 / next appear once it's this briefing).
         v.setImageViewResource(R.id.brief_play_icon, if (playing) R.drawable.bic_pause_white else R.drawable.bic_play_white)
-        if (!compact) text(R.id.brief_play_text, if (playing) "Pause" else if (mine) "Resume" else "Play briefing", WidgetText.Face.SANS_SEMIBOLD, 14f, (160 * d).toInt())
-        v.setContentDescription(R.id.brief_play, if (playing) "Pause briefing" else "Play briefing")
+        if (!compact) text(R.id.brief_play_text, tr(if (playing) R.string.action_pause else if (mine) R.string.action_resume else R.string.briefing_play), WidgetText.Face.SANS_SEMIBOLD, 14f, (160 * d).toInt())
+        v.setContentDescription(R.id.brief_play, tr(if (playing) R.string.cd_pause_briefing else R.string.briefing_play))
         v.setOnClickPendingIntent(R.id.brief_play, service(context, id, 1, BriefingService.ACTION_PLAY_TOPIC) { putTopic(topicId, label) })
         val transport = if (mine) View.VISIBLE else View.GONE
         v.setViewVisibility(R.id.brief_prev, transport)
@@ -180,12 +182,12 @@ object BriefWidgets {
         if (shape == Shape.TALL) {
             val now = if (mine) player.storyTitle else null
             v.setViewVisibility(R.id.brief_now, if (now != null) View.VISIBLE else View.GONE)
-            if (now != null) text(R.id.brief_now, "Now: $now", WidgetText.Face.SANS_MEDIUM, 12f, content)
+            if (now != null) text(R.id.brief_now, tr(R.string.briefing_now, now), WidgetText.Face.SANS_MEDIUM, 12f, content)
         }
 
         // 4x4: the stories in the briefing; tap one to hear it now.
         if (shape == Shape.TALL && Build.VERSION.SDK_INT >= 31) {
-            text(R.id.brief_list_label, "IN THIS BRIEFING", WidgetText.Face.MONO_SEMIBOLD, 10f, content, tracking = 0.16f)
+            text(R.id.brief_list_label, tr(R.string.in_this_briefing), WidgetText.Face.MONO_SEMIBOLD, 10f, content, tracking = 0.16f)
             val items = RemoteViews.RemoteCollectionItems.Builder().setHasStableIds(true).setViewTypeCount(1)
             val rowWidth = content - (34 * d).toInt()
             stories.take(12).forEachIndexed { i, a ->

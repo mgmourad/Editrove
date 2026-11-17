@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import news.openwire.i18n.tr
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -55,8 +56,8 @@ class BriefingService : Service() {
         super.onCreate()
         running = true
         getSystemService(NotificationManager::class.java)?.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Audio briefing", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Playback controls for the audio briefing"
+            NotificationChannel(CHANNEL, tr(R.string.audio_briefing), NotificationManager.IMPORTANCE_LOW).apply {
+                description = tr(R.string.briefing_channel_desc)
                 setShowBadge(false)
             },
         )
@@ -130,8 +131,8 @@ class BriefingService : Service() {
     private fun preparingNotification(): Notification = Notification.Builder(this, CHANNEL)
         .setSmallIcon(news.openwire.notifications.R.drawable.ic_stat_openwire)
         .setLargeIcon(art)
-        .setContentTitle("Getting the latest stories…")
-        .setContentText("Editrove audio briefing")
+        .setContentTitle(tr(R.string.briefing_getting_stories))
+        .setContentText(tr(R.string.briefing_service_text))
         .setContentIntent(openApp())
         .setOngoing(true)
         .build()

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.widget
 
+import news.openwire.i18n.tr
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -140,7 +141,7 @@ fun PlayButton(playing: Boolean, onClick: Action, diameter: Dp = 44.dp) {
         Box(GlanceModifier.size(diameter).background(ImageProvider(R.drawable.widget_play_bg)).cornerRadius(diameter / 2), contentAlignment = Alignment.Center) {
             Image(
                 ImageProvider(if (playing) R.drawable.wic_pause else R.drawable.wic_play),
-                contentDescription = if (playing) "Pause briefing" else "Play briefing",
+                contentDescription = tr(if (playing) R.string.cd_pause_briefing else R.string.briefing_play),
                 colorFilter = ColorFilter.tint(W.onPlay),
                 modifier = GlanceModifier.size(diameter * 0.45f),
             )
@@ -161,7 +162,7 @@ fun BookmarkButton(saved: Boolean, onClick: Action, tint: ColorProvider = W.text
     Box(GlanceModifier.size(diameter).background(bg).cornerRadius(diameter / 2).clickable(onClick), contentAlignment = Alignment.Center) {
         Image(
             ImageProvider(if (saved) R.drawable.wic_bookmark_filled else R.drawable.wic_bookmark),
-            contentDescription = if (saved) "Remove from Saved" else "Save story",
+            contentDescription = tr(if (saved) R.string.cd_unsave else R.string.cd_save),
             colorFilter = ColorFilter.tint(if (saved) W.accent else tint),
             modifier = GlanceModifier.size(diameter * 0.55f),
         )

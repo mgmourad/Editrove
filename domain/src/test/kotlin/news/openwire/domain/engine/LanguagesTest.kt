@@ -54,14 +54,31 @@ class LanguagesTest {
     @Test
     fun egyptHasLocalNewsroomsThatJoinTheRightTabs() {
         val egypt = LocalSources.forCountry("EG")
-        assertTrue(egypt.any { it.name == "Al-Ahram" } && egypt.any { it.name == "Mada Masr" })
-        val youm7 = egypt.first { it.name == "Youm7" }
+        assertTrue(egypt.any { it.name.startsWith("Al-Ahram") } && egypt.any { it.name == "Mada Masr" })
+        assertTrue(egypt.any { it.name.startsWith("MENA") })
+        val youm7 = egypt.first { it.name.startsWith("Youm7") }
         assertTrue(youm7.url.contains("site%3Ayoum7.com") && youm7.url.contains("gl=EG"))
         // Arabic outlet, English app: the national tab only. English outlet: Top Stories.
         assertEquals(listOf(TopicRegistry.NATIONAL_ID), LocalSources.toFeed(youm7, "EG", "en", 0).topics)
         val mada = egypt.first { it.name == "Mada Masr" }
         assertEquals(listOf("TOP"), LocalSources.toFeed(mada, "EG", "en", 0).topics)
         assertFalse(LocalSources.forCountry("FR").isEmpty())
+    }
+
+    @Test
+    fun arabEditionsShareThePanArabNewsrooms() {
+        assertEquals(LocalSources.Region.ARAB, LocalSources.regionFor("EG"))
+        val arab = LocalSources.forRegion(LocalSources.Region.ARAB, "EG")
+        listOf("Al Jazeera", "Al Arabiya", "TRT Arabic", "Sky News Arabia", "BBC Arabic").forEach { n ->
+            assertTrue(n, arab.any { it.name.startsWith(n) })
+        }
+        // Regional channels in the app's language join Top Stories and International.
+        val jazeera = arab.first { it.name.startsWith("Al Jazeera ·") }
+        assertEquals(listOf("TOP", "INTERNATIONAL"), LocalSources.toFeed(jazeera, "EG", "ar", 0, regional = true).topics)
+        assertEquals(listOf(TopicRegistry.NATIONAL_ID), LocalSources.toFeed(jazeera, "EG", "en", 0, regional = true).topics)
+        // No outlet is offered twice (Le Monde is in France's own list).
+        val fr = LocalSources.forRegion(LocalSources.Region.FRENCH, "FR")
+        assertFalse(fr.any { it.name == "Le Monde" })
     }
 
     @Test

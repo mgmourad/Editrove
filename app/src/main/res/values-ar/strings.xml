@@ -375,4 +375,9 @@
     <string name="badge_archive">أرشيف</string>
     <string name="badge_bypassed">متاح</string>
     <string name="badge_open_source">مفتوح المصدر</string>
+    <string name="region_arab">في العالم العربي</string>
+    <string name="region_french">في العالم الناطق بالفرنسية</string>
+    <string name="region_german">في العالم الناطق بالألمانية</string>
+    <string name="region_spanish">في العالم الناطق بالإسبانية</string>
+    <string name="region_hint">قنوات ووكالات تغطي المنطقة كلها. تنضم إلى أهم الأخبار والأخبار الدولية عندما تكتب بلغة Editrove.</string>
 </resources>

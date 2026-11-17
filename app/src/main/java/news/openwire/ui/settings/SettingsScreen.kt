@@ -387,6 +387,26 @@ private fun EditionPage(vm: SettingsViewModel) {
                 }
             }
         }
+        val region = news.openwire.domain.engine.LocalSources.regionFor(s.edition.country)
+        if (region != null) {
+            val regional = news.openwire.domain.engine.LocalSources.forRegion(region, s.edition.country)
+            Section {
+                Label(tr(when (region) {
+                    news.openwire.domain.engine.LocalSources.Region.ARAB -> R.string.region_arab
+                    news.openwire.domain.engine.LocalSources.Region.FRENCH -> R.string.region_french
+                    news.openwire.domain.engine.LocalSources.Region.GERMAN -> R.string.region_german
+                    news.openwire.domain.engine.LocalSources.Region.SPANISH -> R.string.region_spanish
+                }))
+                Hint(tr(R.string.region_hint))
+                Spacer(Modifier.height(6.dp))
+                regional.forEachIndexed { i, sug ->
+                    if (i > 0) Divider()
+                    SwitchRow(sug.name, news.openwire.domain.engine.Languages.of(sug.language)?.nativeName ?: sug.language, s.customFeeds.any { it.url == sug.url }) {
+                        vm.toggleLocalSource(sug, it, regional = true)
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -377,4 +377,9 @@
     <string name="badge_archive">Archive</string>
     <string name="badge_bypassed">Unlocked</string>
     <string name="badge_open_source">Open source</string>
+    <string name="region_arab">Across the Arab world</string>
+    <string name="region_french">Across the French-speaking world</string>
+    <string name="region_german">Across the German-speaking world</string>
+    <string name="region_spanish">Across the Spanish-speaking world</string>
+    <string name="region_hint">Channels and agencies that cover the whole region. They join Top Stories and International when they write in Editrove\'s language.</string>
 </resources>

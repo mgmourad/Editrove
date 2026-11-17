@@ -195,7 +195,8 @@ class FeedRepositoryImpl(
         val primaryUrl = topic.liveUrl?.takeIf { "google_news" !in s.disabledSources || !it.contains("news.google.com") }
         // A topic read in another language (Arabic, French…) keeps to that language: the built-in
         // catalog and the published snapshot are English, so only the reader's own sources join it.
-        val foreign = news.openwire.domain.engine.Languages.feedLanguage(topic.liveUrl)?.let { it != "en" } == true
+        val feedLang = news.openwire.domain.engine.Languages.feedLanguage(topic.liveUrl)
+        val foreign = feedLang?.let { it != "en" } == true
         val feeds = SourceLibrary.feedsForTopic(topic, catalog(), s.customFeeds, s.disabledSources).filter { !foreign || it.isCustom }
         val configs = buildList {
             if (primaryUrl != null) add(SourceLibrary.GOOGLE_NEWS.copy(url = primaryUrl, name = if (primaryUrl.contains("news.google.com")) "Google News" else topic.label))
@@ -257,6 +258,12 @@ class FeedRepositoryImpl(
                 // Google search already honours the query; publisher feeds are matched locally.
                 if (!(r.source.isPrimary && r.source.url.contains("news.google.com"))) list = PreviewMatcher.filterKeywordArticles(list, topic.keywords)
             }
+            // A news topic never shows week-old stories: some feeds stopped updating years ago
+            // and still serve their last items (CNN's rss.cnn.com, frozen since 2023).
+            val cutoff = clock() - STALE_MS
+            list = list.filter { a -> (a.publishedAt ?: Long.MAX_VALUE) >= cutoff || (topic.isCustom && topic.keywords.isEmpty()) }
+            // An Arabic topic keeps to Arabic headlines (a source added for an English topic doesn't leak in).
+            if (feedLang == "ar" && !r.source.isPrimary) list = list.filter { RX_ARABIC.containsMatchIn(it.title) }
             r.copy(articles = list)
         }
         // Google unavailable (or switched off): the published front page leads instead.
@@ -317,3 +324,6 @@ class FeedRepositoryImpl(
         const val RESOLVE_LIMIT = 40
     }
 }
+
+private const val STALE_MS = 7L * 24 * 60 * 60 * 1000
+private val RX_ARABIC = Regex("[\\u0600-\\u06FF]")

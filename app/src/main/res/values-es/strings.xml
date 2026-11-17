@@ -375,4 +375,9 @@
     <string name="badge_archive">Archivo</string>
     <string name="badge_bypassed">Desbloqueado</string>
     <string name="badge_open_source">Código abierto</string>
+    <string name="region_arab">En el mundo árabe</string>
+    <string name="region_french">En el mundo francófono</string>
+    <string name="region_german">En el mundo germanohablante</string>
+    <string name="region_spanish">En el mundo hispanohablante</string>
+    <string name="region_hint">Canales y agencias que cubren toda la región. Se suman a la portada e Internacional cuando escriben en el idioma de Editrove.</string>
 </resources>

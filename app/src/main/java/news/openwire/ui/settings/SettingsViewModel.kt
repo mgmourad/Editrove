@@ -113,10 +113,10 @@ class SettingsViewModel(
     }
 
     /** Adds or removes a suggested local newsroom. */
-    fun toggleLocalSource(sug: news.openwire.domain.engine.LocalSources.Suggestion, on: Boolean) = settingsRepo.update { s ->
+    fun toggleLocalSource(sug: news.openwire.domain.engine.LocalSources.Suggestion, on: Boolean, regional: Boolean = false) = settingsRepo.update { s ->
         if (on) {
             if (s.customFeeds.any { it.url == sug.url }) s
-            else s.copy(customFeeds = s.customFeeds + news.openwire.domain.engine.LocalSources.toFeed(sug, s.edition.country, news.openwire.domain.engine.Languages.effective(s.language), clock()))
+            else s.copy(customFeeds = s.customFeeds + news.openwire.domain.engine.LocalSources.toFeed(sug, s.edition.country, news.openwire.domain.engine.Languages.effective(s.language), clock(), regional))
         } else s.copy(customFeeds = s.customFeeds.filterNot { it.url == sug.url })
     }
 

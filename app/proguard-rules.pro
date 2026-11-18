@@ -22,3 +22,13 @@
     <init>();
     *;
 }
+
+# sherpa-onnx's native code reads its Kotlin config classes' fields by name (JNI).
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+-dontwarn org.brotli.**
+-dontwarn com.github.luben.zstd.**
+-dontwarn org.tukaani.xz.**
+-dontwarn org.objectweb.asm.**
+# …and calls back into the audio callback passed to generateWithCallback by name and signature
+# (invoke(float[]) returning Integer), so R8 must keep that method on any Function1.
+-keep class news.openwire.voice.PcmSink { *; }

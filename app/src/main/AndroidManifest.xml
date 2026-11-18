@@ -116,6 +116,17 @@
             android:name="news.openwire.ui.home.BriefingService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <!-- Editrove's own voices: a speech engine for phones without Google's (Huawei and others). -->
+        <service
+            android:name="news.openwire.voice.EditroveTtsService"
+            android:exported="true"
+            android:label="@string/voice_engine_name">
+            <intent-filter>
+                <action android:name="android.intent.action.TTS_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data android:name="android.speech.tts" android:resource="@xml/tts_engine" />
+        </service>
         <!-- Real-time breaking alerts (opt-in): one kept-open connection to Bluesky's public stream. -->
         <service
             android:name="news.openwire.realtime.RealtimeAlertService"

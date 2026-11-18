@@ -235,6 +235,11 @@ class HomeViewModel(
     fun openSettings(open: Boolean = true) { _settingsTarget.value = null; _settingsOpen.value = open }
     fun openUpdates() = openSettingsAt("updates")
     fun openSettingsAt(page: String) { _settingsTarget.value = page; _settingsOpen.value = true }
+
+    /** Text to start the opened settings page's search with (a deep link). */
+    var settingsQuery: String? = null
+        private set
+    fun setSettingsQuery(q: String) { settingsQuery = q; news.openwire.ui.settings.SourcesQuery.pending = q }
     fun showLinkDialog(show: Boolean = true) { _linkDialog.value = show }
 
     /**

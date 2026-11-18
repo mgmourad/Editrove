@@ -27,7 +27,7 @@ import news.openwire.ui.home.BriefingService
  * "Play now" plays straight from the notification.
  */
 object BriefingReminders {
-    const val CHANNEL = "briefing_bell"
+    const val CHANNEL = "briefing_bell_v2"
     private const val OLD_CHANNEL = "briefing_reminders"
     private const val ACTION = "news.editrove.BRIEFING_REMINDER"
     private const val EXTRA_KIND = "kind"
@@ -72,7 +72,7 @@ object BriefingReminders {
     /** Creates the channel with Editrove's bell (and removes the previous, tone-less one). */
     fun ensureChannel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        if (nm.getNotificationChannel(OLD_CHANNEL) != null) nm.deleteNotificationChannel(OLD_CHANNEL)
+        listOf(OLD_CHANNEL, "briefing_bell").forEach { if (nm.getNotificationChannel(it) != null) nm.deleteNotificationChannel(it) }
         run {
             nm.createNotificationChannel(
                 NotificationChannel(CHANNEL, tr(R.string.briefing_reminders_channel), NotificationManager.IMPORTANCE_HIGH).apply {

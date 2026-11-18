@@ -143,6 +143,9 @@ and notifications all live on your device. Updates arrive straight from GitHub R
 | **Stay current** | Opening the app or switching pages quietly refreshes anything older than a few minutes; background refresh every 15 minutes to 6 hours (your choice); pull to refresh; opt-in local notifications per topic, grouped into one bundle so several updates arrive with a single sound |
 | **Sharing** | Every card and the reader have a share button that sends the headline first, then the publisher's own link (never a Google redirect) |
 | **On-device feeds** | Built-in topics are built on your phone from live newsroom feeds and ranked on the device, so stories are minutes old. The published snapshot is only a first paint and a fallback |
+| **Find any newspaper** | Settings › Sources: type a paper's name or website (Al-Ahram, youm7.com, The Verge). Editrove searches Feedly's public index, Google News and the sites themselves, checks every result live and adds it to the right tabs in one tap. No feed addresses needed |
+| **Built-in voices** | Phones without Google's speech engine (Huawei and others) get Editrove's own offline voices in all five languages, downloaded once (~20 MB each) and run on the device with [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache 2.0) and Piper voices. Editrove registers them as an Android speech engine, so briefings and the reader use them automatically |
+| **User guide & welcome tour** | Settings › User guide explains every feature with screenshots, in Editrove's language (English, Arabic, French, Spanish, German). A five-slide tour greets new installs and can be replayed from the guide |
 | **Updates** | Checks GitHub Releases on launch, shows an in-app banner, optional automatic install, a "What's new" note and a full changelog in Settings |
 | **Portability** | Export and import every setting as one JSON file, including backups from the original OpenWire web app |
 

@@ -75,12 +75,17 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
 
     // A private engine for listing voices and previews.
     var ready by remember { mutableStateOf(false) }
-    val tts = remember { TextToSpeech(context.applicationContext, { ready = it == TextToSpeech.SUCCESS }, news.openwire.i18n.VoiceSetup.engine(context)) }
+    // Editrove's own voices (downloaded once) for phones without Google's speech engine.
+    val voiceStore = (context.applicationContext as news.openwire.OpenWireApp).container.voices
+    val packStates by voiceStore.states.collectAsState()
+    val engineName = remember(packStates) { news.openwire.i18n.VoiceSetup.engine(context) }
+    val tts = remember(engineName) { ready = false; TextToSpeech(context.applicationContext, { ready = it == TextToSpeech.SUCCESS }, engineName) }
+    DisposableEffect(tts) { onDispose { tts.shutdown() } }
     // A voice in Editrove's language: fetched automatically when the engine has one to download.
     val appLang = news.openwire.domain.engine.Languages.effective(s.language)
     var voiceState by remember { mutableStateOf<news.openwire.i18n.VoiceSetup.State?>(null) }
     var voiceCheck by remember { mutableIntStateOf(0) }
-    LaunchedEffect(appLang, voiceCheck) {
+    LaunchedEffect(appLang, voiceCheck, packStates) {
         if (appLang == "en") return@LaunchedEffect
         voiceState = news.openwire.i18n.VoiceSetup.ensure(context, appLang, s.edition.country)
         // While it downloads, look again now and then.
@@ -229,13 +234,24 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
                     news.openwire.i18n.VoiceSetup.State.DOWNLOADING -> tr(R.string.voice_downloading, name) to null
                     news.openwire.i18n.VoiceSetup.State.MISSING -> tr(R.string.voice_missing, name) to tr(R.string.voice_install)
                     news.openwire.i18n.VoiceSetup.State.UNSUPPORTED -> tr(R.string.voice_unsupported, name) to tr(R.string.voice_install)
+                    news.openwire.i18n.VoiceSetup.State.OWN_VOICE -> {
+                        val pack = news.openwire.voice.VoicePacks.forLanguage(appLang)
+                        when (val ps = pack?.let { packStates[it.id] }) {
+                            is news.openwire.voice.VoiceStore.State.Downloading -> tr(R.string.voice_own_progress, name, (ps.progress * 100).toInt()) to null
+                            is news.openwire.voice.VoiceStore.State.Failed -> tr(R.string.voice_own_failed) to tr(R.string.voice_own_download, pack.sizeMb)
+                            else -> tr(R.string.voice_own_offer, name) to tr(R.string.voice_own_download, pack?.sizeMb ?: 20)
+                        }
+                    }
                 }
                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(msg, style = sans(12.sp, FontWeight.Medium, lineHeight = 17.sp), color = if (st == news.openwire.i18n.VoiceSetup.State.READY) g.textSecondary else g.accentSoft, modifier = Modifier.weight(1f))
                     if (action != null) Text(
                         action, style = sans(12.sp, FontWeight.SemiBold), color = g.textPrimary,
                         modifier = Modifier.padding(start = 8.dp).clip(CircleShape).background(g.chipFill)
-                            .clickable { runCatching { context.startActivity(news.openwire.i18n.VoiceSetup.installIntent()) }; voiceCheck++ }
+                            .clickable {
+                                if (st == news.openwire.i18n.VoiceSetup.State.OWN_VOICE) news.openwire.voice.VoicePacks.forLanguage(appLang)?.let { voiceStore.download(it) }
+                                else { runCatching { context.startActivity(news.openwire.i18n.VoiceSetup.installIntent(context)) }; voiceCheck++ }
+                            }
                             .padding(horizontal = 12.dp, vertical = 7.dp),
                     )
                 }
@@ -252,6 +268,70 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
                 modifier = Modifier.clip(CircleShape).clickable { showAll = !showAll }.padding(vertical = 8.dp),
             )
             Text(tr(R.string.more_voices), style = sans(10.sp, lineHeight = 15.sp), color = g.textMuted)
+        }
+
+        // Editrove's own voices: used where Google's engine is missing; anyone can download and hear them.
+        run {
+            // A preview engine that always speaks with Editrove's own voices.
+            var ownReady by remember { mutableStateOf(false) }
+            val own = remember(packStates.values.count { it == news.openwire.voice.VoiceStore.State.Installed }) {
+                ownReady = false
+                TextToSpeech(context.applicationContext, { ownReady = it == TextToSpeech.SUCCESS }, context.packageName)
+            }
+            DisposableEffect(own) { onDispose { own.shutdown() } }
+            Section(tr(R.string.voice_engine_name)) {
+                Text(tr(R.string.voice_own_hint), style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary)
+                news.openwire.voice.VoicePacks.ALL.sortedBy { if (it.language == appLang) 0 else 1 }.forEach { pack ->
+                    val ps = packStates[pack.id]
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "${news.openwire.domain.engine.Languages.of(pack.language)?.nativeName ?: pack.language} · ${pack.name}",
+                                style = sans(14.sp, FontWeight.Medium), color = g.textPrimary,
+                            )
+                            Text(
+                                when (ps) {
+                                    is news.openwire.voice.VoiceStore.State.Downloading -> tr(R.string.voice_own_progress_short, (ps.progress * 100).toInt())
+                                    is news.openwire.voice.VoiceStore.State.Failed -> tr(R.string.voice_own_failed)
+                                    // Sizes and credits are Latin text: kept left-to-right inside right-to-left lines.
+                                    news.openwire.voice.VoiceStore.State.Installed -> tr(R.string.voice_own_installed) + " · \u2066" + pack.license + "\u2069"
+                                    else -> "\u2066${pack.sizeMb} MB · " + pack.license + "\u2069"
+                                },
+                                style = sans(11.sp), color = g.textSecondary, maxLines = 2,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        when (ps) {
+                            is news.openwire.voice.VoiceStore.State.Downloading ->
+                                androidx.compose.material3.CircularProgressIndicator(progress = { ps.progress }, modifier = Modifier.size(22.dp), strokeWidth = 2.5.dp, color = g.accent)
+                            news.openwire.voice.VoiceStore.State.Installed -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    tr(R.string.preview), style = sans(12.sp, FontWeight.SemiBold), color = Color.White,
+                                    modifier = Modifier.clip(CircleShape).background(g.accent).clickable(enabled = ownReady) {
+                                        own.stop()
+                                        own.voices?.firstOrNull { it.name == pack.voiceName }?.let { own.voice = it }
+                                        own.setSpeechRate(p.speed)
+                                        val sample = news.openwire.domain.engine.BriefingScript.intro(
+                                            news.openwire.domain.engine.Languages.topicName("TOP", pack.language) ?: "Top Stories", 8,
+                                            news.openwire.domain.model.BriefingDetail.HEADLINES, java.time.LocalDateTime.now(), pack.language,
+                                        )
+                                        own.speak(sample, TextToSpeech.QUEUE_FLUSH, null, "own-preview")
+                                    }.padding(horizontal = 12.dp, vertical = 7.dp),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    tr(R.string.voice_own_delete), style = sans(12.sp, FontWeight.SemiBold), color = g.textPrimary,
+                                    modifier = Modifier.clip(CircleShape).background(g.chipFill).clickable { voiceStore.delete(pack) }.padding(horizontal = 12.dp, vertical = 7.dp),
+                                )
+                            }
+                            else -> Text(
+                                tr(R.string.voice_own_get), style = sans(12.sp, FontWeight.SemiBold), color = Color.White,
+                                modifier = Modifier.clip(CircleShape).background(g.accent).clickable { voiceStore.download(pack) }.padding(horizontal = 12.dp, vertical = 7.dp),
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

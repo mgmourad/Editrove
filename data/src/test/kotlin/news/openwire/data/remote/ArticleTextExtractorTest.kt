@@ -60,4 +60,31 @@ class ArticleTextExtractorTest {
         assertEquals("jack", p.authorHandle)
         assertEquals("March 21, 2006", p.linkTitle)
     }
+
+    @Test fun findsPhotosAndVideosBetweenParagraphs() {
+        val html = """
+            <html><head><meta property="og:image" content="https://cdn.example.com/lead.jpg?w=1200"></head><body><article>
+            <figure><img src="https://cdn.example.com/lead.jpg"><figcaption>The lead photo</figcaption></figure>
+            <p>The first paragraph of the story is long enough to count as part of the article text here.</p>
+            <figure><img data-src="/img/bridge.jpg" src="data:image/gif;base64,R0lGOD"><figcaption>The bridge on Monday morning.</figcaption></figure>
+            <p>The second paragraph keeps going with more detail about what happened on the bridge today.</p>
+            <img src="https://cdn.example.com/site-logo.png" width="120">
+            <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"></iframe>
+            <p>The third paragraph adds the reaction from officials and residents who live near the river.</p>
+            <video poster="/p.jpg"><source src="https://cdn.example.com/clip.mp4" type="video/mp4"></video>
+            <p>The last paragraph wraps up the story with what comes next for the bridge and its repairs.</p>
+            <img src="https://cdn.example.com/related.jpg">
+            </article></body></html>
+        """.trimIndent()
+        val x = ArticleTextExtractor(okhttp3.OkHttpClient())
+        val doc = Jsoup.parse(html, "https://news.example.com/story")
+        doc.select("figure").forEach { f -> f.selectFirst("figcaption")?.text()?.let { f.attr("data-ew-caption", it) } }
+        val ps = x.articleParagraphs(doc)
+        val media = x.articleMedia(doc, ps, "https://cdn.example.com/lead.jpg?w=1200")
+        assertEquals(listOf("https://news.example.com/img/bridge.jpg", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "https://cdn.example.com/clip.mp4"), media.map { it.url })
+        assertEquals(listOf(0, 1, 2), media.map { it.after })
+        assertEquals("The bridge on Monday morning.", media[0].caption)
+        assertEquals(ArticleMedia.Kind.EXTERNAL, media[1].kind)
+        assertEquals("https://news.example.com/p.jpg", media[2].poster)
+    }
 }

@@ -328,6 +328,16 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
             AnimatedVisibility(whatsNew != null, enter = fadeIn(tween(240)), exit = fadeOut(tween(200))) {
                 whatsNew?.let { e -> news.openwire.update.WhatsNewDialog(e) { app.container.changelog.markSeen(); whatsNew = null } }
             }
+            // After an update (and after What's new): can alerts actually reach the reader?
+            val deliveryCtx = LocalContext.current
+            LaunchedEffect(whatsNew == null, userSettings.notificationsEnabled) {
+                if (whatsNew == null && !news.openwire.guide.Guide.showing &&
+                    news.openwire.delivery.DeliveryCheck.shouldPrompt(deliveryCtx, userSettings.notificationsEnabled)
+                ) news.openwire.delivery.DeliveryCheck.showing = true
+            }
+            if (news.openwire.delivery.DeliveryCheck.showing && whatsNew == null) {
+                news.openwire.delivery.DeliveryDialog { news.openwire.delivery.DeliveryCheck.showing = false; news.openwire.delivery.DeliveryCheck.markChecked(deliveryCtx) }
+            }
             // The welcome tour sits over everything, Settings included (first launch, or replayed from the guide).
             if (news.openwire.guide.Guide.showing) {
                 val ctx = LocalContext.current

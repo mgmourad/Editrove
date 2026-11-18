@@ -11,4 +11,7 @@ interface FeedRepository {
 
     /** Fetches a source with the same path the feed uses (library audit / add-source validation). */
     suspend fun verifyFeed(url: String): FeedCheck = FeedCheck(ok = false, error = "Unsupported")
+
+    /** The stories last stored for a topic (no network). */
+    suspend fun cachedArticles(topicId: String): List<news.openwire.domain.model.Article> = emptyList()
 }

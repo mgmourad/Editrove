@@ -10,6 +10,8 @@
     <!-- Opt-in real-time breaking alerts keep one connection open while switched on. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Lets Editrove ask Android once to stop battery optimisation from blocking its alerts. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Self-update from GitHub Releases (user-initiated or opted-in automatic installs). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />

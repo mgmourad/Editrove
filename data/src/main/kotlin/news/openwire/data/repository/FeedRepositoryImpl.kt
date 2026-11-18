@@ -96,6 +96,8 @@ class FeedRepositoryImpl(
         if (live) observeLive(topic, s) else observeSnapshot(topic)
     }.flowOn(Dispatchers.Default) // parsing, weaving and routing stay off the main thread
 
+    override suspend fun cachedArticles(topicId: String): List<Article> = cached(topicId)
+
     private suspend fun cached(topicId: String): List<Article> =
         runCatching { dao.getByTopic(topicId).map { it.toArticle() } }.getOrDefault(emptyList())
 

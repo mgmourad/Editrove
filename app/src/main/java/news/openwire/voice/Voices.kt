@@ -36,8 +36,10 @@ data class VoicePack(
 }
 
 object VoicePacks {
+    /** Voices offered in earlier versions and since withdrawn (removed from phones on launch). */
+    val RETIRED = listOf("vits-piper-ar_JO-kareem-medium-int8")
+
     val ALL = listOf(
-        VoicePack("ar", "vits-piper-ar_JO-kareem-medium-int8", "Kareem", 19, "Piper voice; dataset github.com/AliMokhammad/arabicttstrain", "ar_JO-kareem-medium.onnx"),
         VoicePack("en", "vits-piper-en_US-ljspeech-medium-int8", "LJ", 20, "Piper voice; LJ Speech dataset (public domain)", "en_US-ljspeech-medium.onnx"),
         VoicePack("fr", "vits-piper-fr_FR-siwis-medium-int8", "Siwis", 19, "Piper voice; SIWIS dataset (CC BY 4.0)", "fr_FR-siwis-medium.onnx"),
         VoicePack("es", "vits-piper-es_ES-davefx-medium-int8", "Davefx", 20, "Piper voice; davefx dataset (CC0)", "es_ES-davefx-medium.onnx"),
@@ -66,6 +68,11 @@ class VoiceStore(context: Context) {
         data class Downloading(val progress: Float) : State
         data object Installed : State
         data class Failed(val reason: String) : State
+    }
+
+    init {
+        // The Arabic voice wasn't natural or accurate enough; it's withdrawn and its files removed.
+        VoicePacks.RETIRED.forEach { File(root, it).takeIf { f -> f.exists() }?.deleteRecursively() }
     }
 
     private val _states = MutableStateFlow(VoicePacks.ALL.associate { it.id to (if (isInstalled(it)) State.Installed else State.Missing) as State })

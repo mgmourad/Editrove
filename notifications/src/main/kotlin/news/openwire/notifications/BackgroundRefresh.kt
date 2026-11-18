@@ -60,17 +60,18 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     override suspend fun doWork(): Result {
         val provider = applicationContext as? BackgroundRefresher.Provider ?: return Result.failure()
         val refresher = provider.backgroundRefresher
-        // Breaking news first: it's the time-sensitive part of the run.
-        val breaking = runCatching { refresher.breaking() }.getOrDefault(emptyList())
         // While Editrove is on screen the reader already sees new stories: mark them seen,
         // don't pop alerts over the app (that's what made alerts "arrive after opening").
         val onScreen = appInForeground()
-        if (refresher.notificationsEnabled() && !onScreen) breaking.take(3).forEach { Notifier.postBreaking(applicationContext, it, refresher.storyIntent(applicationContext, it.headline, null)) }
+        // Topics first, so breaking news is judged against fresh stories from every source.
         val updates = try {
             refresher.refresh()
         } catch (e: Exception) {
-            return if (runAttemptCount < 2) Result.retry() else Result.failure()
+            null
         }
+        val breaking = runCatching { refresher.breaking() }.getOrDefault(emptyList())
+        if (refresher.notificationsEnabled() && !onScreen) breaking.take(3).forEach { Notifier.postBreaking(applicationContext, it, refresher.storyIntent(applicationContext, it.headline, null)) }
+        if (updates == null) return if (runAttemptCount < 2) Result.retry() else Result.failure()
         if (refresher.notificationsEnabled() && !onScreen) {
             val posted = updates.filter { it.headlines.isNotEmpty() }
             // Several topics in one refresh: one stack with a single sound, not a burst of alerts.
@@ -187,7 +188,7 @@ object Notifier {
         if (!canPost(context)) return
         val total = updates.sumOf { it.headlines.size }
         val style = NotificationCompat.InboxStyle().setSummaryText(context.getString(R.string.n_new_stories, total))
-        updates.forEach { style.addLine("${it.topicLabel}: ${it.headlines.first().title}") }
+        updates.forEach { u -> val h = u.headlines.first(); style.addLine("${h.source?.takeIf { it.isNotBlank() } ?: u.topicLabel}: ${h.title}") }
         val n = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_openwire)
             .setContentTitle(context.getString(R.string.n_topics_have_news, updates.size))
@@ -207,18 +208,17 @@ object Notifier {
         val more = update.headlines.size - 1
         val open = PendingIntent.getActivity(context, update.topicId.hashCode(), storyIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val all = PendingIntent.getActivity(context, update.topicId.hashCode() + 1, topicIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val expanded = buildString {
-            append(first.title)
-            first.source?.takeIf { it.isNotBlank() }?.let { append("\n").append(it) }
-        }
+        // The newspaper is the title; the topic sits in the header beside the app name.
+        val source = first.source?.takeIf { it.isNotBlank() } ?: update.topicLabel
         val b = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_openwire)
-            .setContentTitle(if (more == 0) update.topicLabel else context.getString(R.string.n_topic_new, update.topicLabel, update.headlines.size))
+            .setContentTitle(source)
+            .setSubText(if (more == 0) update.topicLabel else context.getString(R.string.n_topic_new, update.topicLabel, update.headlines.size))
             .setContentText(first.title)
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .setBigContentTitle(update.topicLabel)
-                    .bigText(expanded)
+                    .setBigContentTitle(source)
+                    .bigText(first.title)
                     .also { if (more > 0) it.setSummaryText(context.getString(R.string.n_more, more)) },
             )
             .setContentIntent(open)

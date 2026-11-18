@@ -37,7 +37,12 @@ data class SocialPost(
     val image: String? = null,
     val likes: Int = 0,
     val reposts: Int = 0,
+    /** Photos and videos attached to the post (X posts read through X's embed data). */
+    val media: List<PostMedia> = emptyList(),
 )
+
+/** A photo, or a video (an mp4 [url] with its [poster] frame), attached to a post. */
+data class PostMedia(val video: Boolean, val url: String, val poster: String? = null, val aspect: Float? = null)
 
 object OpinionCatalog {
     private fun site(path: String, lang: String): String {
@@ -321,6 +326,69 @@ object XPosts {
     /** The canonical x.com address of a post link, or null when it isn't one. */
     fun canonical(url: String): String? = STATUS.find(url)?.let { "https://x.com/${it.groupValues[1]}/status/${it.groupValues[2]}" }
 
+    /**
+     * X's embed data for one post (what its embedded-post widget reads): the text, author,
+     * date and attached photos and videos. The token is the one the widget derives from the id.
+     */
+    fun syndicationUrl(post: String): String? {
+        val id = STATUS.find(post)?.groupValues?.get(2) ?: return null
+        return "https://cdn.syndication.twimg.com/tweet-result?id=$id&lang=en&token=${token(id)}"
+    }
+
+    /** ((id / 1e15) × π) in base 36, without zeros or the point. */
+    internal fun token(id: String): String {
+        val n = (id.toDoubleOrNull() ?: return "0") / 1e15 * Math.PI
+        val whole = n.toLong()
+        val sb = StringBuilder(java.lang.Long.toString(whole, 36))
+        var frac = n - whole
+        repeat(11) { frac *= 36; val d = frac.toInt(); sb.append(Character.forDigit(d, 36)); frac -= d }
+        return sb.toString().replace("0", "")
+    }
+
+    fun parseSyndication(body: String, url: String, formatDate: (Long) -> String? = { null }): SocialPost? {
+        val o = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull() ?: return null
+        fun JsonObject.s(k: String) = this[k]?.jsonPrimitive?.contentOrNull
+        val user = o["user"] as? JsonObject ?: return null
+        val handle = user.s("screen_name") ?: return null
+        val raw = o.s("text") ?: return null
+        // The words only: X ends a post with t.co links to its own attachments.
+        val text = text(raw).replace(TRAILING_LINKS, "").trim()
+        val media = (o["mediaDetails"] as? JsonArray).orEmpty().mapNotNull { e ->
+            val m = e as? JsonObject ?: return@mapNotNull null
+            val still = m.s("media_url_https") ?: return@mapNotNull null
+            val size = (m["original_info"] as? JsonObject)?.let { i ->
+                val w = i["width"]?.jsonPrimitive?.contentOrNull?.toFloatOrNull(); val h = i["height"]?.jsonPrimitive?.contentOrNull?.toFloatOrNull()
+                if (w != null && h != null && h > 0) w / h else null
+            }
+            when (m.s("type")) {
+                "photo" -> PostMedia(false, still, aspect = size)
+                "video", "animated_gif" -> {
+                    val variants = ((m["video_info"] as? JsonObject)?.get("variants") as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+                        .filter { it.s("content_type") == "video/mp4" }
+                    // A phone-sized rendition: the best one under ~2.2 Mbps.
+                    val pick = variants.sortedBy { it.s("bitrate")?.toLongOrNull() ?: 0 }
+                        .lastOrNull { (it.s("bitrate")?.toLongOrNull() ?: 0) <= 2_200_000 } ?: variants.firstOrNull()
+                    pick?.s("url")?.let { PostMedia(true, it, poster = still, aspect = size) } ?: PostMedia(false, still, aspect = size)
+                }
+                else -> null
+            }
+        }
+        val created = o.s("created_at")?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() }
+        return SocialPost(
+            id = url,
+            network = "X",
+            authorHandle = handle,
+            authorName = user.s("name") ?: handle,
+            avatar = user.s("profile_image_url_https")?.replace("_normal.", "_bigger."),
+            text = text.ifBlank { if (media.isEmpty()) return null else "" },
+            createdAt = created,
+            url = url,
+            linkTitle = created?.let(formatDate),
+            likes = o.s("favorite_count")?.toIntOrNull() ?: 0,
+            media = media.take(4),
+        )
+    }
+
     fun oembedUrl(post: String) =
         "https://publish.twitter.com/oembed?url=${java.net.URLEncoder.encode(post, "UTF-8")}&omit_script=true&dnt=true&hide_thread=true"
 
@@ -328,6 +396,7 @@ object XPosts {
     private val P = Regex("<p[^>]*>(.*?)</p>", RegexOption.DOT_MATCHES_ALL)
     private val DATE = Regex("<a[^>]*>([^<]*)</a>\\s*</blockquote>")
     private val TAG = Regex("<[^>]+>")
+    private val TRAILING_LINKS = Regex("(\\s*https://t\\.co/\\S+)+\\s*$")
 
     private fun text(html: String) = html.replace(Regex("<br\\s*/?>"), "\n").replace(TAG, "")
         .replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">")

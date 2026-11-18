@@ -85,6 +85,22 @@ class SettingsViewModel(
         }
         _message.value = tr(R.string.msg_edition_set, next.displayName)
         offerLanguageFor(next.country)
+        // Then (after the language question, if any) the country's newsrooms, so they're a
+        // deliberate choice rather than a list at the bottom of the page.
+        val L = news.openwire.domain.engine.LocalSources
+        if (L.forCountry(next.country).isNotEmpty() || L.regionFor(next.country) != null) _sourcesOffer.value = next.country
+    }
+
+    private val _sourcesOffer = MutableStateFlow<String?>(null)
+    /** A country whose newsrooms to offer after an edition change (survives the language switch). */
+    val sourcesOffer: StateFlow<String?> = _sourcesOffer.asStateFlow()
+    fun dismissSourcesOffer() { _sourcesOffer.value = null }
+
+    /** Adds every suggested newsroom for the edition (country and region). */
+    fun addAllLocalSources(country: String) {
+        val L = news.openwire.domain.engine.LocalSources
+        L.forCountry(country).forEach { toggleLocalSource(it, true) }
+        L.regionFor(country)?.let { r -> L.forRegion(r, country).forEach { toggleLocalSource(it, true, regional = true) } }
     }
 
     private val _languageOffer = MutableStateFlow<news.openwire.domain.engine.Languages.Language?>(null)

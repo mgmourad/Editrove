@@ -27,6 +27,8 @@ data class ArticleContent(
     val partial: Boolean = false,
     /** Posts from X the story embeds (x.com status links), shown as cards under the text. */
     val embeds: List<String> = emptyList(),
+    /** Photos and videos from the story, each placed after the paragraph it follows. */
+    val media: List<ArticleMedia> = emptyList(),
 ) {
     val paragraphs: List<String> get() = text.split("\n\n").filter { it.isNotBlank() }
     val wordCount: Int get() = text.split(RX_1).count { it.isNotBlank() }
@@ -49,6 +51,23 @@ data class ArticleContent(
 
     private companion object {
         val QUOTE = Regex("[“\"]([^”\"]{50,220})[”\"]")
+    }
+}
+
+/** A photo or video inside a story. [after] is the index of the paragraph it follows. */
+data class ArticleMedia(
+    val kind: Kind,
+    val url: String,
+    val poster: String? = null,
+    val caption: String? = null,
+    val after: Int = 0,
+) {
+    enum class Kind {
+        IMAGE,
+        /** A video file or stream (mp4, HLS), played in the reader. */
+        VIDEO,
+        /** A YouTube / Vimeo player: shown as a card that opens the video. */
+        EXTERNAL,
     }
 }
 
@@ -148,7 +167,7 @@ class ArticleTextExtractor(
         race {
             val p = publisher.await()
             if (p != null && p.text.length >= 600) null
-            else renderPage(url)?.let { parse(it) }?.copy(via = TextSource.PUBLISHER, viaUrl = url)
+            else renderPage(url)?.let { parse(it, url) }?.copy(via = TextSource.PUBLISHER, viaUrl = url)
         }
         // Archives: immediately for paywalled sites, otherwise only if the publisher is slow.
         val archiveDelay = if (paywalled) 0L else 4_000L
@@ -244,15 +263,19 @@ class ArticleTextExtractor(
 
     private suspend fun extractFrom(url: String): ArticleContent? = withContext(Dispatchers.IO) {
         try {
-            get(url)?.let { parse(it) }
+            get(url)?.let { parse(it, url) }
         } catch (e: Exception) {
             null
         }
     }
 
-    private fun parse(html: String): ArticleContent? {
+    private fun parse(html: String, baseUrl: String = ""): ArticleContent? {
         try {
-            val doc = Jsoup.parse(html)
+            val doc = Jsoup.parse(html, baseUrl)
+            // Captions are page chrome to the text finder: keep each on its figure first.
+            doc.select("figure").forEach { f ->
+                f.selectFirst("figcaption")?.text()?.trim()?.takeIf { it.length in 3..300 }?.let { f.attr("data-ew-caption", it) }
+            }
             val title = doc.selectFirst("h1")?.text().orEmpty().ifEmpty { doc.title() }
             // Embedded X posts become cards; their text isn't part of the story's paragraphs.
             val embeds = embeddedPosts(doc)
@@ -260,6 +283,7 @@ class ArticleTextExtractor(
             val text = paragraphs.joinToString("\n\n")
             if (text.isBlank()) return null
             val imageUrl = doc.meta("og:image") ?: doc.selectFirst("article img")?.attr("src")
+            val media = runCatching { articleMedia(doc, paragraphs, imageUrl) }.getOrDefault(emptyList())
             return ArticleContent(
                 title = title,
                 text = text,
@@ -269,6 +293,7 @@ class ArticleTextExtractor(
                 author = (doc.meta("author") ?: doc.meta("article:author"))
                     ?.takeIf { it.isNotBlank() && !it.startsWith("http") && it.length < 80 },
                 embeds = embeds,
+                media = media,
             )
         } catch (e: Exception) {
             return null
@@ -290,6 +315,99 @@ class ArticleTextExtractor(
             e.remove()
         }
         return found.take(8)
+    }
+
+    /**
+     * Photos and videos that sit between the story's paragraphs (in page order). Anything
+     * before the first paragraph (the lead photo, shown already) or after the last (related
+     * stories, ads) is left out, as are logos, icons and tracking pixels.
+     */
+    internal fun articleMedia(doc: Document, paragraphs: List<String>, hero: String?): List<ArticleMedia> {
+        if (paragraphs.size < 2) return emptyList()
+        val index = HashMap<String, Int>()
+        paragraphs.forEachIndexed { i, p -> index.putIfAbsent(p, i) }
+        val body = doc.body() ?: return emptyList()
+        val consumed = HashSet<org.jsoup.nodes.Element>()
+        val out = ArrayList<ArticleMedia>()
+        val seen = HashSet<String>()
+        hero?.let { seen += mediaKey(it) }
+        var last = -1
+        for (e in body.select("p, figure, picture, img, video, iframe")) {
+            if (e in consumed) continue
+            if (e.tagName() == "p") {
+                // Stripped of a site banner, the first paragraph may not match: it's paragraph 0.
+                val i = index[e.text().trim()] ?: if (last < 0 && paragraphs[0].length > 40 && e.text().trim().endsWith(paragraphs[0])) 0 else null
+                if (i != null) last = maxOf(last, i)
+                continue
+            }
+            consumed += e.allElements
+            if (last < 0) continue
+            val m = mediaOf(e) ?: continue
+            if (!seen.add(mediaKey(m.url))) continue
+            out += m.copy(after = last)
+        }
+        // After the story's last paragraph is where related links and ads live.
+        return out.filter { it.after < paragraphs.lastIndex }.take(12)
+    }
+
+    private fun mediaKey(url: String) = url.substringBefore('?').substringBefore('#').removePrefix("https:").removePrefix("http:").lowercase()
+
+    private fun captionOf(e: org.jsoup.nodes.Element): String? =
+        (if (e.tagName() == "figure") e else e.closest("figure"))?.attr("data-ew-caption")?.takeIf { it.isNotBlank() }
+
+    private fun mediaOf(e: org.jsoup.nodes.Element): ArticleMedia? {
+        when (e.tagName()) {
+            "figure" -> {
+                (e.selectFirst("video") ?: e.selectFirst("iframe"))?.let { return mediaOf(it)?.copy(caption = captionOf(e)) }
+                return e.selectFirst("picture, img")?.let { imageOf(it) }?.let { ArticleMedia(ArticleMedia.Kind.IMAGE, it, caption = captionOf(e)) }
+            }
+            "picture", "img" -> return imageOf(e)?.let {
+                val alt = e.selectFirst("img")?.attr("alt")?.trim()?.takeIf { a -> a.length in 25..200 } ?: e.attr("alt").trim().takeIf { a -> a.length in 25..200 }
+                ArticleMedia(ArticleMedia.Kind.IMAGE, it, caption = captionOf(e) ?: alt)
+            }
+            "video" -> {
+                val src = (listOf(e.absUrl("src")) + e.select("source[src]").map { it.absUrl("src") })
+                    .filter { it.startsWith("http") }
+                    .sortedByDescending { it.contains(".mp4") || it.contains(".m3u8") }
+                    .firstOrNull() ?: return null
+                val poster = e.absUrl("poster").takeIf { it.startsWith("http") }
+                return ArticleMedia(ArticleMedia.Kind.VIDEO, src, poster = poster, caption = captionOf(e))
+            }
+            "iframe" -> {
+                val src = e.absUrl("src").ifBlank { e.absUrl("data-src") }
+                YOUTUBE.find(src)?.groupValues?.get(1)?.let { id ->
+                    return ArticleMedia(ArticleMedia.Kind.EXTERNAL, "https://www.youtube.com/watch?v=$id", poster = "https://i.ytimg.com/vi/$id/hqdefault.jpg", caption = captionOf(e) ?: e.attr("title").takeIf { it.length > 3 })
+                }
+                VIMEO.find(src)?.groupValues?.get(1)?.let { id ->
+                    return ArticleMedia(ArticleMedia.Kind.EXTERNAL, "https://vimeo.com/$id", caption = captionOf(e) ?: e.attr("title").takeIf { it.length > 3 })
+                }
+                return null
+            }
+        }
+        return null
+    }
+
+    /** The best address of a story photo (lazy-loading and responsive sources included), or null for icons and pixels. */
+    private fun imageOf(e: org.jsoup.nodes.Element): String? {
+        val img = if (e.tagName() == "img") e else e.selectFirst("img")
+        val sources = listOfNotNull(img) + e.select("source")
+        fun largest(srcset: String): String? = srcset.split(SRCSET_SPLIT).mapNotNull { part ->
+            val bits = part.trim().split(RX_1)
+            val w = bits.getOrNull(1)?.trimEnd('w', 'x')?.toDoubleOrNull() ?: 1.0
+            bits.firstOrNull()?.takeIf { it.isNotBlank() }?.let { it to w }
+        }.maxByOrNull { it.second }?.first
+        val raw = sources.firstNotNullOfOrNull { s ->
+            listOf("data-srcset", "srcset").firstNotNullOfOrNull { a -> s.attr(a).takeIf { it.isNotBlank() }?.let(::largest) }
+        } ?: img?.let { i -> listOf("data-src", "data-lazy-src", "data-original", "data-url", "src").firstNotNullOfOrNull { a -> i.attr(a).takeIf { it.isNotBlank() && !it.startsWith("data:") } } }
+            ?: return null
+        val url = runCatching { java.net.URL(java.net.URL(e.baseUri().ifBlank { "https://example.invalid/" }), raw.trim()).toString() }.getOrNull() ?: return null
+        if (!url.startsWith("http") || url.startsWith("https://example.invalid")) return null
+        val lower = url.lowercase().substringBefore('?')
+        if (lower.endsWith(".svg") || SMALL_IMAGE.containsMatchIn(lower)) return null
+        val w = img?.attr("width")?.toIntOrNull()
+        val h = img?.attr("height")?.toIntOrNull()
+        if ((w != null && w < 200) || (h != null && h < 120)) return null
+        return url
     }
 
     /**
@@ -389,3 +507,8 @@ private val SENTENCE = Regex("(?<=[.!?])\\s+(?=[A-Z\"“])")
 private val PARA_BREAK = Regex("\\n\\s*\\n|\\n")
 
 private val RX_WORDS = Regex("\\p{L}+")
+private val YOUTUBE = Regex("(?:youtube(?:-nocookie)?\\.com/embed/|youtu\\.be/)([A-Za-z0-9_-]{11})")
+private val VIMEO = Regex("player\\.vimeo\\.com/video/(\\d+)")
+/** Logos, icons, avatars, tracking pixels and placeholders: not story photos. */
+private val SMALL_IMAGE = Regex("(^|[/_.-])(logos?|icons?|avatars?|sprites?|pixel|spacer|placeholder|blank|1x1|badges?|emoji|ads|authors?|headshots?)([/_.-]|$)|doubleclick")
+private val SRCSET_SPLIT = Regex(",\\s+")

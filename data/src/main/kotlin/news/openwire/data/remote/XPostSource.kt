@@ -11,8 +11,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /**
- * Reads single X posts through X's official oEmbed endpoint (do-not-track on, no script),
- * for posts a story embeds. Only the post's address is sent.
+ * Reads single X posts a story embeds: from X's embed data (text, photos, videos), else its
+ * official oEmbed endpoint (text only; do-not-track on, no script). Only the post's id is sent.
  */
 class XPostSource(
     private val client: OkHttpClient = OkHttpClient.Builder()
@@ -26,10 +26,15 @@ class XPostSource(
         cache[key]?.let { return it }
         if (key in missing) return null
         return withContext(Dispatchers.IO) {
-            runCatching {
-                client.newCall(Request.Builder().url(XPosts.oembedUrl(key)).header("User-Agent", "Editrove/1.0 (Android news reader)").build())
-                    .execute().use { r -> if (r.isSuccessful) r.body?.string() else null }
-            }.getOrNull()?.let { XPosts.parse(it, key) }
+            val date = java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.MEDIUM)
+            XPosts.syndicationUrl(key)?.let(::get)?.let { body ->
+                XPosts.parseSyndication(body, key) { ms -> runCatching { date.format(java.time.Instant.ofEpochMilli(ms).atZone(java.time.ZoneId.systemDefault())) }.getOrNull() }
+            } ?: get(XPosts.oembedUrl(key))?.let { XPosts.parse(it, key) }
         }.also { if (it != null) cache[key] = it else missing += key }
     }
+
+    private fun get(url: String): String? = runCatching {
+        client.newCall(Request.Builder().url(url).header("User-Agent", "Editrove/1.0 (Android news reader)").build())
+            .execute().use { r -> if (r.isSuccessful) r.body?.string() else null }
+    }.getOrNull()
 }

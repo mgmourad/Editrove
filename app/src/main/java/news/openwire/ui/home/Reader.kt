@@ -413,10 +413,13 @@ internal fun ArticleBody(
                         )
                     }
                 }
+                val mediaAfter = remember(s.content) { s.content.media.groupBy { it.after } }
                 s.content.paragraphs.forEachIndexed { i, para ->
                     // Drop caps are a Latin-type tradition; Arabic (and Hebrew) text opens plainly.
                     if (i == 0 && !RX_RTL.containsMatchIn(para.take(40))) DropCapParagraph(para) else BodyParagraph(para)
                     Spacer(Modifier.height(16.dp))
+                    // The story's own photos and videos, where the publisher placed them.
+                    mediaAfter[i]?.forEach { m -> StoryMedia(m); Spacer(Modifier.height(16.dp)) }
                 }
                 if (s.content.embeds.isNotEmpty()) {
                     EmbeddedPosts(s.content.embeds, actions.loadPost)

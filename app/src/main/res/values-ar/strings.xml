@@ -272,7 +272,7 @@
     <string name="about_body">قارئ أخبار سريع بلا إعلانات ولا تتبّع، مع محرك لتجاوز جدران الدفع. بلا حسابات ولا تحليلات ولا خادم خاص به — إعداداتك وأخبارك المحفوظة لا تغادر هذا الجهاز.</string>
     <string name="credits">شكر وتقدير</string>
     <string name="credits_body">Editrove — حيث يلتقي الحس التحريري بكنز من الأخبار. بدأ Editrove نسخةً مشتقة من تطبيق OpenWire الأصلي على الويب لـ Anson Lai، الذي ينقل عنه محرك جدار الدفع وفهرس المصادر وخط تغذية الأخبار ويبني عليها.</string>
-    <string name="credits_type">الخطوط: Newsreader وInter وJetBrains Mono (رخصة SIL Open Font). موسيقى الموجز: مجانية الحقوق من Fesliyan Studios ‏(fesliyanstudios.com).</string>
+    <string name="credits_type">الخطوط: Newsreader وInter وJetBrains Mono (رخصة SIL Open Font). موسيقى الموجز: مجانية الحقوق من Fesliyan Studios ‏(fesliyanstudios.com). الأصوات المدمجة: sherpa-onnx (رخصة Apache 2.0) مع أصوات Piper.</string>
     <string name="license">الترخيص</string>
     <string name="license_body">برنامج حر بموجب رخصة GNU Affero العمومية الإصدار 3.0. الشيفرة المصدرية: github.com/mgmourad/Editrove</string>
     <string name="briefing_intro">يقرأ موجزك صوت تحويل النص إلى كلام في هاتفك بأسلوب مذيع أخبار، مع موسيقى افتتاحية وفواصل انتقالية. لا شيء يغادر جهازك.</string>
@@ -470,7 +470,7 @@
     <string name="g_discover_t">استكشاف وبحث</string>
     <string name="g_discover_b">يجمع «استكشاف» أهم الأخبار من كل مواضيعك. اكتب في خانة البحث للعثور على أخبار أو صحف.</string>
     <string name="g_audio_t">الموجز الصوتي</string>
-    <string name="g_audio_b">يقرأ «استماع» الأخبار كنشرة إذاعية، بموسيقى افتتاحية وصوت بلغتك. اضغط «تشغيل الموجز» وتابع التصفح: يبقى المشغّل أسفل الشاشة وعلى شاشة القفل. ومن الإعدادات › الموجز الصوتي يمكنك اختيار العناوين أو الملخصات أو المقالات كاملة، والصوت والسرعة، وجدولة موجزات الصباح والظهيرة والمساء لتصلك كإشعار.</string>
+    <string name="g_audio_b">يقرأ «استماع» الأخبار كنشرة إذاعية، بموسيقى افتتاحية وصوت بلغتك. اضغط «تشغيل الموجز» وتابع التصفح: يبقى المشغّل أسفل الشاشة وعلى شاشة القفل. ومن الإعدادات › الموجز الصوتي يمكنك اختيار العناوين أو الملخصات أو المقالات كاملة، والصوت والسرعة، وجدولة موجزات الصباح والظهيرة والمساء لتصلك كإشعار. وعلى الهواتف التي لا تحتوي على محرك Google للنطق (Huawei وغيرها) يستخدم Editrove صوته الخاص: يُنزَّل مرة واحدة (نحو 20 ميغابايت) ثم يعمل دون إنترنت.</string>
     <string name="g_tv_t">البث التلفزيوني المباشر</string>
     <string name="g_tv_b">تعرض صفحة «مباشر» القنوات الإخبارية التي تبث الآن. القنوات المعلّمة بـ «مباشر» تُعرض داخل Editrove؛ اضغط زر ملء الشاشة لمشاهدتها كبيرة. والقنوات المعلّمة بـ YouTube تفتح صفحتها الرسمية للبث المباشر. استخدم أزرار اللغة لعرض قنوات لغة واحدة.</string>
     <string name="g_radio_t">الراديو</string>
@@ -506,4 +506,14 @@
     <string name="w_skip">تخطّي</string>
     <string name="w_next">التالي</string>
     <string name="w_start">ابدأ</string>
+    <string name="voice_engine_name">أصوات Editrove</string>
+    <string name="voice_own_offer">لا يوجد صوت %1$s على هذا الهاتف. يمكن لـ Editrove تنزيل صوته الخاص — ويعمل بعدها دون إنترنت.</string>
+    <string name="voice_own_download">تنزيل (%1$d ميغابايت)</string>
+    <string name="voice_own_progress">جارٍ تنزيل صوت %1$s… %2$d%%</string>
+    <string name="voice_own_progress_short">جارٍ التنزيل… %1$d%%</string>
+    <string name="voice_own_failed">لم يكتمل التنزيل. تحقق من الاتصال وحاول مجدداً.</string>
+    <string name="voice_own_hint">أصوات يتحدث بها Editrove على الهواتف التي لا تحتوي على محرك Google للنطق (Huawei وغيرها). يُنزَّل كل صوت مرة واحدة ثم يعمل دون إنترنت، ويُولَّد الكلام على هاتفك.</string>
+    <string name="voice_own_installed">على هذا الهاتف</string>
+    <string name="voice_own_delete">حذف</string>
+    <string name="voice_own_get">تنزيل</string>
 </resources>

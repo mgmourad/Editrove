@@ -148,7 +148,21 @@ class BriefingPlayer(
 
     // Google's engine when installed: it holds the default narrator and downloadable voices
     // in every language (the phone's default may be another maker's engine).
-    private val tts: TextToSpeech = TextToSpeech(app, { status -> ready = status == TextToSpeech.SUCCESS }, news.openwire.i18n.VoiceSetup.engine(app)).apply {
+    /** The engine in use (Google's, Editrove's own voice, or the phone's default); swapped when the language needs another. */
+    private var engineName: String? = news.openwire.i18n.VoiceSetup.engine(app)
+    private var tts: TextToSpeech = makeTts(engineName)
+
+    /** Picks the engine for [language] before speaking (a Huawei tablet reads Arabic with Editrove's own voice). */
+    private fun useEngineFor(language: String) {
+        val want = news.openwire.i18n.VoiceSetup.engine(app, language)
+        if (want == engineName) return
+        runCatching { tts.stop(); tts.shutdown() }
+        ready = false
+        engineName = want
+        tts = makeTts(want)
+    }
+
+    private fun makeTts(engine: String?): TextToSpeech = TextToSpeech(app, { status -> ready = status == TextToSpeech.SUCCESS }, engine).apply {
         setAudioAttributes(SPEECH)
         setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
@@ -191,6 +205,7 @@ class BriefingPlayer(
         lang = news.openwire.domain.engine.Languages.effective(null).let { app ->
             if (app != "ar" && stories.count { RX_ARABIC.containsMatchIn(it.title) } * 2 > stories.size) "ar" else app
         }
+        useEngineFor(lang)
         title = tr(R.string.briefing_title, topicLabel)
         content.clear()
         val built = mutableListOf<Pair<Seg, Int>>()
@@ -368,6 +383,12 @@ class BriefingPlayer(
     }
 
     private fun speak(text: String, s: Int, from: Int = 0) {
+        // A freshly swapped engine starts up first.
+        if (!ready) { scope.launch { awaitReady(); if (s == session) speakNow(text, s, from) }; return }
+        speakNow(text, s, from)
+    }
+
+    private fun speakNow(text: String, s: Int, from: Int = 0) {
         val p = prefs()
         tts.setSpeechRate(p.speed)
         val all = runCatching { tts.voices }.getOrNull().orEmpty()

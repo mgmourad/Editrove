@@ -272,7 +272,7 @@
     <string name="about_body">Ein schneller Nachrichtenleser ohne Werbung und Tracking, mit einer Engine zum Umgehen von Paywalls. Keine Konten, keine Analysen, kein eigener Server — deine Einstellungen und gespeicherten Meldungen verlassen dieses Gerät nie.</string>
     <string name="credits">Danksagungen</string>
     <string name="credits_body">Editrove — redaktionelles Gespür trifft auf einen Schatz an Meldungen. Editrove begann als Fork der ursprünglichen OpenWire-Web-App von Anson Lai, deren Paywall-Engine, Quellenkatalog und Feed-Pipeline es übernimmt und weiterentwickelt.</string>
-    <string name="credits_type">Schriften: Newsreader, Inter und JetBrains Mono (SIL Open Font License). Briefing-Musik: lizenzfrei von Fesliyan Studios (fesliyanstudios.com).</string>
+    <string name="credits_type">Schriften: Newsreader, Inter und JetBrains Mono (SIL Open Font License). Briefing-Musik: lizenzfrei von Fesliyan Studios (fesliyanstudios.com). Eingebaute Stimmen: sherpa-onnx (Apache 2.0) mit Piper-Stimmen.</string>
     <string name="license">Lizenz</string>
     <string name="license_body">Freie Software unter der GNU Affero General Public License v3.0. Quellcode: github.com/mgmourad/Editrove</string>
     <string name="briefing_intro">Dein Briefing wird von der Sprachausgabe deines Telefons mit einem Moderationsskript, einem Eröffnungsjingle und Übergängen gelesen. Nichts verlässt dein Gerät.</string>
@@ -470,7 +470,7 @@
     <string name="g_discover_t">Entdecken und suchen</string>
     <string name="g_discover_b">Entdecken sammelt die wichtigsten Meldungen aus allen Themen. Tippe ins Suchfeld, um Meldungen oder Zeitungen zu finden.</string>
     <string name="g_audio_t">Das Audio-Briefing</string>
-    <string name="g_audio_b">Audio liest die Nachrichten wie eine Sendung vor, mit Eröffnungsjingle und einer Stimme in deiner Sprache. Tippe auf Briefing abspielen und lies weiter: Der Player bleibt unten und auf dem Sperrbildschirm. Unter Einstellungen › Audio-Briefing wählst du Schlagzeilen, Zusammenfassungen oder ganze Artikel, Stimme und Tempo und planst Briefings am Morgen, Nachmittag und Abend.</string>
+    <string name="g_audio_b">Audio liest die Nachrichten wie eine Sendung vor, mit Eröffnungsjingle und einer Stimme in deiner Sprache. Tippe auf Briefing abspielen und lies weiter: Der Player bleibt unten und auf dem Sperrbildschirm. Unter Einstellungen › Audio-Briefing wählst du Schlagzeilen, Zusammenfassungen oder ganze Artikel, Stimme und Tempo und planst Briefings am Morgen, Nachmittag und Abend. Auf Telefonen ohne Googles Sprachausgabe (Huawei und andere) spricht Editrove mit eigener Stimme: einmal geladen (etwa 20 MB), danach offline.</string>
     <string name="g_tv_t">Live-Fernsehen</string>
     <string name="g_tv_b">Live zeigt Nachrichtensender, die gerade senden. Mit LIVE markierte Sender laufen in Editrove; tippe auf Vollbild, um sie groß zu sehen. Mit YouTube markierte Sender öffnen ihre offizielle Live-Seite. Mit den Sprachknöpfen filterst du.</string>
     <string name="g_radio_t">Radio</string>
@@ -506,4 +506,14 @@
     <string name="w_skip">Überspringen</string>
     <string name="w_next">Weiter</string>
     <string name="w_start">Los geht’s</string>
+    <string name="voice_engine_name">Editrove-Stimmen</string>
+    <string name="voice_own_offer">Dieses Telefon hat keine Stimme auf %1$s. Editrove kann seine eigene laden — sie funktioniert dann offline.</string>
+    <string name="voice_own_download">Laden (%1$d MB)</string>
+    <string name="voice_own_progress">Stimme auf %1$s wird geladen… %2$d %%</string>
+    <string name="voice_own_progress_short">Wird geladen… %1$d %%</string>
+    <string name="voice_own_failed">Der Download wurde nicht abgeschlossen. Prüfe die Verbindung und versuche es erneut.</string>
+    <string name="voice_own_hint">Stimmen von Editrove für Telefone ohne Googles Sprachausgabe (Huawei und andere). Jede wird einmal geladen und funktioniert dann offline; gesprochen wird auf deinem Telefon.</string>
+    <string name="voice_own_installed">Auf diesem Telefon</string>
+    <string name="voice_own_delete">Löschen</string>
+    <string name="voice_own_get">Laden</string>
 </resources>

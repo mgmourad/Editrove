@@ -272,7 +272,7 @@
     <string name="about_body">Un lector de noticias rápido, sin anuncios ni rastreo, con un motor para esquivar muros de pago. Sin cuentas, sin analíticas, sin servidor propio — tus ajustes y noticias guardadas nunca salen de este dispositivo.</string>
     <string name="credits">Créditos</string>
     <string name="credits_body">Editrove — el criterio editorial al servicio de un tesoro de noticias. Editrove nació como un fork de la app web original OpenWire de Anson Lai, cuyo motor de muros de pago, catálogo de fuentes y canal de feeds adapta y amplía.</string>
-    <string name="credits_type">Tipografías: Newsreader, Inter y JetBrains Mono (SIL Open Font License). Música del resumen: libre de derechos, de Fesliyan Studios (fesliyanstudios.com).</string>
+    <string name="credits_type">Tipografías: Newsreader, Inter y JetBrains Mono (SIL Open Font License). Música del resumen: libre de derechos, de Fesliyan Studios (fesliyanstudios.com). Voces integradas: sherpa-onnx (Apache 2.0) con voces de Piper.</string>
     <string name="license">Licencia</string>
     <string name="license_body">Software libre bajo la GNU Affero General Public License v3.0. Código fuente: github.com/mgmourad/Editrove</string>
     <string name="briefing_intro">Tu resumen lo lee la voz de síntesis de tu teléfono con un guion de presentador, una cortinilla de apertura y transiciones. Nada sale de tu dispositivo.</string>
@@ -470,7 +470,7 @@
     <string name="g_discover_t">Descubrir y buscar</string>
     <string name="g_discover_b">Descubrir reúne las noticias más importantes de todos tus temas. Escribe en el buscador para encontrar noticias o periódicos.</string>
     <string name="g_audio_t">El resumen de audio</string>
-    <string name="g_audio_b">Audio lee las noticias como un informativo, con una cortinilla y una voz en tu idioma. Toca Escuchar resumen y sigue navegando: el reproductor queda abajo y en la pantalla de bloqueo. En Ajustes › Resumen de audio eliges titulares, resúmenes o artículos completos, la voz y la velocidad, y programas resúmenes de mañana, tarde y noche.</string>
+    <string name="g_audio_b">Audio lee las noticias como un informativo, con una cortinilla y una voz en tu idioma. Toca Escuchar resumen y sigue navegando: el reproductor queda abajo y en la pantalla de bloqueo. En Ajustes › Resumen de audio eliges titulares, resúmenes o artículos completos, la voz y la velocidad, y programas resúmenes de mañana, tarde y noche. En teléfonos sin el motor de voz de Google (Huawei y otros), Editrove usa su propia voz: se descarga una vez (unos 20 MB) y luego funciona sin conexión.</string>
     <string name="g_tv_t">Televisión en directo</string>
     <string name="g_tv_b">En directo muestra los canales de noticias que emiten ahora. Los marcados EN VIVO se ven dentro de Editrove; toca pantalla completa para verlos en grande. Los marcados YouTube abren su página oficial. Usa los botones de idioma para filtrar.</string>
     <string name="g_radio_t">Radio</string>
@@ -506,4 +506,14 @@
     <string name="w_skip">Omitir</string>
     <string name="w_next">Siguiente</string>
     <string name="w_start">Empezar</string>
+    <string name="voice_engine_name">Voces de Editrove</string>
+    <string name="voice_own_offer">Este teléfono no tiene voz en %1$s. Editrove puede descargar la suya y luego funciona sin conexión.</string>
+    <string name="voice_own_download">Descargar (%1$d MB)</string>
+    <string name="voice_own_progress">Descargando la voz en %1$s… %2$d %%</string>
+    <string name="voice_own_progress_short">Descargando… %1$d %%</string>
+    <string name="voice_own_failed">La descarga no terminó. Revisa la conexión y vuelve a intentarlo.</string>
+    <string name="voice_own_hint">Voces de Editrove para teléfonos sin el motor de voz de Google (Huawei y otros). Cada una se descarga una vez y luego funciona sin conexión; la voz se genera en tu teléfono.</string>
+    <string name="voice_own_installed">En este teléfono</string>
+    <string name="voice_own_delete">Eliminar</string>
+    <string name="voice_own_get">Descargar</string>
 </resources>

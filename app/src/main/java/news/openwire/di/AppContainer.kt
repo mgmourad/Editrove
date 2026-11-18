@@ -49,6 +49,8 @@ class AppContainer(context: Context) {
         ) }
     val markets: news.openwire.data.remote.MarketDataSource by lazy { news.openwire.data.remote.MarketDataSource() }
     val radioBrowser: news.openwire.data.remote.RadioBrowserSource by lazy { news.openwire.data.remote.RadioBrowserSource() }
+    /** Editrove's own downloadable voices. */
+    val voices: news.openwire.voice.VoiceStore by lazy { news.openwire.voice.VoiceStore(context) }
     val sourceFinder: news.openwire.data.remote.SourceFinder by lazy { news.openwire.data.remote.SourceFinder() }
     val xPosts: news.openwire.data.remote.XPostSource by lazy { news.openwire.data.remote.XPostSource() }
     val opinion: news.openwire.data.remote.OpinionSource by lazy { news.openwire.data.remote.OpinionSource(GoogleNewsRssSource(), RssNormalizer(domainRegistry)) }

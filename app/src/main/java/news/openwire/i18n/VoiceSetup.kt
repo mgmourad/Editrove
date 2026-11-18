@@ -20,7 +20,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * "install voice data" screen is offered.
  */
 object VoiceSetup {
-    enum class State { READY, DOWNLOADING, MISSING, UNSUPPORTED }
+    /** OWN_VOICE: no voice on the phone, but Editrove's own can be downloaded. */
+    enum class State { READY, DOWNLOADING, MISSING, UNSUPPORTED, OWN_VOICE }
 
     const val GOOGLE_TTS = "com.google.android.tts"
 
@@ -48,7 +49,14 @@ object VoiceSetup {
 
     suspend fun ensure(context: Context, lang: String, country: String? = null): State = withContext(Dispatchers.Main) {
         val app = context.applicationContext
-        val engine = engine(app)
+        // No Google engine: Editrove's own voice for the language (downloaded once).
+        if (!hasGoogle(app)) {
+            val pack = news.openwire.voice.VoicePacks.forLanguage(lang) ?: return@withContext State.UNSUPPORTED
+            val store = news.openwire.voice.VoiceStore(app)
+            if (store.isInstalled(pack)) { lastReady = pack.voiceName; return@withContext State.READY }
+            return@withContext State.OWN_VOICE
+        }
+        val engine = engine(app, lang)
         var tts: TextToSpeech? = null
         val ok = withTimeoutOrNull(8_000) {
             suspendCancellableCoroutine { cont ->
@@ -95,16 +103,38 @@ object VoiceSetup {
             return
         }
         if (current != null && currentLang == lang) return
-        if (ensure(context, lang, s.edition.country) != State.READY) return
+        val state = ensure(context, lang, s.edition.country)
+        // No Google engine: fetch Editrove's own voice for the language once, on Wi-Fi.
+        if (state == State.OWN_VOICE && unmetered(context)) {
+            news.openwire.voice.VoicePacks.forLanguage(lang)?.let { pack -> (context.applicationContext as news.openwire.OpenWireApp).container.voices.download(pack) }
+            return
+        }
+        if (state != State.READY) return
         val name = lastReady ?: return
         settings.update { it.copy(briefing = it.briefing.copy(voice = name)) }
     }
 
-    /** Google's speech engine when installed, else the phone's default (null). */
-    fun engine(context: Context): String? =
-        GOOGLE_TTS.takeIf { runCatching { context.packageManager.getPackageInfo(it, 0) }.isSuccess }
+    /** Google's engine is installed and switched on (a disabled one can't speak). */
+    fun hasGoogle(context: Context): Boolean = runCatching { context.packageManager.getApplicationInfo(GOOGLE_TTS, 0).enabled }.getOrDefault(false)
 
-    /** The speech engine's own screen for downloading voices. */
-    fun installIntent(): Intent = Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA)
-        .setPackage(GOOGLE_TTS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    /**
+     * The speech engine to use for [lang]: Google's when installed (it has the most voices);
+     * else Editrove's own when its voice for [lang] is downloaded; else the phone's default.
+     */
+    fun engine(context: Context, lang: String = news.openwire.domain.engine.Languages.effective(null)): String? = when {
+        hasGoogle(context) -> GOOGLE_TTS
+        news.openwire.voice.VoiceStore(context).installed(lang) != null -> context.packageName
+        else -> null
+    }
+
+    /** The speech engine's own screen for downloading voices (Google's, else the phone's text-to-speech settings). */
+    fun installIntent(context: Context): Intent =
+        if (hasGoogle(context)) Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).setPackage(GOOGLE_TTS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        else Intent("com.android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    private fun unmetered(context: Context): Boolean {
+        val cm = context.getSystemService(android.net.ConnectivityManager::class.java) ?: return false
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+    }
 }

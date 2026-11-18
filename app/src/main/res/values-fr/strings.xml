@@ -272,7 +272,7 @@
     <string name="about_body">Un lecteur d’actualité rapide, sans publicité ni pistage, avec un moteur de contournement des paywalls. Ni compte, ni statistiques, ni serveur — vos réglages et articles enregistrés ne quittent jamais cet appareil.</string>
     <string name="credits">Crédits</string>
     <string name="credits_body">Editrove — le jugement éditorial au service d’un trésor d’articles. Editrove est né d’un fork de l’app web OpenWire d’Anson Lai, dont il reprend et enrichit le moteur de paywall, le catalogue de sources et la chaîne de flux.</string>
-    <string name="credits_type">Polices : Newsreader, Inter et JetBrains Mono (SIL Open Font License). Musique du brief : libre de droits, Fesliyan Studios (fesliyanstudios.com).</string>
+    <string name="credits_type">Polices : Newsreader, Inter et JetBrains Mono (SIL Open Font License). Musique du brief : libre de droits, Fesliyan Studios (fesliyanstudios.com). Voix intégrées : sherpa-onnx (Apache 2.0) avec les voix Piper.</string>
     <string name="license">Licence</string>
     <string name="license_body">Logiciel libre sous licence GNU Affero General Public License v3.0. Code source : github.com/mgmourad/Editrove</string>
     <string name="briefing_intro">Votre brief est lu par la voix de synthèse de votre téléphone, avec un texte de présentateur, un jingle d’ouverture et des transitions. Rien ne quitte votre appareil.</string>
@@ -470,7 +470,7 @@
     <string name="g_discover_t">Explorer et rechercher</string>
     <string name="g_discover_b">Explorer rassemble les articles les plus importants de tous vos sujets. Tapez dans la recherche pour trouver des articles ou des journaux.</string>
     <string name="g_audio_t">Le brief audio</string>
-    <string name="g_audio_b">Audio lit l’actualité comme un journal radio, avec un jingle d’ouverture et une voix dans votre langue. Touchez Écouter le brief et continuez à lire : le lecteur reste en bas de l’écran et sur l’écran verrouillé. Dans Réglages › Brief audio, choisissez titres, résumés ou articles complets, la voix et la vitesse, et programmez des briefs du matin, de l’après-midi et du soir.</string>
+    <string name="g_audio_b">Audio lit l’actualité comme un journal radio, avec un jingle d’ouverture et une voix dans votre langue. Touchez Écouter le brief et continuez à lire : le lecteur reste en bas de l’écran et sur l’écran verrouillé. Dans Réglages › Brief audio, choisissez titres, résumés ou articles complets, la voix et la vitesse, et programmez des briefs du matin, de l’après-midi et du soir. Sur les téléphones sans moteur vocal Google (Huawei et autres), Editrove utilise sa propre voix : téléchargée une fois (environ 20 Mo), elle fonctionne ensuite hors ligne.</string>
     <string name="g_tv_t">La télévision en direct</string>
     <string name="g_tv_b">En direct affiche les chaînes d’info qui diffusent maintenant. Les chaînes marquées DIRECT se regardent dans Editrove ; touchez le bouton plein écran pour les voir en grand. Les chaînes marquées YouTube ouvrent leur page officielle. Les boutons de langue filtrent les chaînes.</string>
     <string name="g_radio_t">La radio</string>
@@ -506,4 +506,14 @@
     <string name="w_skip">Passer</string>
     <string name="w_next">Suivant</string>
     <string name="w_start">Commencer</string>
+    <string name="voice_engine_name">Voix Editrove</string>
+    <string name="voice_own_offer">Ce téléphone n’a pas de voix en %1$s. Editrove peut télécharger la sienne — elle fonctionne ensuite hors ligne.</string>
+    <string name="voice_own_download">Télécharger (%1$d Mo)</string>
+    <string name="voice_own_progress">Téléchargement de la voix %1$s… %2$d %%</string>
+    <string name="voice_own_progress_short">Téléchargement… %1$d %%</string>
+    <string name="voice_own_failed">Le téléchargement n’a pas abouti. Vérifiez la connexion et réessayez.</string>
+    <string name="voice_own_hint">Les voix d’Editrove pour les téléphones sans moteur vocal Google (Huawei et autres). Chacune se télécharge une fois puis fonctionne hors ligne ; la voix est produite sur votre téléphone.</string>
+    <string name="voice_own_installed">Sur ce téléphone</string>
+    <string name="voice_own_delete">Supprimer</string>
+    <string name="voice_own_get">Télécharger</string>
 </resources>

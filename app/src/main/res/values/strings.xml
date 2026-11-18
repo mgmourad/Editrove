@@ -274,7 +274,7 @@
     <string name="about_body">A fast, ad-free and tracking-free news reader with a paywall-routing engine. No accounts, no analytics, no server of its own — your settings and saved stories never leave this device.</string>
     <string name="credits">Credits</string>
     <string name="credits_body">Editrove — editorial judgment meets a trove of stories. Editrove began as a fork of the original OpenWire web app by Anson Lai, whose paywall engine, source catalog and feed pipeline it ports and builds on.</string>
-    <string name="credits_type">Typefaces: Newsreader, Inter and JetBrains Mono (SIL Open Font License). Briefing music: royalty-free from Fesliyan Studios (fesliyanstudios.com).</string>
+    <string name="credits_type">Typefaces: Newsreader, Inter and JetBrains Mono (SIL Open Font License). Briefing music: royalty-free from Fesliyan Studios (fesliyanstudios.com). Built-in voices: sherpa-onnx (Apache 2.0) with Piper voices.</string>
     <string name="license">License</string>
     <string name="license_body">Free software under the GNU Affero General Public License v3.0. Source code: github.com/mgmourad/Editrove</string>
     <string name="briefing_intro">Your briefing is read by your phone\'s own text-to-speech voice with a news-anchor script, an opening cue and transition stings. Nothing leaves your device.</string>
@@ -472,7 +472,7 @@
     <string name="g_discover_t">Discover and search</string>
     <string name="g_discover_b">Discover gathers the most important stories across all your topics. Type in the search box to find stories or newspapers.</string>
     <string name="g_audio_t">Audio briefing</string>
-    <string name="g_audio_b">Audio reads the news like a broadcast, with an opening tune and a voice in your language. Tap Play briefing and keep scrolling: the player stays at the bottom of the screen and on your lock screen. In Settings › Audio briefing you can choose headlines, summaries or full articles, the voice and the speed, and schedule Morning, Afternoon and Evening briefings that arrive as a notification.</string>
+    <string name="g_audio_b">Audio reads the news like a broadcast, with an opening tune and a voice in your language. Tap Play briefing and keep scrolling: the player stays at the bottom of the screen and on your lock screen. In Settings › Audio briefing you can choose headlines, summaries or full articles, the voice and the speed, and schedule Morning, Afternoon and Evening briefings that arrive as a notification. Phones without Google’s speech engine (Huawei and others) get Editrove’s own voice: it downloads once, about 20 MB, and then works offline.</string>
     <string name="g_tv_t">Live TV</string>
     <string name="g_tv_b">Live shows news channels broadcasting right now. Channels marked LIVE play inside Editrove; tap the full-screen button to watch them large. Channels marked YouTube open their official live page. Use the language buttons to see channels in one language.</string>
     <string name="g_radio_t">Radio</string>
@@ -508,4 +508,14 @@
     <string name="w_skip">Skip</string>
     <string name="w_next">Next</string>
     <string name="w_start">Get started</string>
+    <string name="voice_engine_name">Editrove voices</string>
+    <string name="voice_own_offer">This phone has no %1$s voice. Editrove can download its own — it then works offline.</string>
+    <string name="voice_own_download">Download (%1$d MB)</string>
+    <string name="voice_own_progress">Downloading the %1$s voice… %2$d%%</string>
+    <string name="voice_own_progress_short">Downloading… %1$d%%</string>
+    <string name="voice_own_failed">The download didn’t finish. Check the connection and try again.</string>
+    <string name="voice_own_hint">Voices Editrove speaks with on phones without Google’s speech engine (Huawei and others). Each downloads once and then works offline; speech is made on your phone.</string>
+    <string name="voice_own_installed">On this phone</string>
+    <string name="voice_own_delete">Delete</string>
+    <string name="voice_own_get">Download</string>
 </resources>

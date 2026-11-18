@@ -15,6 +15,8 @@ android {
         targetSdk = 37
         versionCode = 13
         versionName = "0.7.0-beta.6"
+        // Editrove's built-in voices (sherpa-onnx) ship native code for ARM phones and tablets.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
 
         // Static host of the published topic snapshots (SPEC §8). Override with
         // -Popenwire.dataUrl=https://example.org/ (e.g. your own GitHub Pages copy).
@@ -44,6 +46,9 @@ android {
             }
         }
     }
+
+    // Native libraries stored compressed (the speech runtime is large; this halves its share of the APK).
+    packaging { jniLibs { useLegacyPackaging = true } }
 
     buildTypes {
         release {
@@ -94,6 +99,12 @@ dependencies {
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.ui)
     implementation(libs.media3.session)
+    // Built-in voices for phones without Google's speech engine (Huawei etc.): sherpa-onnx (Apache-2.0),
+    // https://github.com/k2-fsa/sherpa-onnx v1.13.8, sha256 b22c3fc1b6a45666d28892bb2f7694beeb77a8362d7ebd77c1a5431ec9435471.
+    // (1.x: 2.0 dropped the built-in espeak-ng phonemizer that Piper voices need.)
+    implementation(files("libs/sherpa-onnx-static-link-onnxruntime-1.13.8.aar"))
+    // Unpacks the downloaded voices (.tar.bz2).
+    implementation(libs.commons.compress)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

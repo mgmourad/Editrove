@@ -612,9 +612,10 @@ internal class Narrator(context: Context) {
         private set
     var onDone: (() -> Unit)? = null
     private var lastId: String? = null
-    private val tts: TextToSpeech = TextToSpeech(context.applicationContext) { status ->
+    // Same engine choice as the briefing: Google's, else Editrove's own voice, else the phone's.
+    private val tts: TextToSpeech = TextToSpeech(context.applicationContext, { status ->
         ready = status == TextToSpeech.SUCCESS
-    }.apply {
+    }, news.openwire.i18n.VoiceSetup.engine(context.applicationContext)).apply {
         setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {}
             override fun onDone(utteranceId: String?) { if (utteranceId == lastId) onDone?.invoke() }

@@ -9,13 +9,14 @@ import org.junit.Test
 class VoicePacksTest {
     @Test
     fun everyAppLanguageHasAVoice() {
-        listOf("en", "ar", "fr", "es", "de").forEach { assertEquals(it, VoicePacks.forLanguage(it)?.language) }
+        listOf("en", "fr", "es", "de").forEach { assertEquals(it, VoicePacks.forLanguage(it)?.language) }
+        // Arabic was withdrawn (not natural enough); Arabic readers use Google's or the phone's voice.
+        assertNull(VoicePacks.forLanguage("ar"))
         assertNull(VoicePacks.forLanguage("ja"))
     }
 
     @Test
     fun androidLanguageCodesMapToVoices() {
-        assertEquals("ar", VoicePacks.fromIso3("ara")?.language)
         assertEquals("de", VoicePacks.fromIso3("deu")?.language)
         assertEquals("fr", VoicePacks.fromIso3("fra")?.language)
     }

@@ -69,7 +69,8 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
             override suspend fun refresh(): List<TopicUpdate> {
                 val s = container.settingsRepository.settings.value
                 val topics = TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder, s.language)
-                    .filter { it.isVisible && (s.backgroundRefresh || it.id in s.notifyTopics) }
+                    // Breaking alerts read every visible topic, so each is kept fresh while they're on.
+                    .filter { it.isVisible && (s.backgroundRefresh || it.id in s.notifyTopics || (s.breakingEnabled && s.notificationsEnabled)) }
                 val updates = mutableListOf<TopicUpdate>()
                 val now = System.currentTimeMillis()
                 for (topic in topics) {
@@ -94,10 +95,20 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
                 val s = container.settingsRepository.settings.value
                 if (!s.breakingEnabled || !s.notificationsEnabled) return emptyList()
                 val country = TopicRegistry.country(s.edition.country)
-                val url = BreakingNews.queryUrl(s.breakingOutlets, hours = 2, country = country.code, language = country.hl.substringBefore('-')) ?: return emptyList()
-                val feed = news.openwire.data.remote.GoogleNewsRssSource().fetchFeed(url)
-                val normalizer = news.openwire.data.remote.RssNormalizer(container.domainRegistry)
-                val items = feed.items.mapIndexed { i, item -> normalizer.normalize(item, "BREAKING", i) }
+                // The big newsrooms' own breaking stories, plus every story from the sources the
+                // reader follows (built-in, local, custom): a story is breaking wherever it comes from.
+                val url = BreakingNews.queryUrl(s.breakingOutlets, hours = 2, country = country.code, language = country.hl.substringBefore('-'))
+                val watched = url?.let { u ->
+                    runCatching {
+                        val feed = news.openwire.data.remote.GoogleNewsRssSource().fetchFeed(u)
+                        val normalizer = news.openwire.data.remote.RssNormalizer(container.domainRegistry)
+                        feed.items.mapIndexed { i, item -> normalizer.normalize(item, "BREAKING", i) }
+                    }.getOrDefault(emptyList())
+                }.orEmpty()
+                val followed = TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder, s.language)
+                    .filter { it.isVisible }
+                    .flatMap { container.feedRepository.cachedArticles(it.id) }
+                val items = (watched + followed).distinctBy { it.originalUrl }
                 val norm: (String) -> String = { container.domainRegistry.normalizeDomain(it) }
                 val hits = BreakingNews.detect(items, System.currentTimeMillis(), norm)
                 val seen = container.feedState.seen(BREAKING_ID).orEmpty()

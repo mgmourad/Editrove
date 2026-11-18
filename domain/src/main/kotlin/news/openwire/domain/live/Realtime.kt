@@ -62,7 +62,9 @@ object Jetstream {
      * break most stories first), and the newsrooms writing in Editrove's language.
      */
     fun watched(outletKeys: Set<String>, appLanguage: String): List<Newsroom> =
-        NEWSROOMS.filter { it.key in outletKeys || it.key in setOf("ap", "reuters", "afp") || (appLanguage != "en" && it.language == appLanguage) }
+        // Every newsroom: alerts aren't limited to the ones picked in Settings (those still
+        // shape the Google News check); a few dozen accounts is a light stream.
+        NEWSROOMS.sortedByDescending { it.key in outletKeys || it.language == appLanguage }
 
     fun url(server: String, rooms: List<Newsroom>, cursorUs: Long? = null): String =
         "$server/subscribe?wantedCollections=app.bsky.feed.post" +

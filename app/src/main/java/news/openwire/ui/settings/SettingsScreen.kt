@@ -22,6 +22,10 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -178,6 +182,7 @@ fun SettingsScreen(
     }
 
     val offer by vm.languageOffer.collectAsState()
+    val sourcesOffer by vm.sourcesOffer.collectAsState()
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().background(g.deviceBg)) {
         Row(
@@ -248,6 +253,57 @@ fun SettingsScreen(
             onKeep = vm::dismissLanguageOffer,
         )
     }
+    if (offer == null) sourcesOffer?.let { LocalSourcesDialog(vm, it) }
+    }
+}
+
+/**
+ * After choosing an edition (and its language): the country's and region's newsrooms, to add
+ * on purpose. The same list stays at the bottom of the Edition page.
+ */
+@Composable
+private fun LocalSourcesDialog(vm: SettingsViewModel, country: String) {
+    val s by vm.settings.collectAsState()
+    val L = news.openwire.domain.engine.LocalSources
+    val local = L.forCountry(country)
+    val region = L.regionFor(country)
+    val regional = region?.let { L.forRegion(it, country) }.orEmpty()
+    val all = local + regional
+    val added = all.count { sug -> s.customFeeds.any { it.url == sug.url } }
+    GlassDialog(icon = Icons.Outlined.RssFeed, kicker = tr(R.string.sources_offer_kicker), onDismiss = vm::dismissSourcesOffer) {
+        Text(tr(R.string.sources_offer_title, countryName(country)), style = serif(24.sp, FontWeight.Bold, lineHeight = 30.sp), color = Glass.textPrimary)
+        Spacer(Modifier.height(8.dp))
+        Text(tr(R.string.sources_offer_body), style = sans(13.sp, lineHeight = 20.sp), color = Glass.textPrimary.copy(alpha = 0.9f))
+        Spacer(Modifier.height(10.dp))
+        Column(Modifier.heightIn(max = 340.dp).verticalScroll(rememberScrollState())) {
+            fun lang(code: String) = news.openwire.domain.engine.Languages.of(code)?.nativeName ?: code
+            if (local.isNotEmpty()) Label(tr(R.string.edition_local_sources, countryName(country)))
+            local.forEachIndexed { i, sug ->
+                if (i > 0) Divider()
+                SwitchRow(sug.name, lang(sug.language), s.customFeeds.any { it.url == sug.url }) { vm.toggleLocalSource(sug, it) }
+            }
+            if (regional.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Label(tr(when (region!!) {
+                    news.openwire.domain.engine.LocalSources.Region.ARAB -> R.string.region_arab
+                    news.openwire.domain.engine.LocalSources.Region.FRENCH -> R.string.region_french
+                    news.openwire.domain.engine.LocalSources.Region.GERMAN -> R.string.region_german
+                    news.openwire.domain.engine.LocalSources.Region.SPANISH -> R.string.region_spanish
+                }))
+                regional.forEachIndexed { i, sug ->
+                    if (i > 0) Divider()
+                    SwitchRow(sug.name, lang(sug.language), s.customFeeds.any { it.url == sug.url }) { vm.toggleLocalSource(sug, it, regional = true) }
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        if (added < all.size) {
+            DialogButton(tr(R.string.sources_offer_add_all, all.size), primary = true) { vm.addAllLocalSources(country); vm.dismissSourcesOffer() }
+            Spacer(Modifier.height(8.dp))
+        }
+        DialogButton(tr(if (added > 0) R.string.sources_offer_done else R.string.sources_offer_later), primary = added == all.size) { vm.dismissSourcesOffer() }
+        Spacer(Modifier.height(6.dp))
+        Text(tr(R.string.sources_offer_footer), style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -797,6 +853,7 @@ private fun NotificationsPage(vm: SettingsViewModel) {
     val topics by vm.allTopics.collectAsState()
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         vm.setNotificationsEnabled(granted)
+        if (granted && !news.openwire.delivery.DeliveryCheck.status(context).ok) news.openwire.delivery.DeliveryCheck.showing = true
         if (!granted) Toast.makeText(context, tr(R.string.notify_blocked), Toast.LENGTH_LONG).show()
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -805,8 +862,13 @@ private fun NotificationsPage(vm: SettingsViewModel) {
             SwitchRow(tr(R.string.notifications), tr(R.string.notify_master), s.notificationsEnabled) { on ->
                 if (on && Build.VERSION.SDK_INT >= 33 &&
                     ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                ) permission.launch(Manifest.permission.POST_NOTIFICATIONS) else vm.setNotificationsEnabled(on)
+                ) permission.launch(Manifest.permission.POST_NOTIFICATIONS) else {
+                    vm.setNotificationsEnabled(on)
+                    if (on && !news.openwire.delivery.DeliveryCheck.status(context).ok) news.openwire.delivery.DeliveryCheck.showing = true
+                }
             }
+            Divider()
+            NavRowCheck(context)
             Divider()
             SwitchRow(tr(R.string.bg_refresh), tr(R.string.bg_refresh_sub, refreshLabel(s.refreshMinutes, long = true)), s.backgroundRefresh) { vm.setBackgroundRefresh(it) }
         }
@@ -1034,6 +1096,22 @@ private fun NavRow(icon: ImageVector, title: String, subtitle: String, onClick: 
         Column(Modifier.weight(1f)) {
             Text(title, style = sans(14.sp, FontWeight.SemiBold), color = Glass.textPrimary)
             Text(subtitle, style = sans(11.sp), color = Glass.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Glass.textMuted)
+    }
+}
+
+/** Settings › Notifications: "Check that alerts arrive" (opens the delivery check). */
+@Composable
+private fun NavRowCheck(context: android.content.Context) {
+    val ok = remember { news.openwire.delivery.DeliveryCheck.status(context).ok }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { news.openwire.delivery.DeliveryCheck.showing = true }.padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(tr(R.string.delivery_row), style = sans(14.sp, FontWeight.Medium), color = Glass.textPrimary)
+            Text(tr(if (ok) R.string.delivery_row_ok else R.string.delivery_row_bad), style = sans(11.sp, lineHeight = 16.sp), color = if (ok) Glass.textSecondary else Color(0xFFFF9F0A))
         }
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Glass.textMuted)
     }

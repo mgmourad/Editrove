@@ -78,4 +78,29 @@ class OpinionTest {
     fun everyLanguageHasOpinionFeeds() {
         listOf("en", "ar", "fr", "es", "de").forEach { l -> assertTrue(l, OpinionCatalog.FEEDS.count { it.language == l } >= 3) }
     }
+
+    @Test
+    fun xEmbedDataGivesPhotosAndVideos() {
+        val body = """{"__typename":"Tweet","favorite_count":12,"created_at":"2026-11-17T20:50:14.000Z","id_str":"1858000000000000000",
+            "text":"Flooding on the corniche tonight &amp; more rain due https://t.co/abc https://t.co/def",
+            "user":{"name":"Cairo Desk","screen_name":"cairodesk","profile_image_url_https":"https://pbs.twimg.com/profile_images/1/a_normal.jpg"},
+            "mediaDetails":[
+              {"type":"photo","media_url_https":"https://pbs.twimg.com/media/A.jpg","original_info":{"width":1200,"height":800}},
+              {"type":"video","media_url_https":"https://pbs.twimg.com/ext_tw_video_thumb/B.jpg","original_info":{"width":1280,"height":720},
+               "video_info":{"variants":[{"content_type":"application/x-mpegURL","url":"https://video.twimg.com/b.m3u8"},
+                 {"bitrate":256000,"content_type":"video/mp4","url":"https://video.twimg.com/b_320.mp4"},
+                 {"bitrate":2176000,"content_type":"video/mp4","url":"https://video.twimg.com/b_1280.mp4"},
+                 {"bitrate":10368000,"content_type":"video/mp4","url":"https://video.twimg.com/b_1920.mp4"}]}}]}"""
+        val p = XPosts.parseSyndication(body, "https://x.com/cairodesk/status/1858000000000000000") { "Nov 17" }!!
+        assertEquals("Flooding on the corniche tonight & more rain due", p.text)
+        assertEquals("Cairo Desk", p.authorName)
+        assertEquals("https://pbs.twimg.com/profile_images/1/a_bigger.jpg", p.avatar)
+        assertEquals("Nov 17", p.linkTitle)
+        assertEquals(2, p.media.size)
+        assertEquals(PostMedia(false, "https://pbs.twimg.com/media/A.jpg", aspect = 1.5f), p.media[0])
+        assertEquals("https://video.twimg.com/b_1280.mp4", p.media[1].url)
+        assertEquals(true, p.media[1].video)
+        assertEquals("https://pbs.twimg.com/ext_tw_video_thumb/B.jpg", p.media[1].poster)
+        assertEquals("https://cdn.syndication.twimg.com/tweet-result?id=1858000000000000000&lang=en&token=${XPosts.token("1858000000000000000")}", XPosts.syndicationUrl("https://twitter.com/cairodesk/status/1858000000000000000"))
+    }
 }

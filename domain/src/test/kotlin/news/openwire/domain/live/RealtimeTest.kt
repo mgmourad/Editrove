@@ -53,9 +53,10 @@ class RealtimeTest {
     }
 
     @Test
-    fun wiresAndLanguageNewsroomsAreAlwaysWatched() {
+    fun everyNewsroomIsWatchedChosenOnesFirst() {
         val keys = Jetstream.watched(setOf("cnn"), "fr").map { it.key }
-        assertTrue(keys.containsAll(listOf("ap", "reuters", "afp", "cnn", "france24", "lemonde", "franceinfo")))
-        assertTrue("spiegel" !in keys)
+        assertTrue(keys.containsAll(listOf("ap", "reuters", "afp", "cnn", "france24", "lemonde", "franceinfo", "spiegel")))
+        assertTrue(keys.size == Jetstream.NEWSROOMS.size)
+        assertTrue(keys.indexOf("cnn") < keys.indexOf("spiegel"))
     }
 }

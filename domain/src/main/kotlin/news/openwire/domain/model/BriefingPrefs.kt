@@ -19,6 +19,8 @@ data class BriefingPrefs(
     val stings: Boolean = true,
     /** Scheduled briefings (Morning / Afternoon / Evening), each off until the reader turns it on. */
     val slots: List<BriefingSlot> = BriefingSlot.DEFAULTS,
+    /** Speech engine package to read with; null = automatic (Google's, else Editrove's voice, else the phone's). */
+    val engine: String? = null,
 ) {
     companion object {
         val SPEEDS = listOf(0.8f, 0.9f, 1.0f, 1.1f, 1.25f, 1.5f, 1.75f, 2.0f)

@@ -448,4 +448,13 @@
     <string name="rt_running_text">%1$d Redaktionen werden beobachtet</string>
     <string name="rt_connecting">Verbinde…</string>
     <string name="rt_turn_off">Ausschalten</string>
+    <string name="find_sources_eg">Name oder Website einer Zeitung eingeben, z. B. Spiegel oder spiegel.de</string>
+    <string name="find_sources_title">„%1$s“ im Web finden</string>
+    <string name="find_sources_hint">Jedes Ergebnis wurde gerade geprüft und hat aktuelle Meldungen. Tippe auf Hinzufügen – ohne Feed-Adressen.</string>
+    <string name="find_sources_searching">Zeitungen und Websites werden gesucht…</string>
+    <string name="find_sources_none">Noch nichts gefunden. Versuche die Website der Zeitung (z. B. spiegel.de) oder eine andere Schreibweise.</string>
+    <string name="find_via_google">über Google News</string>
+    <string name="find_add">Hinzufügen</string>
+    <string name="find_added">Hinzugefügt ✓</string>
+    <string name="msg_added_to">%1$s zu %2$s hinzugefügt.</string>
 </resources>

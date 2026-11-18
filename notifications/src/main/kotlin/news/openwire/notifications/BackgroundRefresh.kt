@@ -124,15 +124,20 @@ object Notifier {
      * Topic alerts pop up on screen (heads-up). Android never lets an app raise an existing
      * channel's importance, so this is a new channel; the old silent one is removed.
      */
-    const val CHANNEL = "headlines_bell"
+    const val CHANNEL = "headlines_bell_v2"
     /** Earlier topic-alert channels (silent default / heads-up without Editrove's tone). */
-    private val OLD_CHANNELS = listOf("headlines", "headlines_alerts")
-    const val BREAKING = "breaking_sting"
+    private val OLD_CHANNELS = listOf("headlines", "headlines_alerts", "headlines_bell")
+    const val BREAKING = "breaking_sting_v2"
     private const val OLD_BREAKING = "breaking"
 
     /** A bundled sound for a notification channel (played at notification volume). */
+    /**
+     * The sound's address by name (android.resource://pkg/raw/name). A channel keeps its sound
+     * for good, and resource numbers shift between builds, so a numeric address can end up
+     * pointing at nothing (Android then plays its default sound).
+     */
     fun sound(context: Context, raw: Int): android.net.Uri =
-        android.net.Uri.parse("android.resource://${context.packageName}/$raw")
+        android.net.Uri.parse("android.resource://${context.packageName}/raw/${context.resources.getResourceEntryName(raw)}")
 
     val SOUND_ATTRS: android.media.AudioAttributes = android.media.AudioAttributes.Builder()
         .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
@@ -159,7 +164,7 @@ object Notifier {
 
     fun ensureBreakingChannel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        if (nm.getNotificationChannel(OLD_BREAKING) != null) nm.deleteNotificationChannel(OLD_BREAKING)
+        listOf(OLD_BREAKING, "breaking_sting").forEach { if (nm.getNotificationChannel(it) != null) nm.deleteNotificationChannel(it) }
         run {
             nm.createNotificationChannel(
                 NotificationChannel(BREAKING, context.getString(R.string.n_breaking_channel), NotificationManager.IMPORTANCE_HIGH).apply {

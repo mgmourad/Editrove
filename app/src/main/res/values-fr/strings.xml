@@ -448,4 +448,13 @@
     <string name="rt_running_text">%1$d rédactions surveillées</string>
     <string name="rt_connecting">Connexion…</string>
     <string name="rt_turn_off">Désactiver</string>
+    <string name="find_sources_eg">Tapez le nom ou le site d’un journal, p. ex. Le Monde ou lemonde.fr</string>
+    <string name="find_sources_title">Chercher « %1$s » sur le web</string>
+    <string name="find_sources_hint">Chaque résultat ci-dessous vient d’être vérifié et contient des articles récents. Touchez Ajouter, sans adresse de flux.</string>
+    <string name="find_sources_searching">Recherche des journaux et sites…</string>
+    <string name="find_sources_none">Rien pour l’instant. Essayez le site du journal (comme lemonde.fr) ou une autre orthographe.</string>
+    <string name="find_via_google">via Google Actualités</string>
+    <string name="find_add">Ajouter</string>
+    <string name="find_added">Ajouté ✓</string>
+    <string name="msg_added_to">%1$s ajouté à %2$s.</string>
 </resources>

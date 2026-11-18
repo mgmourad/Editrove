@@ -49,6 +49,7 @@ class AppContainer(context: Context) {
         ) }
     val markets: news.openwire.data.remote.MarketDataSource by lazy { news.openwire.data.remote.MarketDataSource() }
     val radioBrowser: news.openwire.data.remote.RadioBrowserSource by lazy { news.openwire.data.remote.RadioBrowserSource() }
+    val sourceFinder: news.openwire.data.remote.SourceFinder by lazy { news.openwire.data.remote.SourceFinder() }
     val xPosts: news.openwire.data.remote.XPostSource by lazy { news.openwire.data.remote.XPostSource() }
     val opinion: news.openwire.data.remote.OpinionSource by lazy { news.openwire.data.remote.OpinionSource(GoogleNewsRssSource(), RssNormalizer(domainRegistry)) }
     /** Live TV and radio; starting either pauses the audio briefing. */

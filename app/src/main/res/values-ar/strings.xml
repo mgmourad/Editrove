@@ -448,4 +448,13 @@
     <string name="rt_running_text">تتابع %1$d غرف أخبار للأخبار العاجلة</string>
     <string name="rt_connecting">جارٍ الاتصال…</string>
     <string name="rt_turn_off">إيقاف</string>
+    <string name="find_sources_eg">اكتب اسم الصحيفة أو موقعها، مثل الأهرام أو youm7.com</string>
+    <string name="find_sources_title">ابحث عن ”%1$s“ على الإنترنت</string>
+    <string name="find_sources_hint">كل نتيجة أدناه فُحصت الآن وفيها أخبار حديثة. اضغط إضافة — لا حاجة لأي روابط.</string>
+    <string name="find_sources_searching">جارٍ البحث في الصحف والمواقع…</string>
+    <string name="find_sources_none">لم نجد شيئاً بعد. جرّب موقع الصحيفة (مثل ahram.org.eg) أو كتابة أخرى للاسم.</string>
+    <string name="find_via_google">عبر أخبار Google</string>
+    <string name="find_add">إضافة</string>
+    <string name="find_added">أُضيف ✓</string>
+    <string name="msg_added_to">أُضيف %1$s إلى %2$s.</string>
 </resources>

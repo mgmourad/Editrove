@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
                     repository = container.feedRepository,
                     catalog = { container.feedCatalog.catalog },
                     health = container.serviceHealth,
+                    finder = container.sourceFinder,
                 )
             }
         }

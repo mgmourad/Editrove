@@ -448,4 +448,13 @@
     <string name="rt_running_text">Vigilando %1$d medios</string>
     <string name="rt_connecting">Conectando…</string>
     <string name="rt_turn_off">Desactivar</string>
+    <string name="find_sources_eg">Escribe el nombre o la web de un periódico, p. ej. El País o elpais.com</string>
+    <string name="find_sources_title">Buscar “%1$s” en la web</string>
+    <string name="find_sources_hint">Cada resultado se acaba de comprobar y tiene noticias recientes. Toca Añadir: sin direcciones de feed.</string>
+    <string name="find_sources_searching">Buscando periódicos y sitios…</string>
+    <string name="find_sources_none">Aún no hay resultados. Prueba con la web del periódico (como elpais.com) u otra forma de escribirlo.</string>
+    <string name="find_via_google">vía Google Noticias</string>
+    <string name="find_add">Añadir</string>
+    <string name="find_added">Añadido ✓</string>
+    <string name="msg_added_to">%1$s añadido a %2$s.</string>
 </resources>

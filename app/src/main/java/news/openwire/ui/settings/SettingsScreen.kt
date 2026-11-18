@@ -589,7 +589,9 @@ private fun LazyListScope.sourcesPage(vm: SettingsViewModel, onAdd: () -> Unit) 
         val library by vm.library.collectAsState()
         val checks by vm.checks.collectAsState()
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Field(tr(R.string.search_sources), filter, { filter = it })
+            Field(tr(R.string.search_sources), filter, { filter = it }, placeholder = tr(R.string.find_sources_eg))
+            // Beyond what's installed: any newspaper or site, found by name or address and checked live.
+            if (filter.trim().length >= 3) FindSources(vm, filter.trim())
             SourceLibrary.groupSources(library, filter).forEach { group ->
                 Section {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1136,4 +1138,63 @@ private fun SmallIcon(icon: ImageVector, description: String, enabled: Boolean =
         Modifier.size(34.dp).clip(CircleShape).clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, description, tint = tint ?: if (enabled) Glass.textPrimary.copy(alpha = 0.75f) else Glass.textMuted.copy(alpha = 0.4f), modifier = Modifier.size(18.dp)) }
+}
+
+/** "Find new sources": results from the web for what was typed, each one tap to add. */
+@Composable
+private fun FindSources(vm: SettingsViewModel, query: String) {
+    val finder = vm.finder ?: return
+    val s by vm.settings.collectAsState()
+    var results by remember { mutableStateOf<List<news.openwire.data.remote.SourceFinder.Found>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    val lang = news.openwire.domain.engine.Languages.effective(s.language)
+    LaunchedEffect(query, lang, s.edition.country) {
+        results = emptyList()
+        searching = true
+        kotlinx.coroutines.delay(650) // wait for a pause in typing
+        finder.search(query, lang, s.edition.country).collect { results = it }
+        searching = false
+    }
+    Section {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(tr(R.string.find_sources_title, query).uppercase(), style = mono(11.sp, FontWeight.SemiBold, 0.14.em), color = Glass.accentSoft, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (searching) androidx.compose.material3.CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Glass.accentSoft)
+        }
+        Spacer(Modifier.height(4.dp))
+        Hint(tr(if (searching && results.isEmpty()) R.string.find_sources_searching else R.string.find_sources_hint))
+        if (!searching && results.isEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Text(tr(R.string.find_sources_none), style = sans(13.sp, lineHeight = 19.sp), color = Glass.textPrimary)
+        }
+        results.forEachIndexed { i, f ->
+            if (i > 0) Divider()
+            val added = s.customFeeds.any { it.url == f.url }
+            Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                SourceLogo(f.domain, f.name, size = 30.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(f.name, style = sans(14.sp, FontWeight.SemiBold), color = Glass.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        listOfNotNull(
+                            f.domain,
+                            f.language?.let { news.openwire.domain.engine.Languages.of(it)?.nativeName },
+                            f.newestAt?.let { tr(R.string.check_newest, NewsProcessor.formatRelativeTime(it)) },
+                            if (f.viaGoogle) tr(R.string.find_via_google) else null,
+                        ).joinToString(" · "),
+                        style = sans(11.sp), color = Glass.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    f.sample?.let { Text("“$it”", style = sans(12.sp).copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = Glass.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    tr(if (added) R.string.find_added else R.string.find_add),
+                    style = sans(13.sp, FontWeight.SemiBold),
+                    color = if (added) Glass.textPrimary else Color.White,
+                    modifier = Modifier.clip(CircleShape).background(if (added) Glass.chipFill else Glass.accent)
+                        .clickable { if (added) vm.removeFound(f.url) else vm.addFound(f) }
+                        .padding(horizontal = 16.dp, vertical = 9.dp),
+                )
+            }
+        }
+    }
 }

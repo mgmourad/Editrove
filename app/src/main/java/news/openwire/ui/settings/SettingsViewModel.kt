@@ -43,6 +43,8 @@ class SettingsViewModel(
     private val catalog: () -> List<FeedSource>,
     private val clock: () -> Long = System::currentTimeMillis,
     private val health: news.openwire.data.remote.ServiceHealth? = null,
+    /** Finds sources by name or website (feed index, Google News, the sites themselves). */
+    val finder: news.openwire.data.remote.SourceFinder? = null,
 ) : ViewModel() {
 
     val settings: StateFlow<UserSettings> = settingsRepo.settings
@@ -193,10 +195,22 @@ class SettingsViewModel(
     /** Verifies the feed with the same fetch path the reader uses, then adds it. */
     fun addSource(name: String, url: String, topics: List<String>, quota: Int, onDone: (Boolean) -> Unit) {
         viewModelScope.launch {
-            val clean = url.trim()
+            var clean = url.trim().let { if (!it.startsWith("http") && news.openwire.domain.engine.FeedDiscovery.looksLikeSite(it)) "https://$it" else it }
             try { SourceLibrary.validateFeedUrl(clean) } catch (e: IllegalArgumentException) { _message.value = e.message; onDone(false); return@launch }
-            val check = repository.verifyFeed(clean)
-            if (!check.ok) { _message.value = tr(R.string.msg_feed_failed, check.error ?: tr(R.string.no_stories)); onDone(false); return@launch }
+            var check = repository.verifyFeed(clean)
+            if (!check.ok) {
+                // A website rather than a feed address: find the site's own feed (or its stories via Google News).
+                val site = news.openwire.domain.engine.FeedDiscovery.domainOf(clean)
+                val s0 = settings.value
+                val found = if (site == null || finder == null) null else kotlinx.coroutines.withTimeoutOrNull(30_000) {
+                    var last: List<news.openwire.data.remote.SourceFinder.Found> = emptyList()
+                    finder.search(site, news.openwire.domain.engine.Languages.effective(s0.language), s0.edition.country).collect { last = it }
+                    last.firstOrNull { it.domain == site || it.domain.endsWith(".$site") || site.endsWith(".${it.domain}") }
+                }
+                if (found == null) { _message.value = tr(R.string.msg_feed_failed, check.error ?: tr(R.string.no_stories)); onDone(false); return@launch }
+                clean = found.url
+                check = news.openwire.data.repository.FeedCheck(ok = true, count = found.count, title = found.name, newestAt = found.newestAt)
+            }
             try {
                 settingsRepo.update { s ->
                     s.copy(customFeeds = SourceLibrary.addCustomFeed(s.customFeeds, name.ifBlank { check.title.orEmpty() }, clean, topics, quota, clock()))
@@ -209,6 +223,24 @@ class SettingsViewModel(
             }
         }
     }
+
+    /** Adds a found source to the right tabs for its language, in one tap. */
+    fun addFound(f: news.openwire.data.remote.SourceFinder.Found) {
+        val s0 = settings.value
+        if (s0.customFeeds.any { it.url == f.url }) return
+        val app = news.openwire.domain.engine.Languages.effective(s0.language)
+        val topics = news.openwire.domain.engine.FeedDiscovery.topicsFor(f.language, app, s0.edition.country)
+        settingsRepo.update { s ->
+            s.copy(customFeeds = s.customFeeds + FeedSource(
+                id = "found_${f.domain.replace(Regex("[^a-z0-9]"), "_")}_${clock().toString().takeLast(5)}",
+                name = f.name, url = f.url, domain = f.domain, topics = topics, maxArticles = 8, category = "Custom", isCustom = true,
+            ))
+        }
+        val where = topicsFor(s0).filter { it.id in topics }.joinToString(" · ") { it.label }
+        _message.value = tr(R.string.msg_added_to, f.name, where)
+    }
+
+    fun removeFound(url: String) = settingsRepo.update { s -> s.copy(customFeeds = s.customFeeds.filterNot { it.url == url }) }
 
     fun deleteSource(id: String) = settingsRepo.update { s -> s.copy(customFeeds = s.customFeeds.filterNot { it.id == id }) }
 

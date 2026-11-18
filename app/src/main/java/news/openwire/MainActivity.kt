@@ -81,6 +81,10 @@ class MainActivity : ComponentActivity() {
             container.settingsRepository.settings.collect { st -> news.openwire.realtime.RealtimeAlertService.sync(this@MainActivity, st) }
         }
         if (savedInstanceState == null) handleIntent(intent)
+        // A fresh install opened from the launcher starts with the welcome tour.
+        if (savedInstanceState == null && intent?.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER) &&
+            news.openwire.guide.Guide.shouldWelcome(this)
+        ) news.openwire.guide.Guide.showing = true
         setContent {
             val mode by vm.themeMode.collectAsState()
             val dark = when (mode) {
@@ -128,6 +132,12 @@ class MainActivity : ComponentActivity() {
             else -> {
                 intent.getStringExtra(EXTRA_TAB)?.let { t -> news.openwire.ui.home.NavTab.entries.firstOrNull { it.name == t }?.let(vm::selectTab) }
                 intent.getStringExtra(EXTRA_TOPIC)?.let { vm.selectTopicId(it) }
+                // Deep links into Settings (also used for the user guide's screenshots).
+                intent.getStringExtra(EXTRA_SETTINGS)?.let { page ->
+                    intent.getStringExtra(EXTRA_QUERY)?.let { vm.setSettingsQuery(it) }
+                    vm.openSettingsAt(page)
+                }
+                intent.getStringExtra(EXTRA_BAND)?.let { news.openwire.live.LiveBand.requested = it }
                 intent.getStringExtra(EXTRA_URL)?.let { vm.openLink(it, title = intent.getStringExtra(EXTRA_TITLE)) }
                 if (intent.getBooleanExtra(EXTRA_AUTOPLAY, false)) {
                     intent.removeExtra(EXTRA_AUTOPLAY)
@@ -149,6 +159,9 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_TOPIC = "news.openwire.extra.TOPIC"
         const val EXTRA_TAB = "news.openwire.extra.TAB"
+        const val EXTRA_SETTINGS = "news.openwire.extra.SETTINGS"
+        const val EXTRA_QUERY = "news.openwire.extra.QUERY"
+        const val EXTRA_BAND = "news.openwire.extra.BAND"
         const val EXTRA_URL = "news.openwire.extra.URL"
         const val EXTRA_TITLE = "news.openwire.extra.TITLE"
         /** Open the Audio tab and play the latest Top Stories briefing (scheduled briefings). */

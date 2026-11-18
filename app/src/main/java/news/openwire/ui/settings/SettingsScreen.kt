@@ -87,6 +87,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.res.stringResource
 import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.MyLocation
 import kotlinx.coroutines.launch
 import news.openwire.R
@@ -128,7 +129,7 @@ import news.openwire.ui.theme.Glass
 private enum class Page(@androidx.annotation.StringRes private val res: Int) {
     HOME(R.string.settings), EDITION(R.string.edition), LANGUAGE(R.string.language), TOPICS(R.string.topics), ADD_TOPIC(R.string.new_topic), SOURCES(R.string.sources),
     ADD_SOURCE(R.string.add_source), RULES(R.string.paywall_rules), NOTIFICATIONS(R.string.notifications_refresh),
-    APPEARANCE(R.string.appearance), BRIEFING(R.string.audio_briefing), BACKUP(R.string.backup_restore), UPDATES(R.string.updates_changelog), ABOUT(R.string.about_editrove),
+    APPEARANCE(R.string.appearance), BRIEFING(R.string.audio_briefing), BACKUP(R.string.backup_restore), UPDATES(R.string.updates_changelog), GUIDE(R.string.g_title), ABOUT(R.string.about_editrove),
     ;
 
     val title: String get() = tr(res)
@@ -156,6 +157,7 @@ fun SettingsScreen(
             when {
                 startPage == "updates" && updateManager != null -> Page.UPDATES
                 startPage == "briefing" -> Page.BRIEFING
+                startPage != null -> Page.entries.firstOrNull { it.name.equals(startPage, true) } ?: Page.HOME
                 else -> Page.HOME
             },
         )
@@ -218,6 +220,7 @@ fun SettingsScreen(
                         Page.APPEARANCE -> item { AppearancePage(vm, themeMode, onTheme) }
                         Page.BACKUP -> item { BackupPage(vm) }
                         Page.ABOUT -> item { AboutPage() }
+                        Page.GUIDE -> item { news.openwire.guide.GuidePage(onReplayTour = { news.openwire.guide.Guide.showing = true }) }
                         Page.BRIEFING -> item {
                             BriefingSettings(vm, chip = { l, sel, on -> Chip(l, selected = sel, onClick = on) }, switch = { c, f -> GlassSwitch(c, onChange = f) })
                         }
@@ -291,6 +294,8 @@ private fun LazyListScope.homePage(vm: SettingsViewModel, themeMode: ThemeMode, 
             NavRow(Icons.Outlined.Save, tr(R.string.backup_restore), tr(R.string.backup_sub)) { go(Page.BACKUP) }
             Divider()
             NavRow(Icons.Outlined.SystemUpdate, tr(R.string.updates_changelog), tr(R.string.updates_sub, news.openwire.BuildConfig.VERSION_NAME)) { go(Page.UPDATES) }
+            Divider()
+            NavRow(Icons.AutoMirrored.Outlined.MenuBook, tr(R.string.g_title), tr(R.string.g_sub)) { go(Page.GUIDE) }
             Divider()
             NavRow(Icons.Outlined.Info, tr(R.string.about_editrove), tr(R.string.about_sub)) { go(Page.ABOUT) }
         }
@@ -585,7 +590,7 @@ private fun LazyListScope.sourcesPage(vm: SettingsViewModel, onAdd: () -> Unit) 
         }
     }
     item {
-        var filter by rememberSaveable { mutableStateOf("") }
+        var filter by rememberSaveable { mutableStateOf(SourcesQuery.take()) }
         val library by vm.library.collectAsState()
         val checks by vm.checks.collectAsState()
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1197,4 +1202,10 @@ private fun FindSources(vm: SettingsViewModel, query: String) {
             }
         }
     }
+}
+
+/** A search to start the Sources page with (from a deep link), used once. */
+object SourcesQuery {
+    @Volatile var pending: String? = null
+    fun take(): String = (pending ?: "").also { pending = null }
 }

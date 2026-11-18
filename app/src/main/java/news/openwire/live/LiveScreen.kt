@@ -132,7 +132,7 @@ fun LiveScreen(
     LaunchedEffect(Unit) { live.connect() }
     val now by live.now.collectAsState()
     val player by live.player.collectAsState()
-    var band by rememberSaveable { mutableStateOf(Band.TV) }
+    var band by rememberSaveable { mutableStateOf(if (LiveBand.take() == "RADIO") Band.RADIO else Band.TV) }
     var lang by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     var searched by rememberSaveable { mutableStateOf("") }
@@ -472,4 +472,10 @@ private fun Monogram(c: LivePalette, name: String, size: Dp) {
         Modifier.size(size).clip(CircleShape).background(Brush.linearGradient(listOf(c.red, c.signal))),
         contentAlignment = Alignment.Center,
     ) { Text(letter, style = sans(15.sp, FontWeight.Bold), color = Color.White) }
+}
+
+/** A band to open the Live page on (from a deep link), used once. */
+object LiveBand {
+    @Volatile var requested: String? = null
+    fun take(): String? = requested.also { requested = null }
 }

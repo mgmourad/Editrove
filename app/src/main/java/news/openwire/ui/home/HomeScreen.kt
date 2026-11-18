@@ -328,6 +328,11 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
             AnimatedVisibility(whatsNew != null, enter = fadeIn(tween(240)), exit = fadeOut(tween(200))) {
                 whatsNew?.let { e -> news.openwire.update.WhatsNewDialog(e) { app.container.changelog.markSeen(); whatsNew = null } }
             }
+            // The welcome tour sits over everything, Settings included (first launch, or replayed from the guide).
+            if (news.openwire.guide.Guide.showing) {
+                val ctx = LocalContext.current
+                news.openwire.guide.WelcomeTour(onDone = { news.openwire.guide.Guide.showing = false; news.openwire.guide.Guide.markWelcomed(ctx) })
+            }
         }
     }
     }

@@ -133,11 +133,11 @@ class SourceFinder(
         val ok = coroutineScope { candidates.map { u -> async { check(q, u, null, 0, false) } }.awaitAll().filterNotNull() }
         if (ok.isNotEmpty()) return ok
         // No working feed: the site's own stories, through Google News, in its language.
-        val probe = check(q, TopicRegistry.googleNewsSearchUrl("site:$domain when:3d", TopicRegistry.country(country)), siteName ?: domain, 0, true, domain)
+        val probe = check(q, TopicRegistry.googleNewsSearchUrl("site:$domain when:3d", TopicRegistry.country(country)), siteNames[domain] ?: siteName ?: domain, 0, true, domain)
         val lang = probe?.language
         if (probe != null && (lang == null || lang == TopicRegistry.country(country).language)) return listOf(probe)
         val c = TopicRegistry.COUNTRIES.firstOrNull { it.language == (lang ?: appLanguage) } ?: TopicRegistry.COUNTRIES.first()
-        return listOfNotNull(check(q, TopicRegistry.googleNewsSearchUrl("site:$domain when:3d", c), siteName ?: domain, 0, true, domain) ?: probe)
+        return listOfNotNull(check(q, TopicRegistry.googleNewsSearchUrl("site:$domain when:3d", c), siteNames[domain] ?: siteName ?: domain, 0, true, domain) ?: probe)
     }
 
     /** Reads [url] as a feed: working, at least three stories, the newest within ten days. */

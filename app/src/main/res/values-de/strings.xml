@@ -470,7 +470,7 @@
     <string name="g_discover_t">Entdecken und suchen</string>
     <string name="g_discover_b">Entdecken sammelt die wichtigsten Meldungen aus allen Themen. Tippe ins Suchfeld, um Meldungen oder Zeitungen zu finden.</string>
     <string name="g_audio_t">Das Audio-Briefing</string>
-    <string name="g_audio_b">Audio liest die Nachrichten wie eine Sendung vor, mit Eröffnungsjingle und einer Stimme in deiner Sprache. Tippe auf Briefing abspielen und lies weiter: Der Player bleibt unten und auf dem Sperrbildschirm. Unter Einstellungen › Audio-Briefing wählst du Schlagzeilen, Zusammenfassungen oder ganze Artikel, Stimme und Tempo und planst Briefings am Morgen, Nachmittag und Abend. Auf Telefonen ohne Googles Sprachausgabe (Huawei und andere) spricht Editrove mit eigener Stimme: einmal geladen (etwa 20 MB), danach offline.</string>
+    <string name="g_audio_b">Audio liest die Nachrichten wie eine Sendung vor, mit Eröffnungsjingle und einer Stimme in deiner Sprache. Tippe auf Briefing abspielen und lies weiter: Der Player bleibt unten und auf dem Sperrbildschirm. Unter Einstellungen › Audio-Briefing wählst du Schlagzeilen, Zusammenfassungen oder ganze Artikel, Stimme und Tempo und planst Briefings am Morgen, Nachmittag und Abend. Auf Telefonen ohne Googles Sprachausgabe (Huawei und andere) spricht Editrove mit eigener Stimme: einmal geladen (etwa 20 MB), danach offline. Um Googles Stimmen auf so einem Telefon zu bekommen, zeigt Einstellungen › Audio-Briefing, wo du sie installierst, und unter Sprachausgabe wählst du jede Engine des Telefons.</string>
     <string name="g_tv_t">Live-Fernsehen</string>
     <string name="g_tv_b">Live zeigt Nachrichtensender, die gerade senden. Mit LIVE markierte Sender laufen in Editrove; tippe auf Vollbild, um sie groß zu sehen. Mit YouTube markierte Sender öffnen ihre offizielle Live-Seite. Mit den Sprachknöpfen filterst du.</string>
     <string name="g_radio_t">Radio</string>
@@ -516,4 +516,13 @@
     <string name="voice_own_installed">Auf diesem Telefon</string>
     <string name="voice_own_delete">Löschen</string>
     <string name="voice_own_get">Laden</string>
+    <string name="engine_title">Sprachausgabe</string>
+    <string name="engine_auto">Automatisch</string>
+    <string name="gv_title">Eine natürlichere Stimme</string>
+    <string name="gv_body">Die natürlichsten Stimmen kommen aus Googles kostenloser Sprach-App (Sprachdienste von Google), die auf diesem Telefon fehlt. Installiere sie und lade die Stimme deiner Sprache; Editrove wechselt dann von selbst.</string>
+    <string name="gv_get">Sprachdienste von Google installieren</string>
+    <string name="gv_mirror">Von APKMirror laden (von Google signierte App)</string>
+    <string name="gv_turn_on">Sprachdienste von Google einschalten</string>
+    <string name="gv_settings">Einstellungen für Sprachausgabe öffnen</string>
+    <string name="gv_note">In den Einstellungen der Sprachausgabe wählst du die bevorzugte Engine und lädst Stimmen. Ohne Google-Dienste lassen sich Googles Stimmen eventuell nicht laden; die Stimme von Editrove funktioniert trotzdem.</string>
 </resources>

@@ -94,6 +94,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         val followedAccounts: Set<String> = emptySet(),
         val opinionTabs: List<String> = emptyList(),
         val realtimeAlerts: Boolean = false,
+        val briefingEngine: String? = null,
     ) {
         fun toSettings() = UserSettings(
             edition = LocalEdition(city, region, country),
@@ -127,6 +128,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 detail = news.openwire.domain.model.BriefingDetail.entries.firstOrNull { it.name == briefingDetail } ?: news.openwire.domain.model.BriefingDetail.HEADLINES,
                 openingCue = briefingCue.coerceIn(0, news.openwire.domain.model.BriefingPrefs.CUE_COUNT), stings = briefingStings,
                 slots = news.openwire.domain.model.BriefingSlot.decode(briefingSlots),
+                engine = briefingEngine,
             ),
         )
 
@@ -150,6 +152,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 s.followedAccounts,
                 s.opinionTabs,
                 s.realtimeAlerts,
+                s.briefing.engine,
             )
         }
     }

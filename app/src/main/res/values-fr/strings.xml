@@ -470,7 +470,7 @@
     <string name="g_discover_t">Explorer et rechercher</string>
     <string name="g_discover_b">Explorer rassemble les articles les plus importants de tous vos sujets. Tapez dans la recherche pour trouver des articles ou des journaux.</string>
     <string name="g_audio_t">Le brief audio</string>
-    <string name="g_audio_b">Audio lit l’actualité comme un journal radio, avec un jingle d’ouverture et une voix dans votre langue. Touchez Écouter le brief et continuez à lire : le lecteur reste en bas de l’écran et sur l’écran verrouillé. Dans Réglages › Brief audio, choisissez titres, résumés ou articles complets, la voix et la vitesse, et programmez des briefs du matin, de l’après-midi et du soir. Sur les téléphones sans moteur vocal Google (Huawei et autres), Editrove utilise sa propre voix : téléchargée une fois (environ 20 Mo), elle fonctionne ensuite hors ligne.</string>
+    <string name="g_audio_b">Audio lit l’actualité comme un journal radio, avec un jingle d’ouverture et une voix dans votre langue. Touchez Écouter le brief et continuez à lire : le lecteur reste en bas de l’écran et sur l’écran verrouillé. Dans Réglages › Brief audio, choisissez titres, résumés ou articles complets, la voix et la vitesse, et programmez des briefs du matin, de l’après-midi et du soir. Sur les téléphones sans moteur vocal Google (Huawei et autres), Editrove utilise sa propre voix : téléchargée une fois (environ 20 Mo), elle fonctionne ensuite hors ligne. Pour obtenir les voix de Google sur un tel téléphone, Réglages › Brief audio indique où les installer, et Moteur vocal permet de choisir n’importe quel moteur du téléphone.</string>
     <string name="g_tv_t">La télévision en direct</string>
     <string name="g_tv_b">En direct affiche les chaînes d’info qui diffusent maintenant. Les chaînes marquées DIRECT se regardent dans Editrove ; touchez le bouton plein écran pour les voir en grand. Les chaînes marquées YouTube ouvrent leur page officielle. Les boutons de langue filtrent les chaînes.</string>
     <string name="g_radio_t">La radio</string>
@@ -516,4 +516,13 @@
     <string name="voice_own_installed">Sur ce téléphone</string>
     <string name="voice_own_delete">Supprimer</string>
     <string name="voice_own_get">Télécharger</string>
+    <string name="engine_title">Moteur vocal</string>
+    <string name="engine_auto">Automatique</string>
+    <string name="gv_title">Une voix plus naturelle</string>
+    <string name="gv_body">Les voix les plus naturelles viennent de l’app vocale gratuite de Google (Services vocaux Google), absente de ce téléphone. Installez-la puis téléchargez la voix de votre langue ; Editrove l’utilisera tout seul.</string>
+    <string name="gv_get">Installer les Services vocaux Google</string>
+    <string name="gv_mirror">Télécharger sur APKMirror (app signée par Google)</string>
+    <string name="gv_turn_on">Activer les Services vocaux Google</string>
+    <string name="gv_settings">Ouvrir les réglages de synthèse vocale</string>
+    <string name="gv_note">Dans les réglages de synthèse vocale, choisissez le moteur préféré et téléchargez des voix. Sans services Google, les voix de Google peuvent ne pas se télécharger ; la voix d’Editrove fonctionne dans tous les cas.</string>
 </resources>

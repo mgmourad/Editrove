@@ -78,7 +78,7 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
     // Editrove's own voices (downloaded once) for phones without Google's speech engine.
     val voiceStore = (context.applicationContext as news.openwire.OpenWireApp).container.voices
     val packStates by voiceStore.states.collectAsState()
-    val engineName = remember(packStates) { news.openwire.i18n.VoiceSetup.engine(context) }
+    val engineName = remember(packStates, p.engine) { news.openwire.i18n.VoiceSetup.engine(context) }
     val tts = remember(engineName) { ready = false; TextToSpeech(context.applicationContext, { ready = it == TextToSpeech.SUCCESS }, engineName) }
     DisposableEffect(tts) { onDispose { tts.shutdown() } }
     // A voice in Editrove's language: fetched automatically when the engine has one to download.
@@ -227,6 +227,46 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
         }
 
         Section(tr(R.string.voice)) {
+            // Which speech engine reads: automatic, or any engine on the phone (Google's, the maker's, Editrove's).
+            val engines = remember(ready, engineName) { if (ready) runCatching { tts.engines }.getOrNull().orEmpty() else emptyList() }
+            if (engines.size > 1 || p.engine != null) {
+                Text(tr(R.string.engine_title), style = sans(12.sp, FontWeight.SemiBold), color = g.textSecondary)
+                Spacer(Modifier.height(6.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    chip(tr(R.string.engine_auto), p.engine == null) { vm.setBriefing { it.copy(engine = null, voice = null) }; voiceCheck++ }
+                    engines.forEach { e -> chip(e.label, p.engine == e.name) { vm.setBriefing { it.copy(engine = e.name, voice = null) }; voiceCheck++ } }
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+            // No Google engine: how to get it (its voices are the most natural), or switch it back on.
+            if (!news.openwire.i18n.VoiceSetup.hasGoogle(context)) {
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(g.chipFill).padding(14.dp),
+                ) {
+                    Text(tr(R.string.gv_title), style = sans(14.sp, FontWeight.SemiBold), color = g.textPrimary)
+                    Spacer(Modifier.height(4.dp))
+                    Text(tr(R.string.gv_body), style = sans(12.sp, lineHeight = 17.sp), color = g.textSecondary)
+                    Spacer(Modifier.height(10.dp))
+                    val open: (android.content.Intent) -> Boolean = { i -> runCatching { context.startActivity(i) }.isSuccess }
+                    if (news.openwire.i18n.VoiceSetup.googleDisabled(context)) {
+                        GvButton(tr(R.string.gv_turn_on), primary = true) { open(news.openwire.i18n.VoiceSetup.googleAppInfoIntent()) }
+                    } else {
+                        GvButton(tr(R.string.gv_get), primary = true) {
+                            // The phone's app store first; without one that has it, the mirror.
+                            if (!open(news.openwire.i18n.VoiceSetup.storeIntent())) open(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(news.openwire.i18n.VoiceSetup.MIRROR_URL)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        GvButton(tr(R.string.gv_mirror), primary = false) {
+                            open(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(news.openwire.i18n.VoiceSetup.MIRROR_URL)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    GvButton(tr(R.string.gv_settings), primary = false) { open(news.openwire.i18n.VoiceSetup.ttsSettingsIntent()) }
+                    Spacer(Modifier.height(8.dp))
+                    Text(tr(R.string.gv_note), style = sans(11.sp, lineHeight = 16.sp), color = g.textMuted)
+                }
+                Spacer(Modifier.height(10.dp))
+            }
             voiceState?.let { st ->
                 val name = news.openwire.domain.engine.Languages.of(appLang)?.nativeName ?: appLang
                 val (msg, action) = when (st) {
@@ -380,4 +420,15 @@ private fun OptionRow(title: String, detail: String?, selected: Boolean, playing
             ) { Icon(if (playing) Icons.Filled.Stop else Icons.Filled.PlayArrow, tr(R.string.preview), tint = g.textPrimary, modifier = Modifier.size(16.dp)) }
         }
     }
+}
+
+@Composable
+private fun GvButton(text: String, primary: Boolean, onClick: () -> Unit) {
+    val g = Glass
+    Text(
+        text, style = sans(13.sp, FontWeight.SemiBold), color = if (primary) Color.White else g.textPrimary,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().clip(CircleShape).background(if (primary) g.accent else g.deviceBg.copy(alpha = 0.6f))
+            .clickable(onClick = onClick).padding(vertical = 11.dp, horizontal = 14.dp),
+    )
 }

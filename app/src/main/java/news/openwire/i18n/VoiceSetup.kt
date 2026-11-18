@@ -50,7 +50,8 @@ object VoiceSetup {
     suspend fun ensure(context: Context, lang: String, country: String? = null): State = withContext(Dispatchers.Main) {
         val app = context.applicationContext
         // No Google engine: Editrove's own voice for the language (downloaded once).
-        if (!hasGoogle(app)) {
+        val chosen = chosenEngine(app)?.takeIf { installedEngine(app, it) }
+        if ((chosen == null && !hasGoogle(app)) || chosen == app.packageName) {
             val pack = news.openwire.voice.VoicePacks.forLanguage(lang) ?: return@withContext State.UNSUPPORTED
             val store = news.openwire.voice.VoiceStore(app)
             if (store.isInstalled(pack)) { lastReady = pack.voiceName; return@withContext State.READY }
@@ -115,6 +116,30 @@ object VoiceSetup {
     }
 
     /** Google's engine is installed and switched on (a disabled one can't speak). */
+    /** The engine picked in Settings › Audio briefing (null = automatic). */
+    fun chosenEngine(context: Context): String? =
+        runCatching { (context.applicationContext as news.openwire.OpenWireApp).container.settingsRepository.settings.value.briefing.engine }.getOrNull()
+
+    /** Installed and switched on (Editrove's own engine always is). */
+    fun installedEngine(context: Context, pkg: String): Boolean =
+        pkg == context.packageName || runCatching { context.packageManager.getApplicationInfo(pkg, 0).enabled }.getOrDefault(false)
+
+    /** Opens Speech Services by Google in the phone's app store (AppGallery on Huawei, Play elsewhere). */
+    fun storeIntent(): Intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=$GOOGLE_TTS")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** A trusted mirror of Google's own signed app, for phones whose store doesn't carry it. */
+    const val MIRROR_URL = "https://www.apkmirror.com/apk/google-inc/google-text-to-speech-engine/"
+
+    /** The phone's text-to-speech settings (preferred engine, voice downloads). */
+    fun ttsSettingsIntent(): Intent = Intent("com.android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** Google's speech app's own page in Android settings (to switch it back on). */
+    fun googleAppInfoIntent(): Intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$GOOGLE_TTS")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    /** Installed but switched off. */
+    fun googleDisabled(context: Context): Boolean =
+        runCatching { !context.packageManager.getApplicationInfo(GOOGLE_TTS, 0).enabled }.getOrDefault(false)
+
     fun hasGoogle(context: Context): Boolean = runCatching { context.packageManager.getApplicationInfo(GOOGLE_TTS, 0).enabled }.getOrDefault(false)
 
     /**
@@ -122,6 +147,7 @@ object VoiceSetup {
      * else Editrove's own when its voice for [lang] is downloaded; else the phone's default.
      */
     fun engine(context: Context, lang: String = news.openwire.domain.engine.Languages.effective(null)): String? = when {
+        chosenEngine(context)?.let { installedEngine(context, it) } == true -> chosenEngine(context)
         hasGoogle(context) -> GOOGLE_TTS
         news.openwire.voice.VoiceStore(context).installed(lang) != null -> context.packageName
         else -> null

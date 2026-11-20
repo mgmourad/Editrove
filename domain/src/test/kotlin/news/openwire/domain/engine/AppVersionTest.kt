@@ -43,4 +43,14 @@ class AppVersionTest {
     @Test fun markdownToPlainText() {
         assertEquals("New\n• Bold thing and code", Releases.plainNotes("### New\n- **Bold** thing and `code`"))
     }
+
+    @Test fun datedBuildsSortByDateAcrossYears() {
+        val nov = AppVersion.parse("0.9-build.112026")!!
+        val dec = AppVersion.parse("0.9-build.120126")!!
+        val jan = AppVersion.parse("0.9-build.010227")!!
+        assertTrue(AppVersion.parse("0.8.2-beta.1")!! < nov)
+        assertTrue(nov < dec)
+        assertTrue(dec < jan)
+        assertEquals("0.9-build.112026", nov.toString())
+    }
 }

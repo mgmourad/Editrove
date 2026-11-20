@@ -564,4 +564,19 @@
     <string name="reader_other_none">Aucun autre média n’a encore cette info.</string>
     <string name="reader_points_outlets">Points clés · %1$d médias</string>
     <string name="reader_outlets">Publié par</string>
+    <string name="reader_others_pill">Lire dans d’autres médias</string>
+    <string name="reader_others_back">Retour à %1$s</string>
+    <string name="reader_others_header">Même sujet · %1$d médias</string>
+    <string name="reader_others_open">Lire l’article complet sur %1$s</string>
+    <string name="reader_others_next">Suivant : %1$s</string>
+    <string name="presenter">Présentateur</string>
+    <string name="presenter_anchor">Présentateur classique</string>
+    <string name="presenter_modern">Présentateur moderne</string>
+    <string name="presenter_correspondent">Correspondant</string>
+    <string name="presenter_conversational">Animateur chaleureux</string>
+    <string name="presenter_anchor_hint">Un présentateur de journal : il vous salue, donne la date et enchaîne posément les sujets.</string>
+    <string name="presenter_modern_hint">Un présentateur d’info numérique : rythmé, actuel, droit à l’essentiel.</string>
+    <string name="presenter_correspondent_hint">Concis et factuel : le moins de mots possible entre vous et l’info.</string>
+    <string name="presenter_conversational_hint">Il s’adresse directement à vous, sur un ton chaleureux et détendu.</string>
+    <string name="presenter_sample_topic">À la une</string>
 </resources>

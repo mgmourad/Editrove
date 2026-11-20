@@ -68,7 +68,12 @@ class AppContainer(context: Context) {
     }
     /** Audio briefing engine — app-scoped so playback survives leaving the app and locking the phone. */
     val briefingPlayer: news.openwire.ui.home.BriefingPlayer by lazy {
-        news.openwire.ui.home.BriefingPlayer(context, prefs = { settingsRepository.settings.value.briefing }, extractor = articleTextExtractor, normalizeDomain = { domainRegistry.normalizeDomain(it) })
+        news.openwire.ui.home.BriefingPlayer(
+            context, prefs = { settingsRepository.settings.value.briefing }, extractor = articleTextExtractor,
+            normalizeDomain = { domainRegistry.normalizeDomain(it) },
+            storyContext = { stories -> briefingContext(stories) },
+            country = { settingsRepository.settings.value.edition.country },
+        )
             .also { news.openwire.widget.WidgetSync.attach(context, it) }
     }
     val changelog: news.openwire.update.Changelog by lazy { news.openwire.update.Changelog(context) }
@@ -112,5 +117,34 @@ class AppContainer(context: Context) {
         val result = if (rule.strategy == Strategy.WAYBACK) archiveChecker.checkWayback(article.originalUrl)
         else archiveChecker.checkArchiveIs(article.originalUrl)
         return result.archiveUrl.takeIf { result.available }
+    }
+
+    /**
+     * Where each briefing story sits in the reader's edition, from the tabs that carry it: the
+     * local, national or international tab (scope) and a section tab (category). Only what the
+     * edition itself says, so the presenter never guesses.
+     */
+    private suspend fun briefingContext(stories: List<news.openwire.domain.model.Article>): Map<String, Pair<news.openwire.domain.engine.BriefingScript.Scope?, news.openwire.domain.engine.BriefingScript.Category?>> {
+        val s = settingsRepository.settings.value
+        val urls = stories.mapNotNull { it.originalUrl }.toSet()
+        if (urls.isEmpty()) return emptyMap()
+        val scopes = HashMap<String, news.openwire.domain.engine.BriefingScript.Scope>()
+        val cats = HashMap<String, news.openwire.domain.engine.BriefingScript.Category>()
+        val priority = listOf(news.openwire.domain.engine.TopicRegistry.LOCAL_ID, news.openwire.domain.engine.TopicRegistry.NATIONAL_ID, "INTERNATIONAL")
+        val topics = news.openwire.domain.engine.TopicRegistry.buildTopics(s.edition, s.customTopics, s.hiddenTopics, s.topicOrder, s.language)
+            .filter { it.isVisible }
+            .sortedBy { t -> priority.indexOf(t.id).let { if (it < 0) priority.size else it } }
+        for (t in topics) {
+            val sc = news.openwire.domain.engine.BriefingPlan.scopeOf(t.id)
+            val ca = news.openwire.domain.engine.BriefingPlan.categoryOf(t.id)
+            if (sc == null && ca == null) continue
+            for (a in feedRepository.cachedArticles(t.id)) {
+                val u = a.originalUrl ?: continue
+                if (u !in urls) continue
+                if (sc != null) scopes.putIfAbsent(u, sc)
+                if (ca != null) cats.putIfAbsent(u, ca)
+            }
+        }
+        return urls.associateWith { scopes[it] to cats[it] }
     }
 }

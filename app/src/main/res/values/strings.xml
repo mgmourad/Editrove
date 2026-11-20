@@ -566,4 +566,19 @@
     <string name="reader_other_none">No other outlet has this story yet.</string>
     <string name="reader_points_outlets">Key points · from %1$d outlets</string>
     <string name="reader_outlets">Reported by</string>
+    <string name="reader_others_pill">Read from other outlets</string>
+    <string name="reader_others_back">Back to %1$s</string>
+    <string name="reader_others_header">Same story · %1$d outlets</string>
+    <string name="reader_others_open">Read the full report at %1$s</string>
+    <string name="reader_others_next">Next: %1$s</string>
+    <string name="presenter">Presenter</string>
+    <string name="presenter_anchor">Traditional anchor</string>
+    <string name="presenter_modern">Modern presenter</string>
+    <string name="presenter_correspondent">Correspondent</string>
+    <string name="presenter_conversational">Friendly host</string>
+    <string name="presenter_anchor_hint">A broadcast anchor: greets you, gives the date, measured hand-offs between stories.</string>
+    <string name="presenter_modern_hint">A digital-news presenter: brisk, current, straight to what\'s happening.</string>
+    <string name="presenter_correspondent_hint">Concise and information-first: the fewest words between you and the news.</string>
+    <string name="presenter_conversational_hint">Talks to you directly, warm and relaxed, with a friendly sign-off.</string>
+    <string name="presenter_sample_topic">Top Stories</string>
 </resources>

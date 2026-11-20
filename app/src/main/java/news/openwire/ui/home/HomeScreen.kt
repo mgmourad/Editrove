@@ -759,6 +759,10 @@ private fun HeadlineBriefingCard(
             Spacer(Modifier.width(10.dp))
             Box(Modifier.weight(1f).height(16.dp)) { Waveform(playing) }
         }
+        // Something is on its way: the latest stories, the voice, or the next story's text.
+        androidx.compose.animation.AnimatedVisibility(updating || (mine && player.loading)) {
+            SweepBar(Modifier.padding(top = 14.dp))
+        }
         if (mine && player.storyTitle != null) {
             Spacer(Modifier.height(10.dp))
             Text(tr(R.string.briefing_now, player.storyTitle.orEmpty()), style = sans(12.sp, FontWeight.Medium), color = g.textPrimary.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)

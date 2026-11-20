@@ -33,6 +33,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.material.icons.outlined.Newspaper
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -249,23 +258,28 @@ internal fun ArticleBody(
     val url = article.originalUrl ?: article.targetUrl ?: ""
     // Retry starts the article over; "other outlets" reads the same story from other newsrooms.
     var attempt by remember(article.id) { androidx.compose.runtime.mutableIntStateOf(0) }
-    var useOthers by remember(article.id) { mutableStateOf(false) }
     val appContext = LocalContext.current.applicationContext
-    // What the publisher gave (a teaser, say): kept on screen if no other outlet has the story.
-    var original by remember(article.id) { mutableStateOf<news.openwire.data.remote.ArticleContent?>(null) }
-    var noOthers by remember(article.id) { mutableStateOf(false) }
-    val state by produceState<BodyState>(BodyState.Loading, article.id, attempt, useOthers) {
+    val state by produceState<BodyState>(BodyState.Loading, article.id, attempt) {
         value = BodyState.Loading
-        value = if (useOthers) {
-            val country = (appContext as? news.openwire.OpenWireApp)?.container?.settingsRepository?.settings?.value?.edition?.country ?: "US"
-            actions.extractor.fromOtherOutlets(article.title, url.ifEmpty { null }, country)?.let { BodyState.Loaded(it) }
-                ?: original?.let { noOthers = true; useOthers = false; BodyState.Loaded(it) } ?: BodyState.Failed
-        } else if (url.isEmpty()) BodyState.Failed
-        else actions.extractor.extract(url, article.title)?.also { original = it }?.let { BodyState.Loaded(it) } ?: BodyState.Failed
+        value = if (url.isEmpty()) BodyState.Failed
+        else actions.extractor.extract(url, article.title)?.let { BodyState.Loaded(it) } ?: BodyState.Failed
     }
+    // The same story from other newsrooms: fetched only when the reader asks, then kept.
+    var othersRequested by remember(article.id) { mutableStateOf(false) }
+    var useOthers by remember(article.id) { mutableStateOf(false) }
+    var noOthers by remember(article.id) { mutableStateOf(false) }
+    val others by produceState<OthersState>(OthersState.Idle, article.id, othersRequested) {
+        if (!othersRequested) return@produceState
+        value = OthersState.Loading
+        val country = (appContext as? news.openwire.OpenWireApp)?.container?.settingsRepository?.settings?.value?.edition?.country ?: "US"
+        val list = runCatching { actions.extractor.otherReports(article.title, url.ifEmpty { null }, country) }.getOrDefault(emptyList())
+        value = if (list.isEmpty()) OthersState.Empty else OthersState.Ready(list)
+    }
+    LaunchedEffect(others) { if (others == OthersState.Empty && useOthers) { useOthers = false; noOthers = true } }
+    val openOthers = { othersRequested = true; useOthers = true; noOthers = false }
     // After a while, offer a way out (the article keeps loading meanwhile, and appears if it arrives).
-    var slow by remember(article.id, attempt, useOthers) { mutableStateOf(false) }
-    LaunchedEffect(article.id, attempt, useOthers) { kotlinx.coroutines.delay(SLOW_ARTICLE_MS); slow = true }
+    var slow by remember(article.id, attempt) { mutableStateOf(false) }
+    LaunchedEffect(article.id, attempt) { kotlinx.coroutines.delay(SLOW_ARTICLE_MS); slow = true }
     // A photo the reader found is remembered, so the story's card shows it next time.
     val images = LocalImageResolver.current
     LaunchedEffect(state) { (state as? BodyState.Loaded)?.content?.imageUrl?.let { images?.remember(article.originalUrl, it) } }
@@ -308,9 +322,13 @@ internal fun ArticleBody(
         // Reader-service pill: tells you how this story is unlocked and opens that page.
         val context = LocalContext.current
         val service = remember(article.id) { actions.router.serviceFor(article) }
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 12.dp),
+        ) {
         if (service != null) {
             Row(
-                Modifier.padding(bottom = 12.dp).clip(CircleShape)
+                Modifier.clip(CircleShape)
                     .background(g.indigo.copy(alpha = 0.14f)).border(1.dp, g.indigo.copy(alpha = 0.32f), CircleShape)
                     .clickable { actions.router.open(actions.scope, context, article) }
                     .padding(horizontal = 12.dp, vertical = 5.dp),
@@ -320,6 +338,7 @@ internal fun ArticleBody(
                 Spacer(Modifier.width(4.dp))
                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = g.indigo, modifier = Modifier.size(12.dp))
             }
+        }
         }
 
         // Editorial serif headline
@@ -338,8 +357,9 @@ internal fun ArticleBody(
             Spacer(Modifier.height(20.dp))
         }
 
-        // Byline
-        Row(Modifier.fillMaxWidth().padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Byline (on a narrow screen, the other-outlets pill sits just under the source instead).
+        val narrowByline = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 520
+        Row(Modifier.fillMaxWidth().padding(bottom = if (narrowByline) 10.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(36.dp).clip(CircleShape)
                     .background(Brush.linearGradient(listOf(Indigo, g.accent)))
@@ -357,6 +377,11 @@ internal fun ArticleBody(
                     style = sans(11.sp), color = g.textPrimary.copy(alpha = 0.6f), maxLines = 1,
                 )
             }
+            // Optional: the same story as other newsrooms reported it (nothing is fetched until tapped).
+            if (!narrowByline) {
+                OtherOutletsPill(showing = useOthers, original = article.source ?: article.domain ?: "") { if (useOthers) useOthers = false else openOthers() }
+                Spacer(Modifier.width(8.dp))
+            }
             Box(
                 Modifier.clip(CircleShape).background(g.chipFill.copy(alpha = g.chipFill.alpha / 2))
                     .border(1.dp, g.hairline, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
@@ -368,13 +393,19 @@ internal fun ArticleBody(
             }
         }
 
+        if (narrowByline) {
+            Box(Modifier.padding(start = 48.dp, bottom = 18.dp)) {
+                OtherOutletsPill(showing = useOthers, original = article.source ?: article.domain ?: "") { if (useOthers) useOthers = false else openOthers() }
+            }
+        }
+
         // Liquid Glass narrated-briefing player
         AudioBriefingCard(article, content)
         Spacer(Modifier.height(16.dp))
 
         // On-device summary: the article's own key sentences.
         val keyPoints = remember(content) { content?.let { c -> c.combinedPoints.ifEmpty { news.openwire.domain.engine.Summarizer.keyPoints(c.text, 3) } }.orEmpty() }
-        androidx.compose.animation.AnimatedVisibility(keyPoints.isNotEmpty(), enter = androidx.compose.animation.expandVertically(springTween(420)) + androidx.compose.animation.fadeIn()) {
+        androidx.compose.animation.AnimatedVisibility(keyPoints.isNotEmpty() && !useOthers, enter = androidx.compose.animation.expandVertically(springTween(420)) + androidx.compose.animation.fadeIn()) {
             GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), contentPadding = PaddingValues(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(tr(R.string.reader_summary), style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = g.accentSoft, modifier = Modifier.weight(1f))
@@ -412,25 +443,22 @@ internal fun ArticleBody(
             Spacer(Modifier.height(24.dp))
         }
 
-        when (val s = state) {
+        if (noOthers) Text(tr(R.string.reader_other_none), style = sans(13.sp, lineHeight = 20.sp), color = g.indigo, modifier = Modifier.padding(bottom = 16.dp))
+        if (useOthers) OtherOutletsView(others, original = article.source ?: article.domain ?: "", onBack = { useOthers = false }, loadPost = actions.loadPost)
+        else when (val s = state) {
             BodyState.Loading -> {
-                LoadingBar(tr(if (useOthers) R.string.reader_other_loading else R.string.reader_loading))
-                if (slow && !useOthers) SlowArticleCard(failed = false, onRetry = { attempt++ }, onOthers = { useOthers = true }, smryUrl = if (service == null) url else "")
+                LoadingBar(tr(R.string.reader_loading))
+                if (slow) SlowArticleCard(failed = false, onRetry = { attempt++ }, onOthers = openOthers, smryUrl = if (service == null) url else "")
                 else BodySkeleton()
             }
             BodyState.Failed -> {
-                if (useOthers) Text(tr(R.string.reader_other_none), style = sans(14.sp, lineHeight = 22.sp), color = g.textSecondary, modifier = Modifier.padding(bottom = 12.dp))
-                else Text(
+                Text(
                     if (service != null) tr(R.string.reader_blocked_service, service.name) else tr(R.string.reader_failed),
                     style = sans(14.sp, lineHeight = 22.sp), color = g.textSecondary, modifier = Modifier.padding(bottom = 12.dp),
                 )
-                SlowArticleCard(failed = true, onRetry = { useOthers = false; attempt++ }, onOthers = if (useOthers) null else ({ useOthers = true }), smryUrl = if (service == null) url else "")
+                SlowArticleCard(failed = true, onRetry = { attempt++ }, onOthers = openOthers, smryUrl = if (service == null) url else "")
             }
             is BodyState.Loaded -> {
-                if (s.content.via == news.openwire.data.remote.TextSource.OTHER_OUTLETS) OtherOutletsBanner(article.source ?: article.domain ?: "", s.content)
-                if (noOthers && s.content.via != news.openwire.data.remote.TextSource.OTHER_OUTLETS) {
-                    Text(tr(R.string.reader_other_none), style = sans(13.sp, lineHeight = 20.sp), color = g.indigo, modifier = Modifier.padding(bottom = 16.dp))
-                }
                 s.content.pullQuote?.let { quote ->
                     Row(Modifier.fillMaxWidth().padding(bottom = 24.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
                         Box(Modifier.width(2.dp).fillMaxHeight().background(g.accent))
@@ -461,7 +489,7 @@ internal fun ArticleBody(
                     )
                     Spacer(Modifier.height(12.dp))
                     // Only a teaser: the whole story may be open at another newsroom.
-                    SlowArticleCard(failed = true, onRetry = { attempt++ }, onOthers = { useOthers = true }, smryUrl = if (service == null) url else "")
+                    SlowArticleCard(failed = true, onRetry = { attempt++ }, onOthers = openOthers, smryUrl = if (service == null) url else "")
                 }
                 if (s.content.via != news.openwire.data.remote.TextSource.PUBLISHER) {
                     val viaUrl = s.content.viaUrl
@@ -546,20 +574,27 @@ private const val SLOW_ARTICLE_MS = 12_000L
 @Composable
 private fun LoadingBar(label: String) {
     val g = Glass
+    Column(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+        SweepBar()
+        Text(label, style = mono(10.sp, tracking = 0.06.em), color = g.textSecondary, modifier = Modifier.padding(top = 8.dp))
+    }
+}
+
+/** An indeterminate progress bar: an accent highlight sweeping along a hairline track. */
+@Composable
+internal fun SweepBar(modifier: Modifier = Modifier) {
+    val g = Glass
     val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "load")
     val x by t.animateFloat(
         -0.4f, 1f,
         androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1300, easing = androidx.compose.animation.core.FastOutSlowInEasing)),
         label = "sweep",
     )
-    Column(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(g.hairline)) {
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(g.hairline)) {
             Box(
                 Modifier.fillMaxHeight().width(maxWidth * 0.4f).offset(x = maxWidth * x).clip(CircleShape)
                     .background(Brush.horizontalGradient(listOf(g.accent.copy(alpha = 0f), g.accent, g.accentSoft))),
             )
-        }
-        Text(label, style = mono(10.sp, tracking = 0.06.em), color = g.textSecondary, modifier = Modifier.padding(top = 8.dp))
     }
 }
 
@@ -594,34 +629,6 @@ private fun SlowArticleCard(failed: Boolean, onRetry: () -> Unit, onOthers: (() 
                     runCatching { androidx.browser.customtabs.CustomTabsIntent.Builder().build().launchUrl(context, android.net.Uri.parse("https://smry.ai/$smryUrl")) }
                 }.padding(vertical = 4.dp),
             )
-        }
-    }
-}
-
-/** Credit when the text is another newsroom's report of the same story. */
-@Composable
-private fun OtherOutletsBanner(original: String, c: news.openwire.data.remote.ArticleContent) {
-    val g = Glass
-    val context = LocalContext.current
-    Column(
-        Modifier.fillMaxWidth().padding(bottom = 20.dp).clip(RoundedCornerShape(18.dp)).background(g.indigo.copy(alpha = 0.10f))
-            .border(1.dp, g.indigo.copy(alpha = 0.30f), RoundedCornerShape(18.dp)).padding(14.dp),
-    ) {
-        Text(tr(R.string.reader_other_banner, original, c.viaName ?: ""), style = sans(13.sp, lineHeight = 20.sp), color = g.textPrimary)
-        if (c.otherOutlets.isNotEmpty()) {
-            Spacer(Modifier.height(10.dp))
-            Text(tr(R.string.reader_outlets).uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.indigo)
-            Spacer(Modifier.height(6.dp))
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                c.otherOutlets.forEach { o ->
-                    Text(
-                        o.name, style = sans(12.sp, FontWeight.Medium), color = g.textPrimary,
-                        modifier = Modifier.clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape)
-                            .clickable { runCatching { androidx.browser.customtabs.CustomTabsIntent.Builder().build().launchUrl(context, android.net.Uri.parse(o.url)) } }
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
-                    )
-                }
-            }
         }
     }
 }
@@ -779,3 +786,188 @@ internal fun rememberNarrator(context: Context): Narrator {
 private val RX_1 = Regex("(?<=[.!?])\\s+")
 
 private val RX_RTL = Regex("[\\u0590-\\u08FF]")
+
+/** Other newsrooms' reports of the story: not asked for yet, loading, none found, or ready. */
+internal sealed interface OthersState {
+    data object Idle : OthersState
+    data object Loading : OthersState
+    data object Empty : OthersState
+    data class Ready(val reports: List<news.openwire.data.remote.ArticleContent>) : OthersState
+}
+
+/**
+ * "Read from other outlets", beside the source: gold on gold (like the red section pill) so it
+ * stands out; while other outlets are shown it becomes the way back to the original.
+ */
+@Composable
+private fun OtherOutletsPill(showing: Boolean, original: String, onClick: () -> Unit) {
+    val g = Glass
+    val gold = if (g.deviceBg.luminance() < 0.5f) GOLD_ON_DARK else GOLD_ON_LIGHT
+    Row(
+        Modifier.clip(CircleShape)
+            .background(gold.copy(alpha = if (showing) 0.24f else 0.15f))
+            .border(1.dp, gold.copy(alpha = 0.40f), CircleShape)
+            .clickable(onClickLabel = if (showing) tr(R.string.reader_others_back, original) else tr(R.string.reader_others_pill), onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(if (showing) Icons.AutoMirrored.Filled.ArrowBack else Icons.Outlined.Newspaper, null, tint = gold, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            if (showing) tr(R.string.reader_others_back, original) else tr(R.string.reader_others_pill),
+            style = mono(10.sp, FontWeight.SemiBold, 0.08.em), color = gold,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private val GOLD_ON_DARK = Color(0xFFF5C451)
+private val GOLD_ON_LIGHT = Color(0xFF9A6A00)
+
+/**
+ * The same story from other newsrooms, one tab per outlet (logo and name), the most detailed
+ * report first. Swipe the report or tap a tab to switch; every report is credited and links
+ * to its source.
+ */
+@Composable
+private fun OtherOutletsView(state: OthersState, original: String, onBack: () -> Unit, loadPost: suspend (String) -> news.openwire.domain.opinion.SocialPost?) {
+    val g = Glass
+    when (state) {
+        OthersState.Idle, OthersState.Loading -> { LoadingBar(tr(R.string.reader_other_loading)); BodySkeleton() }
+        OthersState.Empty -> Text(tr(R.string.reader_other_none), style = sans(14.sp, lineHeight = 22.sp), color = g.textSecondary)
+        is OthersState.Ready -> {
+            val reports = state.reports
+            var selected by androidx.compose.runtime.saveable.rememberSaveable(reports.size) { androidx.compose.runtime.mutableIntStateOf(0) }
+            val tabs = androidx.compose.foundation.lazy.rememberLazyListState()
+            LaunchedEffect(selected) { tabs.animateScrollToItem((selected - 1).coerceAtLeast(0)) }
+            val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+            Column(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                    Text(tr(R.string.reader_others_header, reports.size).uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, modifier = Modifier.weight(1f))
+                    Text(
+                        tr(R.string.reader_others_back, original), style = sans(12.sp, FontWeight.Medium), color = g.textSecondary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clip(CircleShape).clickable(onClick = onBack).padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+                // Tabs: each outlet's logo and name; the selected one filled.
+                androidx.compose.foundation.lazy.LazyRow(
+                    state = tabs, horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                ) {
+                    items(reports.size) { i ->
+                        val r = reports[i]
+                        val on = i == selected
+                        val bg by animateColorAsState(if (on) g.accent else g.chipFill, springTween(260), label = "tab")
+                        Row(
+                            Modifier.clip(CircleShape).background(bg).border(1.dp, if (on) Color.Transparent else g.hairline, CircleShape)
+                                .semantics { this.selected = on; role = androidx.compose.ui.semantics.Role.Tab }
+                                .clickable { selected = i }
+                                .padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            val domain = r.viaUrl?.let { news.openwire.domain.engine.FeedDiscovery.domainOf(it) }
+                            Box(Modifier.size(24.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) { SourceLogo(domain, r.viaName, size = 18.dp) }
+                            Spacer(Modifier.width(8.dp))
+                            Text(r.viaName ?: domain.orEmpty(), style = sans(13.sp, if (on) FontWeight.SemiBold else FontWeight.Medium), color = if (on) Color.White else g.textPrimary, maxLines = 1)
+                        }
+                    }
+                }
+                // The report: swipe sideways for the next outlet.
+                var drag by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+                val threshold = with(androidx.compose.ui.platform.LocalDensity.current) { 72.dp.toPx() }
+                androidx.compose.animation.AnimatedContent(
+                    targetState = selected,
+                    transitionSpec = {
+                        val forward = (targetState > initialState) != rtl
+                        (androidx.compose.animation.slideInHorizontally(springTween(340)) { w -> if (forward) w / 3 else -w / 3 } + fadeIn(springTween(260)))
+                            .togetherWith(androidx.compose.animation.slideOutHorizontally(springTween(260)) { w -> if (forward) -w / 4 else w / 4 } + fadeOut(tween(140)))
+                            .using(androidx.compose.animation.SizeTransform(clip = false))
+                    },
+                    label = "outlet",
+                    modifier = Modifier.fillMaxWidth().pointerInput(reports.size, rtl) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { drag = 0f },
+                            onHorizontalDrag = { _, dx -> drag += dx },
+                            onDragEnd = {
+                                val towardsNext = if (rtl) drag > threshold else drag < -threshold
+                                val towardsPrev = if (rtl) drag < -threshold else drag > threshold
+                                if (towardsNext && selected < reports.lastIndex) selected++
+                                else if (towardsPrev && selected > 0) selected--
+                                drag = 0f
+                            },
+                        )
+                    },
+                ) { i -> OutletReport(reports[i], loadPost) }
+                // Step through outlets without hunting for the tab.
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${selected + 1} / ${reports.size}", style = mono(11.sp, tracking = 0.06.em), color = g.textSecondary, modifier = Modifier.weight(1f))
+                    reports.getOrNull(selected + 1)?.let { n ->
+                        Text(
+                            tr(R.string.reader_others_next, n.viaName ?: ""), style = sans(13.sp, FontWeight.SemiBold), color = g.accentSoft,
+                            modifier = Modifier.clip(CircleShape).clickable { selected++ }.padding(horizontal = 12.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One outlet's report: its headline and deck, key points, the text with its photos, credit and link. */
+@Composable
+private fun OutletReport(c: news.openwire.data.remote.ArticleContent, loadPost: suspend (String) -> news.openwire.domain.opinion.SocialPost?) {
+    val g = Glass
+    val context = LocalContext.current
+    Column(Modifier.fillMaxWidth()) {
+        if (c.title.isNotBlank()) {
+            Text(c.title, style = serif(21.sp, FontWeight.Bold, lineHeight = 27.sp), color = g.textPrimary)
+            Spacer(Modifier.height(8.dp))
+        }
+        c.description?.let { Text(it, style = sans(14.sp, lineHeight = 22.sp), color = g.textPrimary.copy(alpha = 0.75f)); Spacer(Modifier.height(10.dp)) }
+        Text(
+            listOfNotNull(c.author, c.viaName).joinToString(" · "),
+            style = mono(10.sp, tracking = 0.06.em), color = g.textSecondary, modifier = Modifier.padding(bottom = 14.dp),
+        )
+        val points = remember(c) { news.openwire.domain.engine.Summarizer.keyPoints(c.text, 3) }
+        if (points.isNotEmpty()) {
+            GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 18.dp), contentPadding = PaddingValues(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(tr(R.string.reader_summary), style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = g.accentSoft, modifier = Modifier.weight(1f))
+                    Text(tr(R.string.reader_key_points), style = sans(10.sp), color = g.textSecondary)
+                }
+                points.forEach { point ->
+                    Row(Modifier.padding(top = 10.dp)) {
+                        Box(Modifier.padding(top = 7.dp).size(5.dp).clip(CircleShape).background(g.accent))
+                        Spacer(Modifier.width(10.dp))
+                        Text(point, style = sans(13.5.sp, lineHeight = 21.sp), color = g.textPrimary.copy(alpha = 0.92f))
+                    }
+                }
+            }
+        }
+        c.imageUrl?.takeIf { c.media.none { m -> m.url == it } }?.let { lead ->
+            StoryMedia(news.openwire.data.remote.ArticleMedia(news.openwire.data.remote.ArticleMedia.Kind.IMAGE, lead))
+            Spacer(Modifier.height(16.dp))
+        }
+        val mediaAfter = remember(c) { c.media.groupBy { it.after } }
+        c.paragraphs.forEachIndexed { i, para ->
+            if (i == 0 && !RX_RTL.containsMatchIn(para.take(40))) DropCapParagraph(para) else BodyParagraph(para)
+            Spacer(Modifier.height(16.dp))
+            mediaAfter[i]?.forEach { m -> StoryMedia(m); Spacer(Modifier.height(16.dp)) }
+        }
+        if (c.embeds.isNotEmpty()) { EmbeddedPosts(c.embeds, loadPost); Spacer(Modifier.height(16.dp)) }
+        c.viaUrl?.let { link ->
+            Row(
+                Modifier.clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape)
+                    .clickable { runCatching { androidx.browser.customtabs.CustomTabsIntent.Builder().build().launchUrl(context, android.net.Uri.parse(link)) } }
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(tr(R.string.reader_others_open, c.viaName ?: ""), style = sans(13.sp, FontWeight.SemiBold), color = g.accentSoft)
+                Spacer(Modifier.width(6.dp))
+                Icon(Icons.AutoMirrored.Filled.OpenInNew, null, tint = g.accentSoft, modifier = Modifier.size(14.dp))
+            }
+        }
+    }
+}
+

@@ -236,9 +236,37 @@ class ArticleTextExtractor(
      * reports with the same headline from other outlets (open ones first), the best full text
      * is shown with its outlet credited, and key points are drawn from every report read.
      */
-    suspend fun fromOtherOutlets(title: String, originalUrl: String?, country: String = "US"): ArticleContent? = kotlinx.coroutines.coroutineScope {
-        val clean = title.substringBeforeLast(" - ").substringBeforeLast(" | ").trim()
-        if (clean.length < 12) return@coroutineScope null
+    suspend fun fromOtherOutlets(title: String, originalUrl: String?, country: String = "US"): ArticleContent? {
+        val reports = otherReports(title, originalUrl, country)
+        val best = reports.firstOrNull() ?: return null
+        val clean = cleanTitle(title)
+        // Key points: the chosen report's first, then the other full reports' (short clips and promos left out).
+        val full = reports.drop(1).filter { it.text.length >= 1_200 && match(it, clean) >= 2 }
+        val points = (news.openwire.domain.engine.Summarizer.keyPoints(best.text, 3) +
+            news.openwire.domain.engine.Summarizer.keyPoints(full.joinToString("\n\n") { it.text }, 3))
+            .distinct().take(5)
+        return best.copy(
+            title = clean,
+            // The deck and byline were the other outlet's: the reader credits it in a banner instead.
+            description = null, author = null,
+            otherOutlets = reports.map { OtherOutlet(it.viaName ?: "", it.viaUrl ?: "") },
+            combinedPoints = points,
+        )
+    }
+
+    private fun cleanTitle(title: String) = title.substringBeforeLast(" - ").substringBeforeLast(" | ").trim()
+
+    private fun match(c: ArticleContent, clean: String) = titleOverlap(c.title + " " + c.paragraphs.take(3).joinToString(" "), clean)
+
+    /**
+     * Every other newsroom's full report of the story behind [title] (Google News search on the
+     * headline's distinctive words; open sites first; each read and checked to be about it),
+     * the most detailed close match first. Each carries its outlet ([ArticleContent.viaName],
+     * [ArticleContent.viaUrl]) so it can be credited.
+     */
+    suspend fun otherReports(title: String, originalUrl: String?, country: String = "US", max: Int = 6): List<ArticleContent> = kotlinx.coroutines.coroutineScope {
+        val clean = cleanTitle(title)
+        if (clean.length < 12) return@coroutineScope emptyList()
         val home = originalUrl?.let { news.openwire.domain.engine.FeedDiscovery.domainOf(it) }
         val c = news.openwire.domain.engine.TopicRegistry.country(country)
         // The headline's distinctive words, not the whole sentence: other outlets word it differently.
@@ -251,35 +279,25 @@ class ArticleTextExtractor(
         }.distinctBy { it.source }
             // Open sites first: a paywalled outlet would stall here just like the original.
             .sortedBy { item -> runCatching { isPaywalled(item.source.orEmpty()) }.getOrDefault(false) }
-            .take(6)
+            .take(max + 2)
         val reads = candidates.map { item ->
             async {
                 withTimeoutOrNull(12_000) {
                     val url = if (news.openwire.domain.engine.GoogleNewsUrls.isGoogleNewsUrl(item.link)) resolveLink(item.link) else item.link
                     url ?: return@withTimeoutOrNull null
-                    extractFrom(url)?.takeIf { complete(it, false) && relevant(it, clean) }
-                        ?.let { Triple(item.sourceName ?: news.openwire.domain.engine.FeedDiscovery.domainOf(url) ?: url, url, it) }
+                    extractFrom(url)?.takeIf { complete(it, false) && relevant(it, clean) }?.copy(
+                        via = TextSource.OTHER_OUTLETS, viaUrl = url, partial = false,
+                        viaName = item.sourceName ?: news.openwire.domain.engine.FeedDiscovery.domainOf(url) ?: url,
+                    )
                 }
             }
         }.awaitAll().filterNotNull()
-        if (reads.isEmpty()) return@coroutineScope null
-        // The closest match to the headline, not the longest: a related feature isn't the story.
-        fun match(c: ArticleContent) = titleOverlap(c.title + " " + c.paragraphs.take(3).joinToString(" "), clean)
-        val (name, url, best) = reads.sortedWith(compareByDescending<Triple<String, String, ArticleContent>> { match(it.third) }.thenByDescending { it.third.text.length }).first()
-        // Key points: the chosen report's first, then the other full reports' (short clips and promos left out).
-        val full = reads.filter { it.third.text.length >= 1_200 && match(it.third) >= 2 }
-        val points = (news.openwire.domain.engine.Summarizer.keyPoints(best.text, 3) +
-            news.openwire.domain.engine.Summarizer.keyPoints(full.filter { it.third !== best }.joinToString("\n\n") { it.third.text }, 3))
-            .distinct().take(5)
-        best.copy(
-            title = clean,
-            // The deck and byline were the other outlet's: the reader credits it in a banner instead.
-            description = null, author = null,
-            via = TextSource.OTHER_OUTLETS, viaUrl = url, viaName = name,
-            otherOutlets = reads.map { OtherOutlet(it.first, it.second) },
-            combinedPoints = points,
-            partial = false,
-        )
+        if (reads.isEmpty()) return@coroutineScope emptyList()
+        // Close matches to the headline (a related feature isn't the story), the most detailed first.
+        val top = reads.maxOf { match(it, clean) }
+        reads.sortedWith(
+            compareByDescending<ArticleContent> { match(it, clean) >= top - 1 }.thenByDescending { it.text.length + it.media.size * 400 },
+        ).take(max)
     }
 
     /** Keeps the publisher's own deck/byline/photo when the text came from an archive. */

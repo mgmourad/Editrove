@@ -550,4 +550,18 @@
     <string name="delivery_row_bad">Etwas auf diesem Handy blockiert womöglich Meldungen</string>
     <string name="reader_watch_on">Auf %1$s ansehen</string>
     <string name="reader_play_video">Video abspielen</string>
+    <string name="delivery_alerts_on">Eilmeldungen eingeschaltet</string>
+    <string name="delivery_alerts_hint">Editroves Meldungen sind aus. Schalte Eilmeldungen ein; Themen später unter Einstellungen › Benachrichtigungen wählen.</string>
+    <string name="delivery_turn_on">Einschalten</string>
+    <string name="reader_loading">Artikel wird geladen…</string>
+    <string name="reader_other_loading">Diese Meldung wird bei anderen Medien gesucht…</string>
+    <string name="reader_slow_t">Dauert länger als üblich</string>
+    <string name="reader_slow_b">Der Verlag antwortet langsam. Warte weiter, versuche es erneut oder lies dieselbe Meldung, wie andere Redaktionen sie gebracht haben.</string>
+    <string name="reader_retry">Erneut versuchen</string>
+    <string name="reader_other">Bei anderen Medien lesen</string>
+    <string name="reader_smry">Zusammenfassung auf smry.ai</string>
+    <string name="reader_other_banner">%1$s ließ sich nicht laden; hier der Bericht von %2$s zur selben Meldung. Die Kernpunkte stammen aus allen Medien unten.</string>
+    <string name="reader_other_none">Noch kein anderes Medium hat diese Meldung.</string>
+    <string name="reader_points_outlets">Kernpunkte · aus %1$d Medien</string>
+    <string name="reader_outlets">Berichtet von</string>
 </resources>

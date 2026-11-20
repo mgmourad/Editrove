@@ -1,0 +1,6 @@
+Editrove 0.8.0 Beta 1 — Richer stories, alerts you can count on
+• Photos and videos inside articles, where the publisher placed them.
+• Posts from X show their pictures and videos.
+• Breaking news counts every source you follow.
+• Notifications are titled with the news source.
+• After choosing an edition, a window lists its newsrooms to add.

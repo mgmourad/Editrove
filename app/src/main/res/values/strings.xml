@@ -552,4 +552,18 @@
     <string name="delivery_row_bad">Something on this phone may block alerts</string>
     <string name="reader_watch_on">Watch on %1$s</string>
     <string name="reader_play_video">Play video</string>
+    <string name="delivery_alerts_on">Breaking news alerts on</string>
+    <string name="delivery_alerts_hint">Editrove\'s alerts are off. Turn on breaking news; pick topics later in Settings › Notifications.</string>
+    <string name="delivery_turn_on">Turn on</string>
+    <string name="reader_loading">Loading the article…</string>
+    <string name="reader_other_loading">Finding this story at other outlets…</string>
+    <string name="reader_slow_t">Taking longer than usual</string>
+    <string name="reader_slow_b">The publisher is slow to respond. Keep waiting, try again, or read the same story as other newsrooms reported it.</string>
+    <string name="reader_retry">Retry</string>
+    <string name="reader_other">Read it from other outlets</string>
+    <string name="reader_smry">Summary on smry.ai</string>
+    <string name="reader_other_banner">%1$s didn\'t load, so this is %2$s\'s report of the same story. The key points draw on every outlet below.</string>
+    <string name="reader_other_none">No other outlet has this story yet.</string>
+    <string name="reader_points_outlets">Key points · from %1$d outlets</string>
+    <string name="reader_outlets">Reported by</string>
 </resources>

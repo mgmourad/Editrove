@@ -87,4 +87,31 @@ class ArticleTextExtractorTest {
         assertEquals(ArticleMedia.Kind.EXTERNAL, media[1].kind)
         assertEquals("https://news.example.com/p.jpg", media[2].poster)
     }
+
+    @Test fun consentNoticesAndTheNextStoryAreNotTheArticle() {
+        val html = """
+            <html><body>
+            <div class="privacy-dialog"><p>As a California consumer, you have the right to opt-out from the sale or sharing of your personal information at any time across business platform, services, businesses and devices.</p>
+            <p>You can opt-out of the sale and sharing of your personal information by using this toggle switch at the bottom of the page.</p></div>
+            <main>
+              <article><h1>Bridge reopens after two-year repair</h1>
+                <p>The city's main river bridge reopened to traffic on Tuesday after a two-year repair that ran months over schedule.</p>
+                <p>Drivers lined up before dawn to cross the bridge, which carries about forty thousand vehicles a day between downtown and the east side.</p>
+                <p>Officials said the repair cost came in under budget despite the delays caused by supply shortages and a wet spring.</p>
+              </article>
+              <article><h1>Council votes on new parking rules</h1>
+                <p>In a separate meeting the council approved new parking rules for the downtown core that take effect next month for residents.</p>
+                <p>The rules raise meter prices in the evening and extend enforcement hours to ten at night on weekdays across the district.</p>
+                <p>Business owners had asked for a delay, saying the change would hurt restaurants that depend on evening customers downtown.</p>
+              </article>
+            </main></body></html>
+        """.trimIndent()
+        val x = ArticleTextExtractor(okhttp3.OkHttpClient())
+        val ps = x.articleParagraphs(Jsoup.parse(html))
+        assertEquals(3, ps.size)
+        assertTrue(ps.all { "bridge" in it.lowercase() || "repair" in it.lowercase() || "budget" in it.lowercase() })
+        val privacy = ArticleContent("Trump calls Putin and Xi friends. They have other plans.", "As a California consumer, you have the right to opt-out.\n\nYou can opt-out of the sale and sharing of your personal information.", null)
+        assertFalse(x.relevant(privacy, "Trump calls Putin and Xi friends. They have other plans."))
+        assertTrue(x.relevant(ArticleContent("", ps.joinToString("\n\n"), null), "Bridge reopens after two-year repair"))
+    }
 }

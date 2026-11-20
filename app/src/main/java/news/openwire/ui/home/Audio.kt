@@ -336,7 +336,7 @@ class BriefingPlayer(
         // Every level fetches the article: Headlines reads its subtitle too.
         if (extractor == null || i !in stories.indices || content.containsKey(i)) return
         val url = stories[i].originalUrl ?: return
-        content[i] = scope.async(kotlinx.coroutines.Dispatchers.IO) { runCatching { extractor.extract(url) }.getOrNull() }
+        content[i] = scope.async(kotlinx.coroutines.Dispatchers.IO) { runCatching { extractor.extract(url, stories[i].title) }.getOrNull() }
     }
 
     private fun advance() {

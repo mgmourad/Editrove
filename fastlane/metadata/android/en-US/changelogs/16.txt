@@ -1,0 +1,7 @@
+Editrove 0.8.2 Beta 1 — Cleaner articles, alerts that arrive
+• A loading bar on articles; if one takes too long, Retry or read the story from other outlets, with credit.
+• Articles no longer pick up privacy notices or the next story on the page, so briefings read the right text.
+• Small pictures (author portraits, icons) are left out of articles.
+• Fewer, better breaking alerts: from every source you follow, but only when several outlets carry the story.
+• A quick alert check on the first run of every version, so notifications keep arriving.
+• What's new now shows after every update.

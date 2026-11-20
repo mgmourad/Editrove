@@ -550,4 +550,18 @@
     <string name="delivery_row_bad">قد يمنع شيء في هذا الهاتف وصول التنبيهات</string>
     <string name="reader_watch_on">شاهد على %1$s</string>
     <string name="reader_play_video">تشغيل الفيديو</string>
+    <string name="delivery_alerts_on">تنبيهات الأخبار العاجلة مفعّلة</string>
+    <string name="delivery_alerts_hint">تنبيهات Editrove متوقفة. فعّل الأخبار العاجلة، واختر المواضيع لاحقًا من الإعدادات › الإشعارات.</string>
+    <string name="delivery_turn_on">تفعيل</string>
+    <string name="reader_loading">جارٍ تحميل المقال…</string>
+    <string name="reader_other_loading">جارٍ البحث عن الخبر لدى وسائل أخرى…</string>
+    <string name="reader_slow_t">يستغرق وقتًا أطول من المعتاد</string>
+    <string name="reader_slow_b">الناشر بطيء في الاستجابة. يمكنك الانتظار، أو إعادة المحاولة، أو قراءة الخبر نفسه كما نشرته غرف أخبار أخرى.</string>
+    <string name="reader_retry">إعادة المحاولة</string>
+    <string name="reader_other">اقرأه من وسائل أخرى</string>
+    <string name="reader_smry">الملخص على smry.ai</string>
+    <string name="reader_other_banner">تعذّر تحميل %1$s، فهذا تقرير %2$s عن الخبر نفسه. النقاط الرئيسية مأخوذة من كل الوسائل أدناه.</string>
+    <string name="reader_other_none">لا توجد وسيلة أخرى نشرت هذا الخبر بعد.</string>
+    <string name="reader_points_outlets">النقاط الرئيسية · من %1$d وسائل</string>
+    <string name="reader_outlets">نشرته</string>
 </resources>

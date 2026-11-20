@@ -1,0 +1,7 @@
+Editrove 0.7.0 Beta 6 — Global, live and opinionated
+• Fresh feeds built on your phone, minutes old; stale and off-language stories left out.
+• Editrove in العربية, Français, Español and Deutsch, right-to-left for Arabic.
+• Editions for 27 countries with Use my location, each with its own newsrooms.
+• Live TV and radio in the app, playing in the background.
+• Analysis & Opinion: columns in five languages, follow writers, trending topics.
+• Optional real-time breaking alerts, within seconds of a newsroom breaking a story.

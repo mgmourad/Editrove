@@ -550,4 +550,18 @@
     <string name="delivery_row_bad">Algo en este teléfono puede bloquear las alertas</string>
     <string name="reader_watch_on">Ver en %1$s</string>
     <string name="reader_play_video">Reproducir vídeo</string>
+    <string name="delivery_alerts_on">Alertas de última hora activadas</string>
+    <string name="delivery_alerts_hint">Las alertas de Editrove están desactivadas. Activa la última hora; elige temas después en Ajustes › Notificaciones.</string>
+    <string name="delivery_turn_on">Activar</string>
+    <string name="reader_loading">Cargando el artículo…</string>
+    <string name="reader_other_loading">Buscando esta noticia en otros medios…</string>
+    <string name="reader_slow_t">Tarda más de lo normal</string>
+    <string name="reader_slow_b">El editor tarda en responder. Sigue esperando, reinténtalo o lee la misma noticia tal como la publicaron otras redacciones.</string>
+    <string name="reader_retry">Reintentar</string>
+    <string name="reader_other">Leerla en otros medios</string>
+    <string name="reader_smry">Resumen en smry.ai</string>
+    <string name="reader_other_banner">%1$s no se pudo cargar: esta es la crónica de %2$s sobre la misma noticia. Los puntos clave salen de todos los medios de abajo.</string>
+    <string name="reader_other_none">Ningún otro medio tiene esta noticia todavía.</string>
+    <string name="reader_points_outlets">Puntos clave · de %1$d medios</string>
+    <string name="reader_outlets">Publicada por</string>
 </resources>

@@ -105,4 +105,16 @@ class NewsFeaturesTest {
         assertEquals(1, out.size)
         assertTrue(out.first().title.contains("Houston"))
     }
+
+    @Test fun followedSourcesNeedSeveralOutletsAndAlertsAreThrottled() {
+        val clickbait = a("mf", "BREAKING: This stock could soar 300%", "fool.com", ageMin = 5)
+        val wire = a("ap", "BREAKING: Earthquake strikes off Japan", "apnews.com", ageMin = 5)
+        val trusted: (news.openwire.domain.model.Article) -> Boolean = { it.id == "ap" }
+        val out = BreakingNews.detect(listOf(clickbait, wire), NOW, norm, trusted = trusted)
+        assertEquals(listOf("ap"), out.map { it.id })
+        // Within 20 minutes of the last alert only a major story gets through, two at most per run.
+        val three = listOf(wire, a("b", "Storm hits coast", ageMin = 3), a("c", "Storm hits coast again", ageMin = 4))
+        assertEquals(listOf("ap"), BreakingNews.throttle(three, NOW, NOW - 5 * 60_000, isMajor = { it.id == "ap" }).map { it.id })
+        assertEquals(2, BreakingNews.throttle(three, NOW, NOW - 60 * 60_000, isMajor = { false }).size)
+    }
 }

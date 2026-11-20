@@ -69,6 +69,10 @@ class BriefingPlayer(
     private val prefs: () -> news.openwire.domain.model.BriefingPrefs,
     private val extractor: news.openwire.data.remote.ArticleTextExtractor?,
     private val normalizeDomain: (String) -> String = { it },
+    /** Where each story sits in the edition (local / national / international, and its section), by URL. */
+    private val storyContext: suspend (List<news.openwire.domain.model.Article>) -> Map<String, Pair<news.openwire.domain.engine.BriefingScript.Scope?, news.openwire.domain.engine.BriefingScript.Category?>> = { emptyMap() },
+    /** The edition's country, for finding a story at other outlets. */
+    private val country: () -> String = { "US" },
 ) {
     private val app = context.applicationContext
     var title by mutableStateOf<String?>(null)
@@ -121,6 +125,18 @@ class BriefingPlayer(
     private var topic = ""
     private var detail = news.openwire.domain.model.BriefingDetail.HEADLINES
     private val content = HashMap<Int, kotlinx.coroutines.Deferred<news.openwire.data.remote.ArticleContent?>>()
+    /** Reads stories one after another, ahead of the narrator (one fetch at a time). */
+    private var pipeline: kotlinx.coroutines.Job? = null
+    private var plan: List<news.openwire.domain.engine.BriefingPlan.Item> = emptyList()
+    private var breakingFlags: List<Boolean> = emptyList()
+    private var developingFlags: List<Boolean> = emptyList()
+    private var meta: Map<String, Pair<news.openwire.domain.engine.BriefingScript.Scope?, news.openwire.domain.engine.BriefingScript.Category?>> = emptyMap()
+    private var metaJob: kotlinx.coroutines.Job? = null
+    private var presenter = news.openwire.domain.model.Presenter.ANCHOR
+    private var seed = 0
+    private var outro: android.media.MediaPlayer? = null
+    private var outroJob: kotlinx.coroutines.Job? = null
+    private var outroLevel = 0f
     private var cue: android.media.MediaPlayer? = null
     private var sting: android.media.MediaPlayer? = null
     private var cueJob: kotlinx.coroutines.Job? = null
@@ -198,8 +214,18 @@ class BriefingPlayer(
         val p = prefs()
         topic = topicLabel
         detail = p.detail
-        // Every story in a briefing is a different story: no second outlet's take on one already read.
-        stories = news.openwire.domain.engine.StoryIdentity.distinct(articles, p.count, normalizeDomain)
+        // Every story in a briefing is a different story: other outlets' takes are named, not read
+        // again; stories on one subject sit together; a story labelled breaking leads.
+        val nowMs = System.currentTimeMillis()
+        plan = news.openwire.domain.engine.BriefingPlan.arrange(articles, p.count, normalizeDomain) { news.openwire.domain.engine.BriefingPlan.isBreaking(it, nowMs) }
+        stories = plan.map { it.article }
+        breakingFlags = stories.map { news.openwire.domain.engine.BriefingPlan.isBreaking(it, nowMs) }
+        developingFlags = stories.map { news.openwire.domain.engine.BriefingPlan.isDeveloping(it) }
+        presenter = p.presenter
+        seed = (nowMs / 60_000).toInt()
+        meta = emptyMap()
+        metaJob?.cancel()
+        metaJob = scope.launch { meta = runCatching { storyContext(stories) }.getOrDefault(emptyMap()) }
         // The anchor speaks the stories' language: Editrove's own, unless the stories are in another
         // script (an Arabic national tab while the app is in English).
         lang = news.openwire.domain.engine.Languages.effective(null).let { app ->
@@ -209,17 +235,18 @@ class BriefingPlayer(
         title = tr(R.string.briefing_title, topicLabel)
         content.clear()
         val built = mutableListOf<Pair<Seg, Int>>()
-        built += Seg.Speech(news.openwire.domain.engine.BriefingScript.intro(topicLabel, stories.size, detail, java.time.LocalDateTime.now(), lang)) to -1
+        val now = java.time.LocalDateTime.now()
+        built += Seg.Speech(news.openwire.domain.engine.BriefingScript.intro(topicLabel, stories.size, detail, now, lang, presenter, breakingFlags.firstOrNull() == true, seed)) to -1
         stories.indices.forEach { i ->
             if (i > 0 && p.stings) built += Seg.Sting to i
             built += Seg.Story(i) to i
         }
-        built += Seg.Speech(news.openwire.domain.engine.BriefingScript.outro(topicLabel, lang)) to stories.size
+        built += Seg.Speech(news.openwire.domain.engine.BriefingScript.outro(topicLabel, lang, presenter, now, breakingFlags.any { it }, seed)) to stories.size
         segs = built.map { it.first }.toMutableList()
         segStory = built.map { it.second }.toMutableList()
         pos = 0
         narrationStarted = false
-        prefetch(0); prefetch(1)
+        startPipeline()
         audio?.requestAudioFocus(focus)
         playing = true
         session++
@@ -249,6 +276,7 @@ class BriefingPlayer(
         stingJob?.cancel(); sting?.release(); sting = null
         // The opening cue belongs to the open; it doesn't come back on resume.
         cueJob?.cancel(); cue?.release(); cue = null
+        outroJob?.cancel(); runCatching { outro?.pause() }
         playing = false
         notifyChange()
     }
@@ -262,6 +290,12 @@ class BriefingPlayer(
         if (segs.getOrNull(pos) == Seg.Sting) pos++
         BriefingService.start(app)
         notifyChange()
+        outro?.let { mp ->
+            runCatching { mp.start() }
+            // Paused during the play-out: carry on to the end of the music.
+            if (pos >= segs.size) { playOutOutro(); return }
+            outroJob = scope.launch { rampCurve(mp, outroLevel, OUTRO_UNDER_VOICE, 600, easeIn = false) }
+        }
         run()
     }
 
@@ -286,6 +320,7 @@ class BriefingPlayer(
     }
 
     private fun jumpTo(i: Int, line: Int = 0) {
+        if (segStory.getOrNull(i) != stories.size) { outroJob?.cancel(); outro?.release(); outro = null }
         resumeLine = line
         lineIndex = line
         session++
@@ -327,16 +362,46 @@ class BriefingPlayer(
         stepJob?.cancel(); cueJob?.cancel(); stingJob?.cancel()
         cue?.release(); cue = null
         sting?.release(); sting = null
+        outroJob?.cancel(); outro?.release(); outro = null
+        pipeline?.cancel(); metaJob?.cancel()
         content.values.forEach { it.cancel() }
+        content.clear()
         audio?.abandonAudioFocusRequest(focus)
         playing = false
     }
 
-    private fun prefetch(i: Int) {
-        // Every level fetches the article: Headlines reads its subtitle too.
-        if (extractor == null || i !in stories.indices || content.containsKey(i)) return
-        val url = stories[i].originalUrl ?: return
-        content[i] = scope.async(kotlinx.coroutines.Dispatchers.IO) { runCatching { extractor.extract(url, stories[i].title) }.getOrNull() }
+    /**
+     * The story text for [i]: the publisher's page; for Summaries and Full articles, when that
+     * has no usable body (a paywall teaser, a page that won't load), the same story from
+     * another outlet, credited by name. Started on demand (a jump ahead) or by [pipeline].
+     */
+    private fun fetch(i: Int): kotlinx.coroutines.Deferred<news.openwire.data.remote.ArticleContent?>? {
+        if (extractor == null || i !in stories.indices) return null
+        return content.getOrPut(i) {
+            val a = stories[i]
+            val wantBody = detail != news.openwire.domain.model.BriefingDetail.HEADLINES
+            scope.async(kotlinx.coroutines.Dispatchers.IO) {
+                val url = a.originalUrl
+                val c = url?.let { runCatching { extractor.extract(it, a.title) }.getOrNull() }
+                val usable = c != null && !c.partial && c.text.length >= 600
+                if (!wantBody || usable) return@async c
+                val other = runCatching { extractor.fromOtherOutlets(a.title, url, country()) }.getOrNull()
+                android.util.Log.i("EditroveBriefing", "story ${i + 1}: ${if (other != null) "from ${other.viaName}" else "no other outlet"} (publisher ${c?.text?.length ?: 0}ch partial=${c?.partial})")
+                other ?: c
+            }
+        }
+    }
+
+    /** While the narrator reads one story, the next ones are fetched — one at a time, in order. */
+    private fun startPipeline() {
+        pipeline?.cancel()
+        val s = stories
+        pipeline = scope.launch {
+            for (i in s.indices) {
+                if (s !== stories) return@launch
+                runCatching { fetch(i)?.await() }
+            }
+        }
     }
 
     private fun advance() {
@@ -348,37 +413,105 @@ class BriefingPlayer(
 
     private fun run() {
         if (!playing) return
-        val seg = segs.getOrNull(pos) ?: run { finish(); return }
+        val seg = segs.getOrNull(pos) ?: run { playOutOutro(); return }
         val s = session
         when (seg) {
-            is Seg.Speech -> { val from = resumeLine; resumeLine = 0; speak(seg.text, s, from) }
+            is Seg.Speech -> {
+                // The sign-off: the outro music fades in beneath it.
+                if (pos == segs.lastIndex && segStory.getOrNull(pos) == stories.size) startOutroBed()
+                val from = resumeLine; resumeLine = 0; speak(seg.text, s, from)
+            }
             Seg.Sting -> playSting(s)
             is Seg.Story -> {
-                prefetch(seg.index + 1); prefetch(seg.index + 2)
                 stepJob = scope.launch {
                     val a = stories[seg.index]
-                    val c = content[seg.index]?.let { kotlinx.coroutines.withTimeoutOrNull(STORY_WAIT_MS) { it.await() } }
+                    val c = fetch(seg.index)?.let { kotlinx.coroutines.withTimeoutOrNull(STORY_WAIT_MS) { it.await() } }
                     if (s != session) return@launch
+                    val other = c?.via == news.openwire.data.remote.TextSource.OTHER_OUTLETS
+                    val story = scriptStory(seg.index, c).copy(
+                        // Read from another outlet: credit that outlet, and read its text, not the original's deck.
+                        source = if (other) c?.viaName ?: a.source else a.source,
+                        body = c?.takeIf { !it.partial }?.text?.replace("\n\n", " "),
+                        subtitle = if (other) null else c?.description,
+                        // Same key points as the Summary box in the reader.
+                        keyPoints = if (detail == news.openwire.domain.model.BriefingDetail.SUMMARIES) {
+                            c?.let { it.combinedPoints.ifEmpty { news.openwire.domain.engine.Summarizer.keyPoints(it.text, 3) } }.orEmpty()
+                        } else emptyList(),
+                    )
                     val lines = news.openwire.domain.engine.BriefingScript.story(
-                        seg.index, stories.size,
-                        news.openwire.domain.engine.BriefingScript.Story(
-                            title = a.title,
-                            source = a.source,
-                            summary = a.summary,
-                            body = c?.takeIf { !it.partial }?.text?.replace("\n\n", " "),
-                            subtitle = c?.description,
-                            // Same key points as the Summary box in the reader.
-                            keyPoints = if (detail == news.openwire.domain.model.BriefingDetail.SUMMARIES) {
-                                c?.let { news.openwire.domain.engine.Summarizer.keyPoints(it.text, 3) }.orEmpty()
-                            } else emptyList(),
-                        ),
-                        detail,
-                        lang,
+                        seg.index, stories.size, story, detail, lang, presenter,
+                        previous = if (seg.index > 0) scriptStory(seg.index - 1, null) else null,
+                        seed = seed,
                     )
                     segs[pos] = Seg.Speech(lines.joinToString(SENTENCE_BREAK))
                     run()
                 }
             }
+        }
+    }
+
+    /** What the presenter knows about story [i]: its place in the edition, labels, related and merged coverage. */
+    private fun scriptStory(i: Int, c: news.openwire.data.remote.ArticleContent?): news.openwire.domain.engine.BriefingScript.Story {
+        val a = stories[i]
+        val m = meta[a.originalUrl ?: a.id]
+        return news.openwire.domain.engine.BriefingScript.Story(
+            title = a.title, source = a.source, summary = a.summary,
+            scope = m?.first, category = m?.second,
+            breaking = breakingFlags.getOrElse(i) { false }, developing = developingFlags.getOrElse(i) { false },
+            relatedToPrevious = plan.getOrNull(i)?.relatedToPrevious == true,
+            alsoReportedBy = plan.getOrNull(i)?.alsoReportedBy.orEmpty(),
+        )
+    }
+
+    /**
+     * Outro, mastered like a broadcast close: the opening music comes back from its middle,
+     * fading in under the sign-off (an ease-in, kept below the voice), swells to full level a
+     * breath after the last word, and plays out to the end of the clip.
+     */
+    private fun startOutroBed() {
+        if (outro != null) return
+        val res = CUES.getOrNull(prefs().openingCue - 1) ?: return
+        val mp = android.media.MediaPlayer.create(app, res) ?: return
+        val start = minOf(mp.duration / 2, (mp.duration - OUTRO_MIN_TAIL_MS).coerceAtLeast(0))
+        mp.seekTo(start)
+        android.util.Log.i("EditroveBriefing", "outro bed from ${start / 1000}s of ${mp.duration / 1000}s")
+        mp.setVolume(0f, 0f)
+        outroLevel = 0f
+        mp.start()
+        outro = mp
+        // The opening music, if it is somehow still under the voice, makes way.
+        cue?.let { c -> cueJob?.cancel(); cueJob = scope.launch { ramp(c, CUE_UNDER_VOICE, 0f, 800); c.release(); if (cue === c) cue = null } }
+        outroJob?.cancel()
+        outroJob = scope.launch { rampCurve(mp, 0f, OUTRO_UNDER_VOICE, OUTRO_FADE_IN_MS, easeIn = true) }
+    }
+
+    /** After the sign-off: the music rises and plays out, then the briefing closes. */
+    private fun playOutOutro() {
+        val mp = outro ?: return finish()
+        val s = session
+        outroJob?.cancel()
+        android.util.Log.i("EditroveBriefing", "outro play-out at level $outroLevel")
+        outroJob = scope.launch {
+            kotlinx.coroutines.delay(OUTRO_BREATH_MS)
+            rampCurve(mp, outroLevel, 1f, OUTRO_SWELL_MS, easeIn = false)
+            val left = runCatching { mp.duration - mp.currentPosition }.getOrDefault(0)
+            kotlinx.coroutines.delay((left - OUTRO_TAIL_FADE_MS).coerceAtLeast(0).toLong())
+            if (s != session) return@launch
+            rampCurve(mp, 1f, 0f, minOf(OUTRO_TAIL_FADE_MS, left.coerceAtLeast(0)).toLong().coerceAtLeast(200), easeIn = false)
+            if (s == session) finish()
+        }
+    }
+
+    /** A volume move along a curve (ease-in for fades in under speech, ease-out for swells and fades). */
+    private suspend fun rampCurve(player: android.media.MediaPlayer, from: Float, to: Float, ms: Long, easeIn: Boolean) {
+        val steps = (ms / 30).coerceAtLeast(1)
+        for (i in 1..steps) {
+            val t = i.toFloat() / steps
+            val k = if (easeIn) t * t else 1f - (1f - t) * (1f - t)
+            val v = from + (to - from) * k
+            outroLevel = v
+            runCatching { player.setVolume(v, v) }
+            kotlinx.coroutines.delay(30)
         }
     }
 
@@ -583,7 +716,15 @@ class BriefingPlayer(
         private const val STING_VOLUME = 0.8f
         private const val STING_UNDER_VOICE = 0.25f
         private const val STING_LEAD_MS = 1600L
-        private const val STORY_WAIT_MS = 7000L
+        /** How long a story may take to arrive (it was usually fetched while the one before was read). */
+        private const val STORY_WAIT_MS = 12_000L
+        /** Outro: level under the sign-off, fade in, the breath after the last word, the swell, the tail. */
+        private const val OUTRO_UNDER_VOICE = 0.18f
+        private const val OUTRO_FADE_IN_MS = 3_000L
+        private const val OUTRO_BREATH_MS = 400L
+        private const val OUTRO_SWELL_MS = 1_800L
+        private const val OUTRO_TAIL_FADE_MS = 1_500
+        private const val OUTRO_MIN_TAIL_MS = 12_000
         private const val RESTART_WINDOW_MS = 4000L
     }
 }

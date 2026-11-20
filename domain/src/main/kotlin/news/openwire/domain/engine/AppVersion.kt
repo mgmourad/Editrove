@@ -12,8 +12,9 @@ data class AppVersion(val parts: List<Int>, val pre: List<String> = emptyList())
             if (c != 0) return c
         }
         if (pre.isEmpty() || other.pre.isEmpty()) return other.pre.size.coerceAtMost(1) - pre.size.coerceAtMost(1)
-        for (i in 0 until minOf(pre.size, other.pre.size)) {
-            val a = pre[i]; val b = other.pre[i]
+        val mine = sortKey(pre); val theirs = sortKey(other.pre)
+        for (i in 0 until minOf(mine.size, theirs.size)) {
+            val a = mine[i]; val b = theirs[i]
             val an = a.toIntOrNull(); val bn = b.toIntOrNull()
             val c = when {
                 an != null && bn != null -> an.compareTo(bn)
@@ -24,6 +25,14 @@ data class AppVersion(val parts: List<Int>, val pre: List<String> = emptyList())
             if (c != 0) return c
         }
         return pre.size.compareTo(other.pre.size)
+    }
+
+    /** A dated build ("build.112026", MMddYY) compares by its date: YYMMdd. */
+    private fun sortKey(p: List<String>): List<String> {
+        val d = p.getOrNull(1)
+        return if (p.size == 2 && p[0] == "build" && d != null && d.length == 6 && d.all(Char::isDigit)) {
+            listOf("build", d.substring(4, 6) + d.substring(0, 2) + d.substring(2, 4))
+        } else p
     }
 
     val isPrerelease: Boolean get() = pre.isNotEmpty()

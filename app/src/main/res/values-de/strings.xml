@@ -564,4 +564,19 @@
     <string name="reader_other_none">Noch kein anderes Medium hat diese Meldung.</string>
     <string name="reader_points_outlets">Kernpunkte · aus %1$d Medien</string>
     <string name="reader_outlets">Berichtet von</string>
+    <string name="reader_others_pill">Andere Medien</string>
+    <string name="reader_others_back">Zurück zu %1$s</string>
+    <string name="reader_others_header">Gleiche Meldung · %1$d Medien</string>
+    <string name="reader_others_open">Den ganzen Bericht bei %1$s lesen</string>
+    <string name="reader_others_next">Weiter: %1$s</string>
+    <string name="presenter">Moderation</string>
+    <string name="presenter_anchor">Klassischer Sprecher</string>
+    <string name="presenter_modern">Moderne Moderation</string>
+    <string name="presenter_correspondent">Korrespondent</string>
+    <string name="presenter_conversational">Freundlicher Gastgeber</string>
+    <string name="presenter_anchor_hint">Wie in den Nachrichten: Begrüßung, Datum und ruhige Übergänge zwischen den Meldungen.</string>
+    <string name="presenter_modern_hint">Wie digitale Nachrichten: zügig, aktuell, direkt zum Geschehen.</string>
+    <string name="presenter_correspondent_hint">Knapp und sachlich: so wenige Worte wie möglich zwischen Ihnen und der Nachricht.</string>
+    <string name="presenter_conversational_hint">Spricht Sie direkt an, warm und entspannt, mit freundlicher Verabschiedung.</string>
+    <string name="presenter_sample_topic">Top-Meldungen</string>
 </resources>

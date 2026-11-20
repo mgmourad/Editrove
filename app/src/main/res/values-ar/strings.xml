@@ -564,4 +564,19 @@
     <string name="reader_other_none">لا توجد وسيلة أخرى نشرت هذا الخبر بعد.</string>
     <string name="reader_points_outlets">النقاط الرئيسية · من %1$d وسائل</string>
     <string name="reader_outlets">نشرته</string>
+    <string name="reader_others_pill">وسائل أخرى</string>
+    <string name="reader_others_back">العودة إلى %1$s</string>
+    <string name="reader_others_header">الخبر نفسه · %1$d وسائل</string>
+    <string name="reader_others_open">اقرأ التقرير كاملاً على %1$s</string>
+    <string name="reader_others_next">التالي: %1$s</string>
+    <string name="presenter">المذيع</string>
+    <string name="presenter_anchor">مذيع تقليدي</string>
+    <string name="presenter_modern">مقدّم عصري</string>
+    <string name="presenter_correspondent">مراسل</string>
+    <string name="presenter_conversational">مضيف ودود</string>
+    <string name="presenter_anchor_hint">مذيع نشرة: يحيّيك ويذكر التاريخ وينتقل بين الأخبار بهدوء.</string>
+    <string name="presenter_modern_hint">مقدّم أخبار رقمية: سريع ومواكب ويدخل مباشرة إلى ما يحدث.</string>
+    <string name="presenter_correspondent_hint">موجز ومباشر: أقل الكلمات بينك وبين الخبر.</string>
+    <string name="presenter_conversational_hint">يخاطبك مباشرة بأسلوب دافئ وهادئ، ويودّعك بلطف.</string>
+    <string name="presenter_sample_topic">أهم الأخبار</string>
 </resources>

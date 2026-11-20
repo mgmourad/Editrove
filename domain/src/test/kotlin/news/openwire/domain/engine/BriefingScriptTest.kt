@@ -3,6 +3,7 @@ package news.openwire.domain.engine
 
 import java.time.LocalDateTime
 import news.openwire.domain.model.BriefingDetail
+import news.openwire.domain.model.Presenter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -11,9 +12,48 @@ import org.junit.Test
 class BriefingScriptTest {
     private val story = BriefingScript.Story("Council approves transit plan", "Reuters", summary = "The plan adds three light rail lines by 2030 and is funded by a regional sales tax.", body = "x".repeat(10))
 
-    @Test fun introIsDatedAndCountsStories() {
-        val s = BriefingScript.intro("Top Stories", 8, BriefingDetail.HEADLINES, LocalDateTime.of(2026, 11, 15, 8, 0))
-        assertEquals("Good morning. It's Sunday, November 15, and this is your Top Stories briefing from Editrove. Here are the top 8 headlines.", s)
+    @Test fun anchorIntroIsDatedTimeAwareAndCountsStories() {
+        val s = BriefingScript.intro("Top Stories", 8, BriefingDetail.HEADLINES, LocalDateTime.of(2026, 11, 16, 8, 0))
+        assertEquals("Good morning. Here's what you need to know as the day begins. It's Monday, November 16, and this is your Top Stories briefing from Editrove, with the top 8 headlines.", s)
+        // Every other time, a classic open instead of the time of day.
+        assertTrue(BriefingScript.intro("Top Stories", 8, BriefingDetail.HEADLINES, LocalDateTime.of(2026, 11, 16, 8, 0), seed = 1).startsWith("Good morning. Here are the latest headlines."))
+    }
+
+    @Test fun introsFitPresenterLengthAndWeekend() {
+        val mon = LocalDateTime.of(2026, 11, 16, 13, 0)
+        assertEquals("Here are today's top headlines. Your Top Stories briefing: a quick look at the top 3 headlines.",
+            BriefingScript.intro("Top Stories", 3, BriefingDetail.HEADLINES, mon, presenter = Presenter.CORRESPONDENT))
+        assertTrue(BriefingScript.intro("Top Stories", 8, BriefingDetail.SUMMARIES, mon, presenter = Presenter.MODERN).startsWith("Here's what's happening right now."))
+        val sat = LocalDateTime.of(2026, 11, 21, 10, 0)
+        assertTrue(BriefingScript.intro("Top Stories", 8, BriefingDetail.HEADLINES, sat, presenter = Presenter.CONVERSATIONAL).contains("weekend news update"))
+        assertEquals(BriefingScript.Slot.NIGHT, BriefingScript.slot(LocalDateTime.of(2026, 11, 16, 23, 30)))
+    }
+
+    @Test fun handOffsFollowWhatIsTrueOfTheStory() {
+        val local = story.copy(scope = BriefingScript.Scope.LOCAL)
+        val world = story.copy(scope = BriefingScript.Scope.INTERNATIONAL)
+        assertEquals("We begin with breaking news.", BriefingScript.lead(0, 5, BriefingDetail.HEADLINES, story = story.copy(breaking = true)))
+        assertTrue(BriefingScript.lead(2, 5, BriefingDetail.HEADLINES, story = story.copy(relatedToPrevious = true), previous = story) in
+            listOf("In a related development.", "On a related note.", "Staying with that story.", "Also on this subject."))
+        assertTrue(BriefingScript.lead(2, 5, BriefingDetail.HEADLINES, story = world, previous = local) in
+            listOf("Turning now to developments overseas.", "On the international front.", "Elsewhere around the world.", "Now to developments around the world."))
+        assertEquals("In business news.", BriefingScript.lead(2, 5, BriefingDetail.HEADLINES, story = story.copy(category = BriefingScript.Category.BUSINESS), previous = story.copy(category = BriefingScript.Category.SPORTS)))
+        // Same scope, same section: a neutral hand-off, never a "related" claim.
+        assertTrue(BriefingScript.lead(2, 5, BriefingDetail.HEADLINES, story = local, previous = local) !in listOf("In a related development.", "On a related note."))
+    }
+
+    @Test fun mergedCoverageIsNamedNotReread() {
+        val lines = BriefingScript.story(1, 5, story.copy(alsoReportedBy = listOf("AP", "BBC News", "CNN")), BriefingDetail.HEADLINES)
+        assertEquals("The story is also being covered by AP and BBC News.", lines.last())
+    }
+
+    @Test fun everyLanguageHasEveryPresenter() {
+        val now = LocalDateTime.of(2026, 11, 16, 20, 0)
+        for (lang in listOf("en", "ar", "fr", "es", "de")) for (p in Presenter.entries) {
+            assertTrue(BriefingScript.intro("X", 5, BriefingDetail.SUMMARIES, now, lang, p).isNotBlank())
+            assertTrue(BriefingScript.outro("X", lang, p, now, breaking = true).isNotBlank())
+            (0 until 5).forEach { i -> assertTrue(BriefingScript.story(i, 5, story.copy(scope = BriefingScript.Scope.values()[i % 3]), BriefingDetail.HEADLINES, lang, p, story).isNotEmpty()) }
+        }
     }
 
     @Test fun handOffsVaryAndEndWithFinally() {

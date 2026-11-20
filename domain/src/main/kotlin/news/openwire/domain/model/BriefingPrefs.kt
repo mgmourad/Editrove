@@ -21,6 +21,8 @@ data class BriefingPrefs(
     val slots: List<BriefingSlot> = BriefingSlot.DEFAULTS,
     /** Speech engine package to read with; null = automatic (Google's, else Editrove's voice, else the phone's). */
     val engine: String? = null,
+    /** How the narrator presents the briefing (its words, not its voice). */
+    val presenter: Presenter = Presenter.ANCHOR,
 ) {
     companion object {
         val SPEEDS = listOf(0.8f, 0.9f, 1.0f, 1.1f, 1.25f, 1.5f, 1.75f, 2.0f)
@@ -56,4 +58,16 @@ data class BriefingSlot(val kind: Kind, val enabled: Boolean, val minuteOfDay: I
             return DEFAULTS.map { d -> parsed.firstOrNull { it.kind == d.kind } ?: d }
         }
     }
+}
+
+/** The narrator's editorial style: which openings, hand-offs and sign-offs it uses. */
+enum class Presenter {
+    /** A traditional broadcast anchor: greeting, date, measured hand-offs. */
+    ANCHOR,
+    /** A contemporary digital-news presenter: brisk and current. */
+    MODERN,
+    /** A professional correspondent: concise and information-first. */
+    CORRESPONDENT,
+    /** A friendly host speaking directly to the listener. */
+    CONVERSATIONAL,
 }

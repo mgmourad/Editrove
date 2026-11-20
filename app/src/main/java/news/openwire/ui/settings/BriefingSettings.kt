@@ -57,6 +57,7 @@ import news.openwire.ui.home.BriefingPlayer
 import news.openwire.ui.home.GlassCard
 import news.openwire.ui.home.mono
 import news.openwire.ui.home.sans
+import news.openwire.ui.home.serif
 import news.openwire.ui.theme.Glass
 
 private val CUE_NAMES = listOf(
@@ -167,6 +168,28 @@ fun BriefingSettings(vm: SettingsViewModel, chip: @Composable (String, Boolean, 
                     },
                 )
             }
+        }
+
+        // Presenter: the briefing's editorial voice (its words, not the narrator's voice).
+        Section(tr(R.string.presenter)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                news.openwire.domain.model.Presenter.entries.forEach { pr -> chip(presenterName(pr), p.presenter == pr) { vm.setBriefing { it.copy(presenter = pr) } } }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(presenterHint(p.presenter), style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary)
+            // How it opens, right now, in Editrove's language.
+            val sample = remember(p.presenter, p.detail, p.count) {
+                news.openwire.domain.engine.BriefingScript.intro(
+                    tr(R.string.presenter_sample_topic), p.count, p.detail, java.time.LocalDateTime.now(),
+                    news.openwire.domain.engine.Languages.effective(null), p.presenter,
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "“$sample”", style = serif(14.sp, lineHeight = 21.sp).copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                color = g.textPrimary.copy(alpha = 0.85f),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(g.chipFill).padding(12.dp),
+            )
         }
 
         Section(tr(R.string.detail)) {
@@ -432,3 +455,19 @@ private fun GvButton(text: String, primary: Boolean, onClick: () -> Unit) {
             .clickable(onClick = onClick).padding(vertical = 11.dp, horizontal = 14.dp),
     )
 }
+
+@Composable
+private fun presenterName(p: news.openwire.domain.model.Presenter) = tr(when (p) {
+    news.openwire.domain.model.Presenter.ANCHOR -> R.string.presenter_anchor
+    news.openwire.domain.model.Presenter.MODERN -> R.string.presenter_modern
+    news.openwire.domain.model.Presenter.CORRESPONDENT -> R.string.presenter_correspondent
+    news.openwire.domain.model.Presenter.CONVERSATIONAL -> R.string.presenter_conversational
+})
+
+@Composable
+private fun presenterHint(p: news.openwire.domain.model.Presenter) = tr(when (p) {
+    news.openwire.domain.model.Presenter.ANCHOR -> R.string.presenter_anchor_hint
+    news.openwire.domain.model.Presenter.MODERN -> R.string.presenter_modern_hint
+    news.openwire.domain.model.Presenter.CORRESPONDENT -> R.string.presenter_correspondent_hint
+    news.openwire.domain.model.Presenter.CONVERSATIONAL -> R.string.presenter_conversational_hint
+})

@@ -48,8 +48,13 @@ open in a reader with the publisher's standfirst, a drop cap, a pull quote and a
 <td valign="top">
 
 ### 🎧 A briefing that sounds like the news
-Audio briefings play like a broadcast: an opening cue that sinks under the anchor, dated
-open, hand-offs and transition stings between stories, and a sign-off. Choose **Headlines**
+Audio briefings play like a broadcast: an opening cue that sinks under the presenter, an
+opening that fits the hour, the length and any breaking news, hand-offs that follow the
+stories (related ones told together, local, national and world news introduced as such,
+duplicate coverage named once), transition stings, and a sign-off as the outro music fades
+in and plays out. Pick the **presenter** (Traditional anchor, Modern presenter, Correspondent
+or Friendly host), in all five languages. Stories are fetched one ahead of the narrator, and
+one the publisher won't give is read from another outlet, credited by name. Choose **Headlines**
 (each headline and its subtitle), **Summaries** (plus the key points from the story's Summary
 box) or **Full articles**, the number of stories, the voice and the speed, and schedule a **Morning, Afternoon and Evening briefing** that plays at the tap of a notification. A **floating
 mini-player** follows you down the page.
@@ -129,7 +134,7 @@ and notifications all live on your device. Updates arrive straight from GitHub R
 | **Topics** | Top Stories, Latest, AI, your country, your city, Business, Tech, International, Science, Entertainment, Sports, Politics, Finance, Lifestyle, plus your own keyword and source topics |
 | **Sources** | 117 feeds, including the Washington Post, NBC, CBS, BBC, NPR, Axios, The Economist, The Atlantic, Bloomberg, WSJ, ESPN, MIT Technology Review, NASA and more. Each gets a fair share; 2 stories from one outlet in a row at most |
 | **Paywall engine** | Per-publisher strategies with an editable rules list; archive checks with grey-out; a reader-service health check and fallback chain |
-| **Reading** | In-app reader with adjustable text size (A− / A+, also in Appearance), on-device summary, narration, pull quotes and drop caps; the story's own photos and videos where the publisher placed them (tap a photo for full screen, videos play in place, YouTube and Vimeo open in their app); text from the publisher, then Wayback, then archive.today, with privacy notices and the next story on endless-scroll pages left out. A loading bar shows progress; after 12 seconds you can retry, or read the same story as other newsrooms reported it (credited, with key points drawn from all of them) |
+| **Reading** | In-app reader with adjustable text size (A− / A+, also in Appearance), on-device summary, narration, pull quotes and drop caps; the story's own photos and videos where the publisher placed them (tap a photo for full screen, videos play in place, YouTube and Vimeo open in their app); text from the publisher, then Wayback, then archive.today, with privacy notices and the next story on endless-scroll pages left out. A loading bar shows progress; after 12 seconds you can retry. **Other outlets** on every article (fetched only when tapped) shows the same story from other newsrooms, one swipeable tab per outlet with its logo, the most detailed first, each with its own photos, key points and a link to the source |
 | **Widgets** | **The Editrove Daily Brief**: the app's Audio Briefing card on your home screen, in the app's own fonts, with play/pause, ±15 s, previous/next story, speed and a live waveform. **Top Stories** and **Topic of Choice** (the one topic you pick, with a refresh button) show photos, sections and bookmarks. They resize from 2×2 to an unfolded 6×3 |
 | **Open anything** | Share a link from any app, select a URL and pick *Open in Editrove*, or paste one. It's routed and opened in the reader |
 | **Smart curation** | An on-device editorial ranker: where editors placed a story, how many outlets cover it, freshness, source authority and section fit (hard news leads the front page), then de-duplicated and diversified. "Also covered by" shows who else is running a story, and an optional, local-only tuning favours outlets you save and like. Applies to every topic, Discover and the audio briefing |

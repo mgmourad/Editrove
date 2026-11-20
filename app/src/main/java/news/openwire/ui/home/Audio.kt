@@ -81,6 +81,9 @@ class BriefingPlayer(
         private set
     var ready by mutableStateOf(false)
         private set
+    /** Preparing: the voice is starting up, or the next story's text is still on its way. */
+    var loading by mutableStateOf(false)
+        private set
     /** e.g. "Story 3 of 8". */
     var progress by mutableStateOf("")
         private set
@@ -247,6 +250,7 @@ class BriefingPlayer(
         pos = 0
         narrationStarted = false
         startPipeline()
+        loading = true
         audio?.requestAudioFocus(focus)
         playing = true
         session++
@@ -357,6 +361,7 @@ class BriefingPlayer(
     }
 
     private fun stopAudio() {
+        loading = false
         session++
         tts.stop()
         stepJob?.cancel(); cueJob?.cancel(); stingJob?.cancel()
@@ -425,7 +430,9 @@ class BriefingPlayer(
             is Seg.Story -> {
                 stepJob = scope.launch {
                     val a = stories[seg.index]
-                    val c = fetch(seg.index)?.let { kotlinx.coroutines.withTimeoutOrNull(STORY_WAIT_MS) { it.await() } }
+                    val pending = fetch(seg.index)
+                    if (pending?.isCompleted == false) loading = true
+                    val c = pending?.let { kotlinx.coroutines.withTimeoutOrNull(STORY_WAIT_MS) { it.await() } }
                     if (s != session) return@launch
                     val other = c?.via == news.openwire.data.remote.TextSource.OTHER_OUTLETS
                     val story = scriptStory(seg.index, c).copy(
@@ -644,6 +651,7 @@ class BriefingPlayer(
     }
 
     private fun onSpeechStarted() {
+        loading = false
         if (!narrationStarted) {
             narrationStarted = true
             // Duck the opening cue under the anchor, then let it fade away.

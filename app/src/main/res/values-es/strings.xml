@@ -564,7 +564,7 @@
     <string name="reader_other_none">Ningún otro medio tiene esta noticia todavía.</string>
     <string name="reader_points_outlets">Puntos clave · de %1$d medios</string>
     <string name="reader_outlets">Publicada por</string>
-    <string name="reader_others_pill">Otros medios</string>
+    <string name="reader_others_pill">Leer en otros medios</string>
     <string name="reader_others_back">Volver a %1$s</string>
     <string name="reader_others_header">Misma noticia · %1$d medios</string>
     <string name="reader_others_open">Leer la nota completa en %1$s</string>

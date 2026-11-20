@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.animateColorAsState
@@ -338,8 +339,6 @@ internal fun ArticleBody(
                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = g.indigo, modifier = Modifier.size(12.dp))
             }
         }
-            // Optional: the same story as other newsrooms reported it (nothing is fetched until tapped).
-            OtherOutletsPill(showing = useOthers, original = article.source ?: article.domain ?: "") { if (useOthers) useOthers = false else openOthers() }
         }
 
         // Editorial serif headline
@@ -358,8 +357,9 @@ internal fun ArticleBody(
             Spacer(Modifier.height(20.dp))
         }
 
-        // Byline
-        Row(Modifier.fillMaxWidth().padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Byline (on a narrow screen, the other-outlets pill sits just under the source instead).
+        val narrowByline = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 520
+        Row(Modifier.fillMaxWidth().padding(bottom = if (narrowByline) 10.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(36.dp).clip(CircleShape)
                     .background(Brush.linearGradient(listOf(Indigo, g.accent)))
@@ -377,6 +377,11 @@ internal fun ArticleBody(
                     style = sans(11.sp), color = g.textPrimary.copy(alpha = 0.6f), maxLines = 1,
                 )
             }
+            // Optional: the same story as other newsrooms reported it (nothing is fetched until tapped).
+            if (!narrowByline) {
+                OtherOutletsPill(showing = useOthers, original = article.source ?: article.domain ?: "") { if (useOthers) useOthers = false else openOthers() }
+                Spacer(Modifier.width(8.dp))
+            }
             Box(
                 Modifier.clip(CircleShape).background(g.chipFill.copy(alpha = g.chipFill.alpha / 2))
                     .border(1.dp, g.hairline, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
@@ -385,6 +390,12 @@ internal fun ArticleBody(
                     content?.let { tr(R.string.reader_minutes, it.readMinutes) } ?: tr(R.string.reader_minutes_unknown),
                     style = mono(11.sp, tracking = 0.sp), color = g.textPrimary.copy(alpha = 0.6f),
                 )
+            }
+        }
+
+        if (narrowByline) {
+            Box(Modifier.padding(start = 48.dp, bottom = 18.dp)) {
+                OtherOutletsPill(showing = useOthers, original = article.source ?: article.domain ?: "") { if (useOthers) useOthers = false else openOthers() }
             }
         }
 
@@ -563,20 +574,27 @@ private const val SLOW_ARTICLE_MS = 12_000L
 @Composable
 private fun LoadingBar(label: String) {
     val g = Glass
+    Column(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+        SweepBar()
+        Text(label, style = mono(10.sp, tracking = 0.06.em), color = g.textSecondary, modifier = Modifier.padding(top = 8.dp))
+    }
+}
+
+/** An indeterminate progress bar: an accent highlight sweeping along a hairline track. */
+@Composable
+internal fun SweepBar(modifier: Modifier = Modifier) {
+    val g = Glass
     val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "load")
     val x by t.animateFloat(
         -0.4f, 1f,
         androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1300, easing = androidx.compose.animation.core.FastOutSlowInEasing)),
         label = "sweep",
     )
-    Column(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(g.hairline)) {
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(g.hairline)) {
             Box(
                 Modifier.fillMaxHeight().width(maxWidth * 0.4f).offset(x = maxWidth * x).clip(CircleShape)
                     .background(Brush.horizontalGradient(listOf(g.accent.copy(alpha = 0f), g.accent, g.accentSoft))),
             )
-        }
-        Text(label, style = mono(10.sp, tracking = 0.06.em), color = g.textSecondary, modifier = Modifier.padding(top = 8.dp))
     }
 }
 
@@ -777,30 +795,34 @@ internal sealed interface OthersState {
     data class Ready(val reports: List<news.openwire.data.remote.ArticleContent>) : OthersState
 }
 
-/** "Other outlets" under the reader's top bar; while they're shown, the way back to the original. */
+/**
+ * "Read from other outlets", beside the source: gold on gold (like the red section pill) so it
+ * stands out; while other outlets are shown it becomes the way back to the original.
+ */
 @Composable
 private fun OtherOutletsPill(showing: Boolean, original: String, onClick: () -> Unit) {
     val g = Glass
+    val gold = if (g.deviceBg.luminance() < 0.5f) GOLD_ON_DARK else GOLD_ON_LIGHT
     Row(
         Modifier.clip(CircleShape)
-            .background(if (showing) g.accent.copy(alpha = 0.16f) else g.chipFill)
-            .border(1.dp, if (showing) g.accent.copy(alpha = 0.4f) else g.hairline, CircleShape)
-            .clickable(onClickLabel = tr(if (showing) R.string.reader_others_back else R.string.reader_others_pill, original), onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 5.dp),
+            .background(gold.copy(alpha = if (showing) 0.24f else 0.15f))
+            .border(1.dp, gold.copy(alpha = 0.40f), CircleShape)
+            .clickable(onClickLabel = if (showing) tr(R.string.reader_others_back, original) else tr(R.string.reader_others_pill), onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            if (showing) Icons.AutoMirrored.Filled.ArrowBack else Icons.Outlined.Newspaper, null,
-            tint = if (showing) g.accentSoft else g.textSecondary, modifier = Modifier.size(13.dp),
-        )
+        Icon(if (showing) Icons.AutoMirrored.Filled.ArrowBack else Icons.Outlined.Newspaper, null, tint = gold, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(6.dp))
         Text(
             if (showing) tr(R.string.reader_others_back, original) else tr(R.string.reader_others_pill),
-            style = mono(10.sp, FontWeight.SemiBold, 0.06.em), color = if (showing) g.accentSoft else g.textPrimary,
+            style = mono(10.sp, FontWeight.SemiBold, 0.08.em), color = gold,
             maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
     }
 }
+
+private val GOLD_ON_DARK = Color(0xFFF5C451)
+private val GOLD_ON_LIGHT = Color(0xFF9A6A00)
 
 /**
  * The same story from other newsrooms, one tab per outlet (logo and name), the most detailed

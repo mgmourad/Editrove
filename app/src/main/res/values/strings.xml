@@ -566,7 +566,7 @@
     <string name="reader_other_none">No other outlet has this story yet.</string>
     <string name="reader_points_outlets">Key points · from %1$d outlets</string>
     <string name="reader_outlets">Reported by</string>
-    <string name="reader_others_pill">Other outlets</string>
+    <string name="reader_others_pill">Read from other outlets</string>
     <string name="reader_others_back">Back to %1$s</string>
     <string name="reader_others_header">Same story · %1$d outlets</string>
     <string name="reader_others_open">Read the full report at %1$s</string>

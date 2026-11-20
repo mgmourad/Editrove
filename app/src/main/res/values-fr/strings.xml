@@ -564,7 +564,7 @@
     <string name="reader_other_none">Aucun autre média n’a encore cette info.</string>
     <string name="reader_points_outlets">Points clés · %1$d médias</string>
     <string name="reader_outlets">Publié par</string>
-    <string name="reader_others_pill">Autres médias</string>
+    <string name="reader_others_pill">Lire dans d’autres médias</string>
     <string name="reader_others_back">Retour à %1$s</string>
     <string name="reader_others_header">Même sujet · %1$d médias</string>
     <string name="reader_others_open">Lire l’article complet sur %1$s</string>

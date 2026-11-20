@@ -1,5 +1,5 @@
 Editrove 0.9 (build 112026) — Every story from every side, and a briefing that sounds like the news
-• Other outlets on every article: tap it to read the same story from other newsrooms, one tab per outlet with its logo, the most detailed first, each with its photos and key points.
+• Read from other outlets, beside the source on every article: tap it to read the same story from other newsrooms, one tab per outlet with its logo, the most detailed first, each with its photos and key points.
 • Audio briefings read ahead: while one story plays, the next is fetched; a story the publisher won't give is read from another outlet, credited by name.
 • Choose your presenter: Traditional anchor, Modern presenter, Correspondent or Friendly host, in all five languages.
 • Openings that fit the hour, the length and breaking news; related stories told together, duplicate coverage named once; hand-offs between local, national and world news.

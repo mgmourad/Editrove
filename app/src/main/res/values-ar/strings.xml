@@ -564,7 +564,7 @@
     <string name="reader_other_none">لا توجد وسيلة أخرى نشرت هذا الخبر بعد.</string>
     <string name="reader_points_outlets">النقاط الرئيسية · من %1$d وسائل</string>
     <string name="reader_outlets">نشرته</string>
-    <string name="reader_others_pill">وسائل أخرى</string>
+    <string name="reader_others_pill">اقرأ من وسائل أخرى</string>
     <string name="reader_others_back">العودة إلى %1$s</string>
     <string name="reader_others_header">الخبر نفسه · %1$d وسائل</string>
     <string name="reader_others_open">اقرأ التقرير كاملاً على %1$s</string>

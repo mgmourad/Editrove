@@ -564,7 +564,7 @@
     <string name="reader_other_none">Noch kein anderes Medium hat diese Meldung.</string>
     <string name="reader_points_outlets">Kernpunkte · aus %1$d Medien</string>
     <string name="reader_outlets">Berichtet von</string>
-    <string name="reader_others_pill">Andere Medien</string>
+    <string name="reader_others_pill">Bei anderen Medien lesen</string>
     <string name="reader_others_back">Zurück zu %1$s</string>
     <string name="reader_others_header">Gleiche Meldung · %1$d Medien</string>
     <string name="reader_others_open">Den ganzen Bericht bei %1$s lesen</string>

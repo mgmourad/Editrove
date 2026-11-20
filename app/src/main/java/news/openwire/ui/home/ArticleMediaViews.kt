@@ -73,14 +73,19 @@ internal fun StoryMedia(m: ArticleMedia) {
 
 @Composable
 private fun StoryPhoto(m: ArticleMedia, onError: () -> Unit) {
-    ZoomablePhoto(m.url, m.caption, Modifier.fillMaxWidth().heightIn(max = 560.dp).clip(MediaShape).border(1.dp, Glass.hairline, MediaShape), ContentScale.FillWidth, onError)
+    ZoomablePhoto(m.url, m.caption, Modifier.fillMaxWidth().heightIn(max = 560.dp).clip(MediaShape).border(1.dp, Glass.hairline, MediaShape), ContentScale.FillWidth, onError, minWidthPx = 480)
 }
 
 /** A photo that opens full screen when tapped. */
 @Composable
-internal fun ZoomablePhoto(url: String, description: String?, modifier: Modifier, scale: ContentScale = ContentScale.Crop, onError: () -> Unit = {}) {
+internal fun ZoomablePhoto(url: String, description: String?, modifier: Modifier, scale: ContentScale = ContentScale.Crop, onError: () -> Unit = {}, minWidthPx: Int = 0) {
     var zoomed by remember { mutableStateOf(false) }
-    AsyncImage(model = url, contentDescription = description, contentScale = scale, onError = { onError() }, modifier = modifier.clickable { zoomed = true })
+    AsyncImage(
+        model = url, contentDescription = description, contentScale = scale, onError = { onError() },
+        // Once loaded, a picture smaller than [minWidthPx] (an icon, a thumbnail) is dropped.
+        onSuccess = { st -> val w = st.painter.intrinsicSize.width; if (minWidthPx > 0 && w.isFinite() && w < minWidthPx) onError() },
+        modifier = modifier.clickable { zoomed = true },
+    )
     if (zoomed) {
         Dialog(onDismissRequest = { zoomed = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Box(Modifier.fillMaxSize().background(Color.Black).clickable { zoomed = false }, contentAlignment = Alignment.Center) {

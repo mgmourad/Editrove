@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -246,10 +247,25 @@ internal fun ArticleBody(
 ) {
     val g = Glass
     val url = article.originalUrl ?: article.targetUrl ?: ""
-    val state by produceState<BodyState>(BodyState.Loading, article.id) {
-        value = if (url.isEmpty()) BodyState.Failed
-        else actions.extractor.extract(url)?.let { BodyState.Loaded(it) } ?: BodyState.Failed
+    // Retry starts the article over; "other outlets" reads the same story from other newsrooms.
+    var attempt by remember(article.id) { androidx.compose.runtime.mutableIntStateOf(0) }
+    var useOthers by remember(article.id) { mutableStateOf(false) }
+    val appContext = LocalContext.current.applicationContext
+    // What the publisher gave (a teaser, say): kept on screen if no other outlet has the story.
+    var original by remember(article.id) { mutableStateOf<news.openwire.data.remote.ArticleContent?>(null) }
+    var noOthers by remember(article.id) { mutableStateOf(false) }
+    val state by produceState<BodyState>(BodyState.Loading, article.id, attempt, useOthers) {
+        value = BodyState.Loading
+        value = if (useOthers) {
+            val country = (appContext as? news.openwire.OpenWireApp)?.container?.settingsRepository?.settings?.value?.edition?.country ?: "US"
+            actions.extractor.fromOtherOutlets(article.title, url.ifEmpty { null }, country)?.let { BodyState.Loaded(it) }
+                ?: original?.let { noOthers = true; useOthers = false; BodyState.Loaded(it) } ?: BodyState.Failed
+        } else if (url.isEmpty()) BodyState.Failed
+        else actions.extractor.extract(url, article.title)?.also { original = it }?.let { BodyState.Loaded(it) } ?: BodyState.Failed
     }
+    // After a while, offer a way out (the article keeps loading meanwhile, and appears if it arrives).
+    var slow by remember(article.id, attempt, useOthers) { mutableStateOf(false) }
+    LaunchedEffect(article.id, attempt, useOthers) { kotlinx.coroutines.delay(SLOW_ARTICLE_MS); slow = true }
     // A photo the reader found is remembered, so the story's card shows it next time.
     val images = LocalImageResolver.current
     LaunchedEffect(state) { (state as? BodyState.Loaded)?.content?.imageUrl?.let { images?.remember(article.originalUrl, it) } }
@@ -357,12 +373,15 @@ internal fun ArticleBody(
         Spacer(Modifier.height(16.dp))
 
         // On-device summary: the article's own key sentences.
-        val keyPoints = remember(content) { content?.let { news.openwire.domain.engine.Summarizer.keyPoints(it.text, 3) }.orEmpty() }
+        val keyPoints = remember(content) { content?.let { c -> c.combinedPoints.ifEmpty { news.openwire.domain.engine.Summarizer.keyPoints(c.text, 3) } }.orEmpty() }
         androidx.compose.animation.AnimatedVisibility(keyPoints.isNotEmpty(), enter = androidx.compose.animation.expandVertically(springTween(420)) + androidx.compose.animation.fadeIn()) {
             GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), contentPadding = PaddingValues(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(tr(R.string.reader_summary), style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = g.accentSoft, modifier = Modifier.weight(1f))
-                    Text(tr(R.string.reader_key_points), style = sans(10.sp), color = g.textSecondary)
+                    Text(
+                        content?.otherOutlets?.takeIf { it.size > 1 }?.let { tr(R.string.reader_points_outlets, it.size) } ?: tr(R.string.reader_key_points),
+                        style = sans(10.sp), color = g.textSecondary,
+                    )
                 }
                 keyPoints.forEach { point ->
                     Row(Modifier.padding(top = 10.dp)) {
@@ -394,14 +413,24 @@ internal fun ArticleBody(
         }
 
         when (val s = state) {
-            BodyState.Loading -> BodySkeleton()
-            BodyState.Failed -> Text(
-                if (service != null) tr(R.string.reader_blocked_service, service.name)
-                else tr(R.string.reader_failed),
-                style = sans(14.sp, lineHeight = 22.sp),
-                color = g.textSecondary,
-            )
+            BodyState.Loading -> {
+                LoadingBar(tr(if (useOthers) R.string.reader_other_loading else R.string.reader_loading))
+                if (slow && !useOthers) SlowArticleCard(failed = false, onRetry = { attempt++ }, onOthers = { useOthers = true }, smryUrl = if (service == null) url else "")
+                else BodySkeleton()
+            }
+            BodyState.Failed -> {
+                if (useOthers) Text(tr(R.string.reader_other_none), style = sans(14.sp, lineHeight = 22.sp), color = g.textSecondary, modifier = Modifier.padding(bottom = 12.dp))
+                else Text(
+                    if (service != null) tr(R.string.reader_blocked_service, service.name) else tr(R.string.reader_failed),
+                    style = sans(14.sp, lineHeight = 22.sp), color = g.textSecondary, modifier = Modifier.padding(bottom = 12.dp),
+                )
+                SlowArticleCard(failed = true, onRetry = { useOthers = false; attempt++ }, onOthers = if (useOthers) null else ({ useOthers = true }), smryUrl = if (service == null) url else "")
+            }
             is BodyState.Loaded -> {
+                if (s.content.via == news.openwire.data.remote.TextSource.OTHER_OUTLETS) OtherOutletsBanner(article.source ?: article.domain ?: "", s.content)
+                if (noOthers && s.content.via != news.openwire.data.remote.TextSource.OTHER_OUTLETS) {
+                    Text(tr(R.string.reader_other_none), style = sans(13.sp, lineHeight = 20.sp), color = g.indigo, modifier = Modifier.padding(bottom = 16.dp))
+                }
                 s.content.pullQuote?.let { quote ->
                     Row(Modifier.fillMaxWidth().padding(bottom = 24.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
                         Box(Modifier.width(2.dp).fillMaxHeight().background(g.accent))
@@ -431,6 +460,8 @@ internal fun ArticleBody(
                         style = sans(13.sp, lineHeight = 20.sp), color = g.textSecondary,
                     )
                     Spacer(Modifier.height(12.dp))
+                    // Only a teaser: the whole story may be open at another newsroom.
+                    SlowArticleCard(failed = true, onRetry = { attempt++ }, onOthers = { useOthers = true }, smryUrl = if (service == null) url else "")
                 }
                 if (s.content.via != news.openwire.data.remote.TextSource.PUBLISHER) {
                     val viaUrl = s.content.viaUrl
@@ -504,6 +535,93 @@ private fun DropCapParagraph(text: String) {
         }
         if (split in 0 until text.length - 1) {
             Text(text.drop(1).substring(split).trimStart(), style = bodyStyle, color = g.textPrimary.copy(alpha = 0.9f))
+        }
+    }
+}
+
+/** How long an article loads before the reader is offered Retry or other outlets. */
+private const val SLOW_ARTICLE_MS = 12_000L
+
+/** A slim accent bar sweeping across while the article loads. */
+@Composable
+private fun LoadingBar(label: String) {
+    val g = Glass
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "load")
+    val x by t.animateFloat(
+        -0.4f, 1f,
+        androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1300, easing = androidx.compose.animation.core.FastOutSlowInEasing)),
+        label = "sweep",
+    )
+    Column(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(g.hairline)) {
+            Box(
+                Modifier.fillMaxHeight().width(maxWidth * 0.4f).offset(x = maxWidth * x).clip(CircleShape)
+                    .background(Brush.horizontalGradient(listOf(g.accent.copy(alpha = 0f), g.accent, g.accentSoft))),
+            )
+        }
+        Text(label, style = mono(10.sp, tracking = 0.06.em), color = g.textSecondary, modifier = Modifier.padding(top = 8.dp))
+    }
+}
+
+/** Offered when an article is slow or fails: try again, read other outlets, or smry.ai. */
+@Composable
+private fun SlowArticleCard(failed: Boolean, onRetry: () -> Unit, onOthers: (() -> Unit)?, smryUrl: String) {
+    val g = Glass
+    val context = LocalContext.current
+    GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), contentPadding = PaddingValues(18.dp)) {
+        if (!failed) {
+            Text(tr(R.string.reader_slow_t), style = serif(19.sp, FontWeight.Bold, lineHeight = 24.sp), color = g.textPrimary)
+            Spacer(Modifier.height(6.dp))
+            Text(tr(R.string.reader_slow_b), style = sans(13.sp, lineHeight = 20.sp), color = g.textSecondary)
+            Spacer(Modifier.height(14.dp))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Text(
+                tr(R.string.reader_retry), style = sans(13.sp, FontWeight.SemiBold), color = g.textPrimary, textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f).clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape).clickable(onClick = onRetry).padding(vertical = 11.dp),
+            )
+            onOthers?.let {
+                Text(
+                    tr(R.string.reader_other), style = sans(13.sp, FontWeight.SemiBold), color = Color.White, textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1.6f).clip(CircleShape).background(g.accent).clickable(onClick = it).padding(vertical = 11.dp),
+                )
+            }
+        }
+        if (smryUrl.isNotEmpty()) {
+            Text(
+                tr(R.string.reader_smry), style = mono(10.sp, FontWeight.SemiBold, 0.06.em), color = g.indigo,
+                modifier = Modifier.padding(top = 12.dp).clip(CircleShape).clickable {
+                    runCatching { androidx.browser.customtabs.CustomTabsIntent.Builder().build().launchUrl(context, android.net.Uri.parse("https://smry.ai/$smryUrl")) }
+                }.padding(vertical = 4.dp),
+            )
+        }
+    }
+}
+
+/** Credit when the text is another newsroom's report of the same story. */
+@Composable
+private fun OtherOutletsBanner(original: String, c: news.openwire.data.remote.ArticleContent) {
+    val g = Glass
+    val context = LocalContext.current
+    Column(
+        Modifier.fillMaxWidth().padding(bottom = 20.dp).clip(RoundedCornerShape(18.dp)).background(g.indigo.copy(alpha = 0.10f))
+            .border(1.dp, g.indigo.copy(alpha = 0.30f), RoundedCornerShape(18.dp)).padding(14.dp),
+    ) {
+        Text(tr(R.string.reader_other_banner, original, c.viaName ?: ""), style = sans(13.sp, lineHeight = 20.sp), color = g.textPrimary)
+        if (c.otherOutlets.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Text(tr(R.string.reader_outlets).uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.indigo)
+            Spacer(Modifier.height(6.dp))
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                c.otherOutlets.forEach { o ->
+                    Text(
+                        o.name, style = sans(12.sp, FontWeight.Medium), color = g.textPrimary,
+                        modifier = Modifier.clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape)
+                            .clickable { runCatching { androidx.browser.customtabs.CustomTabsIntent.Builder().build().launchUrl(context, android.net.Uri.parse(o.url)) } }
+                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                    )
+                }
+            }
         }
     }
 }

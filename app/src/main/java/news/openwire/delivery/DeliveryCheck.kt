@@ -70,14 +70,9 @@ object DeliveryCheck {
 
     private const val PREFS = "delivery"
 
-    /** Once per installed version, when alerts are on and something could stop them. */
-    fun shouldPrompt(context: Context, alertsOn: Boolean): Boolean {
-        if (!alertsOn) return false
-        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (p.getLong("checked", -1) == versionCode(context)) return false
-        val s = status(context)
-        return !s.ok || s.launchManager != null
-    }
+    /** On the first run of every installed version (fresh install or update): a required step. */
+    fun shouldPrompt(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong("checked", -1) != versionCode(context)
 
     fun markChecked(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong("checked", versionCode(context)).apply()
@@ -128,17 +123,20 @@ object DeliveryCheck {
 
 /** "Make sure alerts reach you": each check, with the fix one tap away. Rechecks on return. */
 @Composable
-fun DeliveryDialog(onDone: () -> Unit) {
+fun DeliveryDialog(alertsOn: Boolean, onTurnOnAlerts: () -> Unit, onDone: () -> Unit) {
     val context = LocalContext.current
     var tick by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { tick++ }
-    val s = remember(tick) { DeliveryCheck.status(context) }
-    GlassDialog(icon = Icons.Outlined.NotificationsActive, kicker = tr(R.string.delivery_kicker), onDismiss = onDone) {
-        Text(tr(if (s.ok) R.string.delivery_title_ok else R.string.delivery_title), style = serif(24.sp, FontWeight.Bold, lineHeight = 30.sp), color = Glass.textPrimary)
+    val s = remember(tick, alertsOn) { DeliveryCheck.status(context) }
+    val ok = s.ok && alertsOn
+    // A required step after every update: closed only with its own button.
+    GlassDialog(icon = Icons.Outlined.NotificationsActive, kicker = tr(R.string.delivery_kicker), onDismiss = {}) {
+        Text(tr(if (ok) R.string.delivery_title_ok else R.string.delivery_title), style = serif(24.sp, FontWeight.Bold, lineHeight = 30.sp), color = Glass.textPrimary)
         Spacer(Modifier.height(8.dp))
         Text(tr(R.string.delivery_body), style = sans(13.sp, lineHeight = 20.sp), color = Glass.textPrimary.copy(alpha = 0.9f))
         Spacer(Modifier.height(14.dp))
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            CheckRow(alertsOn, tr(R.string.delivery_alerts_on), tr(R.string.delivery_turn_on), hint = if (alertsOn) null else tr(R.string.delivery_alerts_hint), onFix = onTurnOnAlerts)
             CheckRow(s.notificationsAllowed, tr(R.string.delivery_notify), tr(R.string.delivery_fix)) { DeliveryCheck.open(context, DeliveryCheck.notificationSettings(context)) }
             CheckRow(s.unrestricted, tr(R.string.delivery_battery), tr(R.string.delivery_allow)) {
                 DeliveryCheck.open(context, DeliveryCheck.batteryRequest(context))
@@ -149,7 +147,7 @@ fun DeliveryDialog(onDone: () -> Unit) {
             }
         }
         Spacer(Modifier.height(18.dp))
-        DialogButton(tr(if (s.ok) R.string.delivery_done else R.string.delivery_later), primary = s.ok, onClick = onDone)
+        DialogButton(tr(if (ok) R.string.delivery_done else R.string.delivery_later), primary = ok, onClick = onDone)
     }
 }
 

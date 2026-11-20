@@ -182,14 +182,14 @@ class Changelog(private val context: Context) {
 
     private val prefs = context.getSharedPreferences("editrove_updates", Context.MODE_PRIVATE)
 
-    /** The entry to show once after an update (not on a fresh install). */
+    /**
+     * The entry to show once on the first run of each version: after an update and on a fresh
+     * install alike. A version without its own notes shows the newest notes before it.
+     */
     fun pendingWhatsNew(): Entry? {
         val current = BuildConfig.VERSION_CODE
-        val seen = prefs.getInt(KEY_SEEN, -1)
-        val info = context.packageManager.getPackageInfo(context.packageName, 0)
-        val updated = if (seen == -1) info.lastUpdateTime > info.firstInstallTime + 5_000 else seen < current
-        if (seen == -1 && !updated) markSeen()
-        return if (updated) entries.firstOrNull { it.versionCode == current } else null
+        if (prefs.getInt(KEY_SEEN, -1) >= current) return null
+        return entries.firstOrNull { it.versionCode <= current }
     }
 
     fun markSeen() = prefs.edit().putInt(KEY_SEEN, BuildConfig.VERSION_CODE).apply()

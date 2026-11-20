@@ -328,15 +328,28 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
             AnimatedVisibility(whatsNew != null, enter = fadeIn(tween(240)), exit = fadeOut(tween(200))) {
                 whatsNew?.let { e -> news.openwire.update.WhatsNewDialog(e) { app.container.changelog.markSeen(); whatsNew = null } }
             }
-            // After an update (and after What's new): can alerts actually reach the reader?
+            // First run of every version (after the tour and What's new): can alerts reach the reader?
             val deliveryCtx = LocalContext.current
-            LaunchedEffect(whatsNew == null, userSettings.notificationsEnabled) {
-                if (whatsNew == null && !news.openwire.guide.Guide.showing &&
-                    news.openwire.delivery.DeliveryCheck.shouldPrompt(deliveryCtx, userSettings.notificationsEnabled)
-                ) news.openwire.delivery.DeliveryCheck.showing = true
+            val touring = news.openwire.guide.Guide.showing
+            LaunchedEffect(whatsNew == null, touring) {
+                if (whatsNew == null && !touring && news.openwire.delivery.DeliveryCheck.shouldPrompt(deliveryCtx)) news.openwire.delivery.DeliveryCheck.showing = true
             }
-            if (news.openwire.delivery.DeliveryCheck.showing && whatsNew == null) {
-                news.openwire.delivery.DeliveryDialog { news.openwire.delivery.DeliveryCheck.showing = false; news.openwire.delivery.DeliveryCheck.markChecked(deliveryCtx) }
+            val alertsOn = userSettings.notificationsEnabled && (userSettings.breakingEnabled || userSettings.notifyTopics.isNotEmpty())
+            val turnOn = {
+                app.container.settingsRepository.update { it.copy(notificationsEnabled = true, breakingEnabled = true) }
+            }
+            val askPermission = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { granted ->
+                if (granted) turnOn() else news.openwire.delivery.DeliveryCheck.open(deliveryCtx, news.openwire.delivery.DeliveryCheck.notificationSettings(deliveryCtx))
+            }
+            if (news.openwire.delivery.DeliveryCheck.showing && whatsNew == null && !touring) {
+                news.openwire.delivery.DeliveryDialog(
+                    alertsOn = alertsOn,
+                    onTurnOnAlerts = {
+                        if (android.os.Build.VERSION.SDK_INT >= 33 && androidx.core.content.ContextCompat.checkSelfPermission(deliveryCtx, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                            askPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else turnOn()
+                    },
+                ) { news.openwire.delivery.DeliveryCheck.showing = false; news.openwire.delivery.DeliveryCheck.markChecked(deliveryCtx) }
             }
             // The welcome tour sits over everything, Settings included (first launch, or replayed from the guide).
             if (news.openwire.guide.Guide.showing) {

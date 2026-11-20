@@ -61,7 +61,14 @@ object BreakingNews {
      * story that several of the watched newsrooms published within half an hour of each other
      * in the last 45 minutes — how a breaking event actually looks in the feeds.
      */
-    fun detect(articles: List<Article>, nowMillis: Long, normalizeDomain: (String) -> String, minOutlets: Int = 3): List<Article> {
+    fun detect(
+        articles: List<Article>,
+        nowMillis: Long,
+        normalizeDomain: (String) -> String,
+        minOutlets: Int = 3,
+        /** Whose own "BREAKING" label or coverage count is trusted (the watched newsrooms); others need several outlets. */
+        trusted: (Article) -> Boolean = { true },
+    ): List<Article> {
         val recent = articles.filter { a -> a.publishedAt?.let { nowMillis - it in -600_000L..(60 * 60_000L) } == true }
         val spread = recent.filter { a ->
             val t = a.publishedAt ?: return@filter false
@@ -71,10 +78,27 @@ object BreakingNews {
             }.map { normalizeDomain(it.domain ?: it.source ?: "") }.filter { it.isNotEmpty() }.toSet()
             outlets.size >= minOutlets
         }
-        val hits = (articles.filter { reason(it, nowMillis) != null } + spread).distinctBy { it.id }.sortedByDescending { it.publishedAt ?: 0L }
+        val hits = (articles.filter { trusted(it) && reason(it, nowMillis) != null } + spread).distinctBy { it.id }.sortedByDescending { it.publishedAt ?: 0L }
         val out = ArrayList<Article>()
         for (a in hits) if (out.none { StoryIdentity.sameStory(it, a, normalizeDomain) }) out += a
         return out
+    }
+
+    /**
+     * Keeps alerts rare enough to mean something: at most [maxPerRun] at a time, and within
+     * [cooldownMs] of the last alert only a story [isMajor] (very widely carried, or labelled by
+     * a watched newsroom) gets through.
+     */
+    fun throttle(hits: List<Article>, nowMillis: Long, lastAlertAt: Long, isMajor: (Article) -> Boolean, maxPerRun: Int = 2, cooldownMs: Long = 20 * 60_000L): List<Article> {
+        val cooling = nowMillis - lastAlertAt < cooldownMs
+        return hits.filter { !cooling || isMajor(it) }.take(maxPerRun)
+    }
+
+    /** Distinct outlets carrying [a]'s story within half an hour of it. */
+    fun outletCount(a: Article, articles: List<Article>, normalizeDomain: (String) -> String): Int {
+        val t = a.publishedAt ?: return 0
+        return articles.filter { b -> kotlin.math.abs((b.publishedAt ?: 0L) - t) <= 30 * 60_000L && (b === a || StoryIdentity.sameStory(a, b, normalizeDomain)) }
+            .map { normalizeDomain(it.domain ?: it.source ?: "") }.filter { it.isNotEmpty() }.toSet().size
     }
 
     /** Headline without the "BREAKING:" label (the notification says it already). */

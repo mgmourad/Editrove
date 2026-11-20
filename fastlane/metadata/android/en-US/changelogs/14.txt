@@ -1,0 +1,5 @@
+Editrove 0.7.0 Beta 7 — Easier for everyone
+• Add any newspaper by name or website in Settings › Sources; no feed addresses needed.
+• A user guide with pictures in your language, and a short welcome tour.
+• Editrove's own voices for phones without Google's speech engine.
+• The Editrove bell and breaking-news sting play again.

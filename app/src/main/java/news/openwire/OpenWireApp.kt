@@ -110,10 +110,19 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
                     .flatMap { container.feedRepository.cachedArticles(it.id) }
                 val items = (watched + followed).distinctBy { it.originalUrl }
                 val norm: (String) -> String = { container.domainRegistry.normalizeDomain(it) }
-                val hits = BreakingNews.detect(items, System.currentTimeMillis(), norm)
+                // A watched newsroom's own "BREAKING" label counts; anyone else's story needs
+                // three or more outlets carrying it within half an hour (no clickbait labels).
+                val watchedIds = watched.map { it.id }.toSet()
+                val now = System.currentTimeMillis()
+                val hits = BreakingNews.detect(items, now, norm, trusted = { it.id in watchedIds })
                 val seen = container.feedState.seen(BREAKING_ID).orEmpty()
-                val fresh = hits.filter { FeedOrdering.storyKey(it) !in seen }
+                val prefs = getSharedPreferences("breaking", MODE_PRIVATE)
+                val fresh = BreakingNews.throttle(
+                    hits.filter { FeedOrdering.storyKey(it) !in seen }, now, prefs.getLong("last", 0L),
+                    isMajor = { a -> (a.id in watchedIds && BreakingNews.reason(a, now) == "labelled breaking") || BreakingNews.outletCount(a, items, norm) >= 5 },
+                )
                 container.feedState.setSeen(BREAKING_ID, (hits.map(FeedOrdering::storyKey) + seen).toSet())
+                if (fresh.isNotEmpty()) prefs.edit().putLong("last", now).apply()
                 return fresh.map { BreakingAlert(FeedOrdering.storyKey(it), NewHeadline(BreakingNews.cleanTitle(it.title), it.source, it.originalUrl)) }
             }
 

@@ -550,4 +550,18 @@
     <string name="delivery_row_bad">Un réglage de ce téléphone peut bloquer les alertes</string>
     <string name="reader_watch_on">Voir sur %1$s</string>
     <string name="reader_play_video">Lire la vidéo</string>
+    <string name="delivery_alerts_on">Alertes d’actualité urgente activées</string>
+    <string name="delivery_alerts_hint">Les alertes d’Editrove sont désactivées. Activez l’actualité urgente ; choisissez les sujets plus tard dans Réglages › Notifications.</string>
+    <string name="delivery_turn_on">Activer</string>
+    <string name="reader_loading">Chargement de l’article…</string>
+    <string name="reader_other_loading">Recherche de cette info dans d’autres médias…</string>
+    <string name="reader_slow_t">Plus long que d’habitude</string>
+    <string name="reader_slow_b">L’éditeur tarde à répondre. Patientez, réessayez, ou lisez la même info telle que d’autres rédactions l’ont publiée.</string>
+    <string name="reader_retry">Réessayer</string>
+    <string name="reader_other">Lire dans d’autres médias</string>
+    <string name="reader_smry">Résumé sur smry.ai</string>
+    <string name="reader_other_banner">%1$s n’a pas pu être chargé : voici l’article de %2$s sur la même info. Les points clés s’appuient sur tous les médias ci-dessous.</string>
+    <string name="reader_other_none">Aucun autre média n’a encore cette info.</string>
+    <string name="reader_points_outlets">Points clés · %1$d médias</string>
+    <string name="reader_outlets">Publié par</string>
 </resources>

@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -29,6 +30,12 @@ data class ArticleContent(
     val embeds: List<String> = emptyList(),
     /** Photos and videos from the story, each placed after the paragraph it follows. */
     val media: List<ArticleMedia> = emptyList(),
+    /** For [TextSource.OTHER_OUTLETS]: the outlet whose report this is (credited in the reader). */
+    val viaName: String? = null,
+    /** For [TextSource.OTHER_OUTLETS]: every outlet read for the combined summary. */
+    val otherOutlets: List<OtherOutlet> = emptyList(),
+    /** For [TextSource.OTHER_OUTLETS]: key points drawn from all of [otherOutlets]. */
+    val combinedPoints: List<String> = emptyList(),
 ) {
     val paragraphs: List<String> get() = text.split("\n\n").filter { it.isNotBlank() }
     val wordCount: Int get() = text.split(RX_1).count { it.isNotBlank() }
@@ -71,10 +78,15 @@ data class ArticleMedia(
     }
 }
 
+/** Another newsroom's report of the same story. */
+data class OtherOutlet(val name: String, val url: String)
+
 enum class TextSource(val label: String) {
     PUBLISHER("Publisher"),
     WAYBACK("Wayback Machine"),
     ARCHIVE_TODAY("archive.today"),
+    /** The original wouldn't load: the same story as other newsrooms reported it. */
+    OTHER_OUTLETS("Other outlets"),
 }
 
 /**
@@ -102,6 +114,8 @@ class ArticleTextExtractor(
     private val isPaywalled: (String) -> Boolean = { false },
     /** Logs each extraction's source, size and time (diagnostics). */
     private val diagnostics: Boolean = false,
+    /** Google News search (for the same story from other outlets). */
+    private val rss: GoogleNewsRssSource = GoogleNewsRssSource(),
 ) {
     private companion object {
         const val MOBILE_UA = "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
@@ -121,6 +135,14 @@ class ArticleTextExtractor(
             "is provided by", "launched in 20", "launched in 19", "media company", "sign-in, which works",
             "download the app", "watch live", "all rights", "is a leading", "our journalists", "send us a tip",
             "support trusted journalism", "support our journalism", "become a member", "donate now", "make a gift",
+            // Privacy and consent notices (CCPA/GDPR dialogs) that pages ship as plain paragraphs.
+            "right to opt-out", "right to opt out", "opt-out of the sale", "opt out of the sale", "sale or sharing of your personal",
+            "sharing of your personal information", "processing of your personal data", "targeted advertising", "do not sell or share",
+            "your privacy choices", "accept all cookies", "manage your preferences", "manage preferences", "by continuing to use",
+            "consumer, you have the right", "using this toggle", "we and our partners", "store and/or access information",
+            "personalised ads", "personalized ads", "legitimate interest",
+            // Reprint and licensing notices.
+            "non-commercial use only", "subscriber agreement", "djreprints", "order multiple copies", "order presentation-ready copies",
         )
         val PAYWALL_HINTS = listOf(
             "subscribe to continue", "to continue reading", "already a subscriber", "subscribers only",
@@ -143,7 +165,7 @@ class ArticleTextExtractor(
      * pages), the Wayback Machine and archive.today — and the first complete article wins.
      * If none is complete within [BUDGET_MS], the longest partial text is returned.
      */
-    suspend fun extract(link: String): ArticleContent? = kotlinx.coroutines.coroutineScope {
+    suspend fun extract(link: String, title: String? = null): ArticleContent? = kotlinx.coroutines.coroutineScope {
         val started = System.currentTimeMillis()
         // Google News wrappers carry no article: read the publisher's page instead.
         val url = if (news.openwire.domain.engine.GoogleNewsUrls.isGoogleNewsUrl(link)) {
@@ -188,6 +210,11 @@ class ArticleTextExtractor(
             if (left <= 0) break
             val r = kotlinx.coroutines.withTimeoutOrNull(left) { results.receive() } ?: if (System.currentTimeMillis() >= deadline) break else { pending--; continue }
             pending--
+            // Text that isn't about this headline (a privacy notice, another story) never counts.
+            if (!relevant(r, title)) {
+                if (diagnostics) android.util.Log.i("EditroveReader", "off-topic ${r.via} ${r.paragraphs.firstOrNull()?.take(80)}")
+                continue
+            }
             got += r
             // A paywalled publisher's own page is usually a teaser: it only counts when it is
             // clearly the whole piece; otherwise give the archives a few more seconds, then stop.
@@ -202,6 +229,57 @@ class ArticleTextExtractor(
             ?: got.maxByOrNull { it.text.length }?.let { (if (it.via == TextSource.PUBLISHER) it else it.mergeMeta(meta))?.copy(partial = true) }
         if (diagnostics) android.util.Log.i("EditroveReader", "${System.currentTimeMillis() - started}ms ${out?.via ?: "NONE"} ${out?.text?.length ?: 0}ch partial=${out?.partial} paywalled=$paywalled ${url.take(90)}")
         out
+    }
+
+    /**
+     * The same story from other newsrooms, for when the original won't load: Google News finds
+     * reports with the same headline from other outlets (open ones first), the best full text
+     * is shown with its outlet credited, and key points are drawn from every report read.
+     */
+    suspend fun fromOtherOutlets(title: String, originalUrl: String?, country: String = "US"): ArticleContent? = kotlinx.coroutines.coroutineScope {
+        val clean = title.substringBeforeLast(" - ").substringBeforeLast(" | ").trim()
+        if (clean.length < 12) return@coroutineScope null
+        val home = originalUrl?.let { news.openwire.domain.engine.FeedDiscovery.domainOf(it) }
+        val c = news.openwire.domain.engine.TopicRegistry.country(country)
+        // The headline's distinctive words, not the whole sentence: other outlets word it differently.
+        val keywords = RX_WORDS.findAll(clean).map { it.value }.filter { it.length >= 4 && it.lowercase() !in STOP_WORDS }.distinct().take(7).joinToString(" ")
+        val items = runCatching { rss.fetchFeed(news.openwire.domain.engine.TopicRegistry.googleNewsSearchUrl("${keywords.ifBlank { clean }} when:7d", c)).items }.getOrDefault(emptyList())
+        if (diagnostics) android.util.Log.i("EditroveReader", "other outlets: ${items.size} results for '$keywords'")
+        val candidates = items.filter { item ->
+            val d = item.source?.let { news.openwire.domain.engine.FeedDiscovery.domainOf(it) }
+            d != null && d != home && aboutTitle(item.title, clean)
+        }.distinctBy { it.source }
+            // Open sites first: a paywalled outlet would stall here just like the original.
+            .sortedBy { item -> runCatching { isPaywalled(item.source.orEmpty()) }.getOrDefault(false) }
+            .take(6)
+        val reads = candidates.map { item ->
+            async {
+                withTimeoutOrNull(12_000) {
+                    val url = if (news.openwire.domain.engine.GoogleNewsUrls.isGoogleNewsUrl(item.link)) resolveLink(item.link) else item.link
+                    url ?: return@withTimeoutOrNull null
+                    extractFrom(url)?.takeIf { complete(it, false) && relevant(it, clean) }
+                        ?.let { Triple(item.sourceName ?: news.openwire.domain.engine.FeedDiscovery.domainOf(url) ?: url, url, it) }
+                }
+            }
+        }.awaitAll().filterNotNull()
+        if (reads.isEmpty()) return@coroutineScope null
+        // The closest match to the headline, not the longest: a related feature isn't the story.
+        fun match(c: ArticleContent) = titleOverlap(c.title + " " + c.paragraphs.take(3).joinToString(" "), clean)
+        val (name, url, best) = reads.sortedWith(compareByDescending<Triple<String, String, ArticleContent>> { match(it.third) }.thenByDescending { it.third.text.length }).first()
+        // Key points: the chosen report's first, then the other full reports' (short clips and promos left out).
+        val full = reads.filter { it.third.text.length >= 1_200 && match(it.third) >= 2 }
+        val points = (news.openwire.domain.engine.Summarizer.keyPoints(best.text, 3) +
+            news.openwire.domain.engine.Summarizer.keyPoints(full.filter { it.third !== best }.joinToString("\n\n") { it.third.text }, 3))
+            .distinct().take(5)
+        best.copy(
+            title = clean,
+            // The deck and byline were the other outlet's: the reader credits it in a banner instead.
+            description = null, author = null,
+            via = TextSource.OTHER_OUTLETS, viaUrl = url, viaName = name,
+            otherOutlets = reads.map { OtherOutlet(it.first, it.second) },
+            combinedPoints = points,
+            partial = false,
+        )
     }
 
     /** Keeps the publisher's own deck/byline/photo when the text came from an archive. */
@@ -226,6 +304,7 @@ class ArticleTextExtractor(
     }
 
     private fun isBoilerplate(p: String): Boolean {
+        if (BARE_URL.matches(p.trim())) return true
         val l = p.lowercase()
         return BOILERPLATE.any { it in l }
     }
@@ -253,12 +332,31 @@ class ArticleTextExtractor(
      * significant words (one for very short headlines). Pages read without scripts sometimes
      * offer another story's opening (a "most read" box), and a card must never show that.
      */
+    /** How many of the headline's significant words [text] shares. */
+    internal fun titleOverlap(text: String, title: String): Int {
+        fun words(t: String) = RX_WORDS.findAll(t.lowercase()).map { it.value }.filter { it.length >= 4 && it !in STOP_WORDS }.toSet()
+        val body = words(text)
+        return words(title).count { w -> w in body || (w.length >= 5 && body.any { it.startsWith(w.take(5)) }) }
+    }
+
     internal fun aboutTitle(text: String, title: String): Boolean {
-        fun words(t: String) = RX_WORDS.findAll(t.lowercase()).map { it.value }.filter { it.length >= 4 }.toSet()
+        fun words(t: String) = RX_WORDS.findAll(t.lowercase()).map { it.value }.filter { it.length >= 4 && it !in STOP_WORDS }.toSet()
         val head = words(title)
         if (head.isEmpty()) return false
         val shared = head.count { w -> w in words(text) || words(text).any { it.startsWith(w.take(5)) && w.length >= 5 } }
         return shared >= if (head.size < 4) 1 else 2
+    }
+
+    /**
+     * True when an extracted text is the story behind [title]: its opening shares the
+     * headline's words. Rejects consent notices, paywall prompts and the next story on
+     * endless-scroll pages, which would otherwise be read (and narrated) as the article.
+     */
+    internal fun relevant(c: ArticleContent, title: String?): Boolean {
+        val t = title?.takeIf { it.isNotBlank() } ?: c.title.takeIf { it.isNotBlank() } ?: return true
+        // The body itself must be about the headline: a deck alone can't vouch for a reprint notice.
+        val opening = c.paragraphs.take(6).joinToString(" ").ifBlank { return false }
+        return aboutTitle(opening, t.substringBeforeLast(" - ").substringBeforeLast(" | "))
     }
 
     private suspend fun extractFrom(url: String): ArticleContent? = withContext(Dispatchers.IO) {
@@ -289,6 +387,7 @@ class ArticleTextExtractor(
                 text = text,
                 imageUrl = imageUrl,
                 description = (doc.meta("og:description") ?: doc.meta("description"))
+                    ?.replace(MD_LINK, "$1")?.replace(MD_LINK_CUT, "$1")?.trim()
                     ?.takeIf { it.length > 30 },
                 author = (doc.meta("author") ?: doc.meta("article:author"))
                     ?.takeIf { it.isNotBlank() && !it.startsWith("http") && it.length < 80 },
@@ -390,10 +489,15 @@ class ArticleTextExtractor(
     /** The best address of a story photo (lazy-loading and responsive sources included), or null for icons and pixels. */
     private fun imageOf(e: org.jsoup.nodes.Element): String? {
         val img = if (e.tagName() == "img") e else e.selectFirst("img")
+        // Bylines, author bios and logos carry small portraits: never story photos.
+        if (generateSequence(e) { it.parent() }.take(6).any { a -> SMALL_CONTAINER.containsMatchIn(a.className() + " " + a.id()) }) return null
         val sources = listOfNotNull(img) + e.select("source")
+        var widest = 0.0
         fun largest(srcset: String): String? = srcset.split(SRCSET_SPLIT).mapNotNull { part ->
             val bits = part.trim().split(RX_1)
-            val w = bits.getOrNull(1)?.trimEnd('w', 'x')?.toDoubleOrNull() ?: 1.0
+            val d = bits.getOrNull(1)
+            val w = d?.trimEnd('w', 'x')?.toDoubleOrNull() ?: 1.0
+            if (d?.endsWith("w") == true) widest = maxOf(widest, w)
             bits.firstOrNull()?.takeIf { it.isNotBlank() }?.let { it to w }
         }.maxByOrNull { it.second }?.first
         val raw = sources.firstNotNullOfOrNull { s ->
@@ -406,7 +510,9 @@ class ArticleTextExtractor(
         if (lower.endsWith(".svg") || SMALL_IMAGE.containsMatchIn(lower)) return null
         val w = img?.attr("width")?.toIntOrNull()
         val h = img?.attr("height")?.toIntOrNull()
-        if ((w != null && w < 200) || (h != null && h < 120)) return null
+        // Small renditions look blurry in the reader: a story photo is at least ~480 px wide.
+        if ((w != null && w < 480) || (h != null && h < 240) || (widest > 0 && widest < 480)) return null
+        LOW_RES_HINT.find(lower)?.let { m -> m.groupValues.drop(1).firstNotNullOfOrNull { it.toIntOrNull() }?.let { if (it < 480) return null } }
         return url
     }
 
@@ -433,8 +539,19 @@ class ArticleTextExtractor(
             p.parent()?.parent()?.let { scores[it] = (scores[it] ?: 0.0) + score / 2 }
         }
         val best = scores.maxByOrNull { it.value }?.key
-        val inBest = best?.select("p").orEmpty()
-        val source = if (inBest.size >= 3 && pText(best!!) >= total * 0.4) inBest else doc.select("p")
+        // Endless-scroll pages put the next stories right under this one: read the first only.
+        fun firstStory(scope: org.jsoup.nodes.Element): List<org.jsoup.nodes.Element> {
+            val stories = scope.select("article").filter { pText(it) > 300 }
+            val root = if (stories.size >= 2) stories.first() else scope
+            val out = ArrayList<org.jsoup.nodes.Element>()
+            for (e in root.select("p, h1")) {
+                if (e.tagName() == "h1") { if (out.any { it.text().length > 40 }) break else continue }
+                out += e
+            }
+            return out
+        }
+        val inBest = best?.let(::firstStory).orEmpty()
+        val source = if (inBest.size >= 3 && pText(best!!) >= total * 0.4) inBest else firstStory(doc.body() ?: doc)
         val fromParagraphs = source.map { it.text().trim() }
             .map { stripBanner(it, siteName) }
             .filter { it.length > 40 && !isBoilerplate(it) }
@@ -499,7 +616,9 @@ private val RX_2 = Regex("\"closest\"\\s*:\\s*\\{[^}]*\"url\"\\s*:\\s*\"([^\"]+)
 private val RX_3 = Regex("/web/(\\d+)/")
 private const val CHROME = "nav, header, footer, aside, form, script, style, noscript, figcaption, [role=navigation], [role=banner], " +
     "[role=contentinfo], [class*=related], [class*=newsletter], [class*=promo], [class*=share], [class*=social], " +
-    "[class*=footer], [id*=footer], [class*=sidebar], [class*=breadcrumb], [class*=cookie], [class*=subscribe], [aria-hidden=true]"
+    "[class*=footer], [id*=footer], [class*=sidebar], [class*=breadcrumb], [class*=cookie], [class*=subscribe], [aria-hidden=true], " +
+    "[class*=consent], [id*=consent], [class*=privacy], [id*=privacy], [class*=gdpr], [class*=ccpa], [class*=onetrust], [id*=onetrust], " +
+    "[id^=sp_message], [class*=paywall], [class*=modal], [role=dialog], [aria-modal=true], [class*=recirc], [class*=read-next], [class*=up-next]"
 /** A wire-style dateline: "WASHINGTON (DC News Now) —" or "LONDON (Reuters) -". */
 private val DATELINE = Regex("\\b[A-Z][A-Z .,'’-]{2,40}\\s*\\([^)]{2,40}\\)\\s*[—–-]")
 private val ARTICLE_BODY = Regex("\"articleBody\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"")
@@ -507,8 +626,25 @@ private val SENTENCE = Regex("(?<=[.!?])\\s+(?=[A-Z\"“])")
 private val PARA_BREAK = Regex("\\n\\s*\\n|\\n")
 
 private val RX_WORDS = Regex("\\p{L}+")
+/** Words too common to tell two stories apart. */
+private val STOP_WORDS = setOf(
+    "that", "this", "with", "from", "have", "has", "they", "their", "them", "there", "about", "after", "before", "over", "under",
+    "what", "when", "where", "which", "while", "will", "would", "could", "should", "were", "been", "being", "more", "most",
+    "than", "then", "into", "onto", "says", "said", "your", "yours", "other", "others", "some", "just", "also", "only", "very",
+    "here", "these", "those", "does", "done", "make", "made", "like", "much", "many", "such", "each", "every", "first", "last",
+    "dans", "pour", "avec", "sont", "cette", "plus", "para", "como", "pero", "sobre", "esta", "este", "eine", "einer", "nicht", "sich", "auch", "wird",
+)
 private val YOUTUBE = Regex("(?:youtube(?:-nocookie)?\\.com/embed/|youtu\\.be/)([A-Za-z0-9_-]{11})")
 private val VIMEO = Regex("player\\.vimeo\\.com/video/(\\d+)")
 /** Logos, icons, avatars, tracking pixels and placeholders: not story photos. */
 private val SMALL_IMAGE = Regex("(^|[/_.-])(logos?|icons?|avatars?|sprites?|pixel|spacer|placeholder|blank|1x1|badges?|emoji|ads|authors?|headshots?)([/_.-]|$)|doubleclick")
 private val SRCSET_SPLIT = Regex(",\\s+")
+/** A paragraph that is only a web address. */
+private val BARE_URL = Regex("https?://\\S+")
+/** "[soaring costs](https://…)" in a deck → "soaring costs"; a cut-off link at the end is dropped. */
+private val MD_LINK = Regex("\\[([^\\]]{1,200})\\]\\(https?://[^)\\s]*\\)")
+private val MD_LINK_CUT = Regex("\\[([^\\]]{0,200})(\\]\\(https?://\\S*)?$")
+/** Byline, author, bio and logo blocks (their pictures are portraits and marks, not photos). */
+private val SMALL_CONTAINER = Regex("(author|byline|avatar|contributor|headshot|\\bbio\\b|logo)", RegexOption.IGNORE_CASE)
+/** A width spelled in the address: "?w=150", "&width=200", "/150x150/", "-150x100.jpg". */
+private val LOW_RES_HINT = Regex("[?&](?:w|width|resize|size)=(\\d{2,4})|[/_-](\\d{2,4})x\\d{2,4}[./_-]")

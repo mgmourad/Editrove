@@ -22,6 +22,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.customActions
@@ -918,31 +919,87 @@ private fun sectionLabel(s: news.openwire.data.remote.SourceDirectory.Section, l
     else -> news.openwire.domain.engine.Languages.topicName(s.topicId, lang) ?: s.name.lowercase().replaceFirstChar { it.uppercase() }
 }
 
-/** A labelled glass dropdown: tap to open the list, pick one. */
+/**
+ * A labelled glass dropdown: the field shows the choice; tapped, a frosted panel the field's
+ * width unfolds beneath it (fade and scale from the top), the current choice tinted and
+ * ticked and scrolled into view.
+ */
 @Composable
 private fun GlassDropdown(label: String, options: List<Pair<String?, String>>, selected: String?, modifier: Modifier = Modifier, onSelect: (String?) -> Unit) {
     val g = Glass
     var open by remember { mutableStateOf(false) }
+    var fieldWidth by remember { mutableStateOf(0) }
+    var fieldHeight by remember { mutableStateOf(0) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val chevron by androidx.compose.animation.core.animateFloatAsState(if (open) 180f else 0f, label = "chevron")
+    val fieldShape = RoundedCornerShape(16.dp)
     Column(modifier) {
-        Text(label, style = sans(11.sp, FontWeight.Medium), color = g.textSecondary, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+        Text(label.uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.textSecondary, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
         Box {
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(g.chipFill).border(1.dp, g.hairline, RoundedCornerShape(14.dp))
-                    .clickable { open = true }.padding(horizontal = 12.dp, vertical = 11.dp),
+                Modifier.fillMaxWidth()
+                    .onGloballyPositioned { fieldWidth = it.size.width; fieldHeight = it.size.height }
+                    .clip(fieldShape)
+                    .background(if (open) g.accent.copy(alpha = 0.10f) else g.chipFill)
+                    .border(1.dp, if (open) g.accent.copy(alpha = 0.45f) else g.hairline, fieldShape)
+                    .clickable { open = !open }
+                    .padding(start = 14.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(options.firstOrNull { it.first == selected }?.second.orEmpty(), style = sans(13.sp, FontWeight.Medium), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Icon(Icons.Filled.KeyboardArrowDown, null, tint = g.textSecondary, modifier = Modifier.size(18.dp))
+                Text(
+                    options.firstOrNull { it.first == selected }?.second.orEmpty(),
+                    style = sans(14.sp, FontWeight.SemiBold), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                )
+                Icon(Icons.Filled.KeyboardArrowDown, null, tint = if (open) g.accentSoft else g.textSecondary, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = chevron })
             }
-            androidx.compose.material3.DropdownMenu(
-                expanded = open, onDismissRequest = { open = false },
-                modifier = Modifier.heightIn(max = 360.dp).background(g.deviceBg),
-            ) {
-                options.forEach { (key, name) ->
-                    androidx.compose.material3.DropdownMenuItem(
-                        text = { Text(name, style = sans(13.sp, if (key == selected) FontWeight.SemiBold else FontWeight.Normal), color = if (key == selected) g.accentSoft else g.textPrimary) },
-                        onClick = { onSelect(key); open = false },
-                    )
+            if (open) {
+                androidx.compose.ui.window.Popup(
+                    offset = androidx.compose.ui.unit.IntOffset(0, fieldHeight + with(density) { 6.dp.roundToPx() }),
+                    onDismissRequest = { open = false },
+                    properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+                ) {
+                    val shown = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                    androidx.compose.animation.AnimatedVisibility(
+                        shown,
+                        enter = fadeIn(tween(140)) + androidx.compose.animation.scaleIn(tween(180), initialScale = 0.94f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)),
+                    ) {
+                        val panel = RoundedCornerShape(18.dp)
+                        val scroll = rememberScrollState()
+                        val rowPx = with(density) { 46.dp.toPx() }
+                        LaunchedEffect(Unit) {
+                            val k = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
+                            scroll.scrollTo(((k - 2) * rowPx).toInt().coerceAtLeast(0))
+                        }
+                        Column(
+                            Modifier.width(with(density) { fieldWidth.toDp() })
+                                .shadow(18.dp, panel, ambientColor = Color.Black, spotColor = Color.Black)
+                                .clip(panel)
+                                // Solid, a step lighter than the page: it floats above the list, nothing shows through.
+                                // The page's own dark (light) colour, made fully solid so nothing shows through.
+                                .background(g.deviceBg.copy(alpha = 1f).compositeOver(if (g.isDark) Color.Black else Color.White))
+                                .border(1.dp, g.hairline, panel)
+                                .heightIn(max = 330.dp)
+                                .verticalScroll(scroll)
+                                .padding(6.dp),
+                        ) {
+                            options.forEach { (key, name) ->
+                                val on = key == selected
+                                Row(
+                                    Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(12.dp))
+                                        .background(if (on) g.accent.copy(alpha = 0.14f) else Color.Transparent)
+                                        .clickable { onSelect(key); open = false }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        name, style = sans(14.sp, if (on) FontWeight.SemiBold else FontWeight.Medium),
+                                        color = if (on) g.accentSoft else g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                                    )
+                                    if (on) Icon(Icons.Filled.Check, null, tint = g.accentSoft, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

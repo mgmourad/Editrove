@@ -363,9 +363,10 @@ private fun Header(c: OpEdPalette, refreshing: Boolean, onDiscover: () -> Unit, 
             // Writers, columns and voices to follow.
             Icon(
                 Icons.Filled.Add, tr(R.string.op_discover_title), tint = c.onAccent,
-                modifier = Modifier.padding(start = 4.dp).clip(CircleShape).background(c.accent).clickable(onClick = onDiscover).padding(6.dp).size(24.dp),
+                modifier = Modifier.padding(start = 4.dp).clip(CircleShape).background(c.accent).clickable(onClick = onDiscover).padding(5.dp).size(18.dp),
             )
         }
+        Spacer(Modifier.height(6.dp))
         Box(Modifier.fillMaxWidth().height(3.dp).background(c.text))
         Spacer(Modifier.height(10.dp))
         Text(tr(R.string.op_title), style = serif(40.sp, FontWeight.Bold, lineHeight = 44.sp), color = c.text)

@@ -143,43 +143,42 @@ fun Masthead(edition: String, onEdition: () -> Unit, onSettings: () -> Unit, mod
     val date = remember {
         LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE • MMM d", Locale.getDefault())).uppercase()
     }
-    // The edition pill and settings sit on the wordmark's baseline, so their bottoms line up
-    // with the bottom of "Editrove"; the pill shrinks (never overflows) on a narrow screen.
-    Row(modifier = modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 16.dp)) {
-        Column(modifier = Modifier.padding(end = 8.dp).alignBy(androidx.compose.ui.layout.LastBaseline)) {
-            Text(date, style = mono(11.sp, FontWeight.SemiBold, 0.18.em), color = g.accent)
-            Text(
-                "Editrove",
-                style = serif(40.sp, FontWeight.Bold, lineHeight = 40.sp, tracking = (-0.02).em),
-                color = g.textPrimary,
-                maxLines = 1,
-                softWrap = false,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
-        Box(Modifier.weight(1f).alignBy { it.measuredHeight }, contentAlignment = Alignment.BottomEnd) {
+    // Top row, just under the glass fade: the date, and at the right the edition pill and
+    // settings (sized so the whole edition name shows); the wordmark below.
+    Column(modifier = modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(date, style = mono(11.sp, FontWeight.SemiBold, 0.18.em), color = g.accent, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
             Box(
                 modifier = Modifier
-                    .widthIn(max = 200.dp)
+                    .widthIn(max = 220.dp)
                     .clip(CircleShape)
                     .background(g.chipFill)
                     .border(1.dp, g.hairline, CircleShape)
                     .clickable(onClick = onEdition)
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
             ) {
-                Text(edition, style = sans(14.sp, FontWeight.Medium), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(edition, style = sans(12.5.sp, FontWeight.Medium), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.width(6.dp))
+            Box(
+                Modifier.size(32.dp).clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape).clickable(onClick = onSettings),
+                contentAlignment = Alignment.Center,
+            ) {
+                androidx.compose.material3.Icon(
+                    androidx.compose.material.icons.Icons.Outlined.Settings, contentDescription = tr(R.string.settings),
+                    tint = g.textPrimary, modifier = Modifier.size(17.dp),
+                )
             }
         }
-        Spacer(Modifier.width(8.dp))
-        Box(
-            Modifier.alignBy { it.measuredHeight }.size(38.dp).clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape).clickable(onClick = onSettings),
-            contentAlignment = Alignment.Center,
-        ) {
-            androidx.compose.material3.Icon(
-                androidx.compose.material.icons.Icons.Outlined.Settings, contentDescription = tr(R.string.settings),
-                tint = g.textPrimary, modifier = Modifier.size(20.dp),
-            )
-        }
+        Text(
+            "Editrove",
+            style = serif(40.sp, FontWeight.Bold, lineHeight = 40.sp, tracking = (-0.02).em),
+            color = g.textPrimary,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }
 

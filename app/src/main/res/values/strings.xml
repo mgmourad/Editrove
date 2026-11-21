@@ -175,7 +175,7 @@
     <string name="theme_system">System</string>
     <string name="theme_dark">Black Glass</string>
     <string name="theme_light">Editorial Paper</string>
-    <string name="topics_hint">Reorder with the arrows, hide topics you don\'t read, and tap the bell to get a local notification when new stories land.</string>
+    <string name="topics_hint">Drag a topic by its handle to reorder, hide topics you don\'t read, and tap the bell to get a local notification when new stories land.</string>
     <string name="topics_new_button">New topic from keywords or sources</string>
     <string name="topic_keywords">Keywords: %1$s</string>
     <string name="topic_sources">%1$d sources</string>
@@ -581,4 +581,28 @@
     <string name="presenter_correspondent_hint">Concise and information-first: the fewest words between you and the news.</string>
     <string name="presenter_conversational_hint">Talks to you directly, warm and relaxed, with a friendly sign-off.</string>
     <string name="presenter_sample_topic">Top Stories</string>
+    <string name="msg_added_sources">Added %1$d sources</string>
+    <string name="by_country_title">Add sources by country</string>
+    <string name="by_country_hint">Browse a country\'s news media by topic and add several at once.</string>
+    <string name="country_label">Country</string>
+    <string name="topic_label">Topic</string>
+    <string name="global">Global</string>
+    <string name="all_topics">All topics</string>
+    <string name="dir_loading">Finding today\'s news media…</string>
+    <string name="dir_failed">Couldn\'t load news media. Check your connection and try again.</string>
+    <string name="dir_stories">%1$d stories today</string>
+    <string name="dir_added">Already a source</string>
+    <string name="add_selected">Add %1$d selected</string>
+    <string name="dir_general">Top news</string>
+    <string name="dir_health">Health</string>
+    <string name="cd_drag_topic">Drag to reorder</string>
+    <string name="related_keywords">Related keywords</string>
+    <string name="related_keywords_hint">Type a name or a few keywords: related ones appear here, and each one you add brings more.</string>
+    <string name="suggested_sources">Suggested sources</string>
+    <string name="suggested_sources_hint">The outlets covering these keywords most, across all of them.</string>
+    <string name="suggested_source_hits">%1$d stories · %2$s</string>
+    <string name="op_discover_title">Writers &amp; voices to follow</string>
+    <string name="op_discover_sub">Columnists, commentators and the topics people are writing about.</string>
+    <string name="op_discover_cta">Find writers, columns and voices to follow</string>
+    <string name="dir_story_one">1 story today</string>
 </resources>

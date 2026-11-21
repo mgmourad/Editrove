@@ -192,15 +192,28 @@ class HomeViewModel(
     fun toggleFollowAuthor(name: String) = settingsRepo.update { s ->
         val key = news.openwire.domain.opinion.OpinionCatalog.authorKey(name)
         val existing = s.followedAuthors.firstOrNull { news.openwire.domain.opinion.OpinionCatalog.authorKey(it) == key }
-        s.copy(followedAuthors = if (existing != null) s.followedAuthors - existing else s.followedAuthors + name.trim())
+        // Following again turns its alerts back on.
+        s.copy(
+            followedAuthors = if (existing != null) s.followedAuthors - existing else s.followedAuthors + name.trim(),
+            opinionMuted = if (existing == null) s.opinionMuted - news.openwire.opinion.writerKey(name) else s.opinionMuted,
+        )
     }
 
     fun toggleFollowAccount(handle: String) = settingsRepo.update { s ->
-        s.copy(followedAccounts = if (handle in s.followedAccounts) s.followedAccounts - handle else s.followedAccounts + handle)
+        s.copy(
+            followedAccounts = if (handle in s.followedAccounts) s.followedAccounts - handle else s.followedAccounts + handle,
+            opinionMuted = if (handle !in s.followedAccounts) s.opinionMuted - news.openwire.opinion.accountKey(handle) else s.opinionMuted,
+        )
     }
 
     fun addOpinionTab(topic: String) = settingsRepo.update { s ->
-        if (s.opinionTabs.any { it.equals(topic, true) }) s else s.copy(opinionTabs = s.opinionTabs + topic.trim())
+        if (s.opinionTabs.any { it.equals(topic, true) }) s
+        else s.copy(opinionTabs = s.opinionTabs + topic.trim(), opinionMuted = s.opinionMuted - news.openwire.opinion.topicKey(topic))
+    }
+
+    /** Alerts for a followed writer, account or opinion topic: on by default, toggled here. */
+    fun toggleOpinionMute(key: String) = settingsRepo.update { s ->
+        s.copy(opinionMuted = if (key in s.opinionMuted) s.opinionMuted - key else s.opinionMuted + key)
     }
 
     fun removeOpinionTab(topic: String) = settingsRepo.update { s -> s.copy(opinionTabs = s.opinionTabs.filterNot { it.equals(topic, true) }) }

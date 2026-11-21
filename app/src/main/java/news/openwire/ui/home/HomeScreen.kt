@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import news.openwire.i18n.tr
 import news.openwire.i18n.text
 import androidx.activity.compose.PredictiveBackHandler
@@ -563,7 +565,12 @@ private fun TabFeed(
             val app = LocalContext.current.applicationContext as OpenWireApp
             val headlines = remember(feeds) { feeds.values.flatMap { (it as? FeedResult.Success)?.articles.orEmpty() } }
             news.openwire.opinion.OpinionScreen(
-                padding = padding, source = app.container.opinion,
+                // Just under the top glass fade (the page has its own masthead).
+                padding = PaddingValues(
+                    start = padding.calculateStartPadding(androidx.compose.ui.unit.LayoutDirection.Ltr), end = padding.calculateEndPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                    top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 24.dp, bottom = padding.calculateBottomPadding(),
+                ),
+                source = app.container.opinion, muted = userSettings.opinionMuted,
                 appLanguage = news.openwire.domain.engine.Languages.effective(userSettings.language),
                 news = headlines,
                 followedAuthors = userSettings.followedAuthors, followedAccounts = userSettings.followedAccounts, tabs = userSettings.opinionTabs,
@@ -572,7 +579,7 @@ private fun TabFeed(
                         openArticle = onOpen,
                         openLink = { vm.openLink(it) },
                         toggleAuthor = vm::toggleFollowAuthor, toggleAccount = vm::toggleFollowAccount,
-                        addTab = vm::addOpinionTab, removeTab = vm::removeOpinionTab,
+                        addTab = vm::addOpinionTab, removeTab = vm::removeOpinionTab, toggleMute = vm::toggleOpinionMute,
                     )
                 },
             )

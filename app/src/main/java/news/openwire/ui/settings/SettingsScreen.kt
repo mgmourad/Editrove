@@ -22,6 +22,16 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.heightIn
@@ -520,31 +530,79 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit) {
     item {
         val topics by vm.allTopics.collectAsState()
         val s by vm.settings.collectAsState()
+        // Drag a topic by its handle to reorder (move up / down stay available to accessibility services).
+        var dragging by remember { mutableStateOf<String?>(null) }
+        var dragOffset by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+        val rowHeights = remember { androidx.compose.runtime.mutableStateMapOf<String, Int>() }
+        val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
         Section {
             topics.forEachIndexed { i, t ->
-                if (i > 0) Divider()
-                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(t.label, style = sans(14.sp, FontWeight.SemiBold), color = if (t.isVisible) Glass.textPrimary else Glass.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            when {
-                                t.isCustom && t.keywords.isNotEmpty() -> tr(R.string.topic_keywords, t.keywords.joinToString())
-                                t.isCustom -> tr(R.string.topic_sources, t.sources.size)
-                                t.liveOnly -> tr(R.string.topic_live)
-                                else -> tr(R.string.topic_snapshot)
+                androidx.compose.runtime.key(t.id) {
+                    if (i > 0) Divider()
+                    val lifted = dragging == t.id
+                    val elevation by androidx.compose.animation.core.animateDpAsState(if (lifted) 10.dp else 0.dp, label = "lift")
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .onGloballyPositioned { rowHeights[t.id] = it.size.height }
+                            .zIndex(if (lifted) 1f else 0f)
+                            .graphicsLayer { translationY = if (lifted) dragOffset else 0f; scaleX = if (lifted) 1.02f else 1f; scaleY = if (lifted) 1.02f else 1f }
+                            .shadow(elevation, RoundedCornerShape(14.dp))
+                            .background(if (lifted) Glass.deviceBg else Color.Transparent, RoundedCornerShape(14.dp))
+                            .semantics {
+                                customActions = listOf(
+                                    androidx.compose.ui.semantics.CustomAccessibilityAction(tr(R.string.cd_move_up)) { vm.moveTopic(t.id, up = true); true },
+                                    androidx.compose.ui.semantics.CustomAccessibilityAction(tr(R.string.cd_move_down)) { vm.moveTopic(t.id, up = false); true },
+                                )
+                            }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // The handle: press and drag.
+                        Icon(
+                            Icons.Filled.DragIndicator, tr(R.string.cd_drag_topic), tint = if (lifted) Glass.accent else Glass.textMuted,
+                            modifier = Modifier.size(28.dp).padding(2.dp).pointerInput(t.id) {
+                                detectDragGestures(
+                                    onDragStart = { dragging = t.id; dragOffset = 0f; haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) },
+                                    onDragEnd = { dragging = null; dragOffset = 0f },
+                                    onDragCancel = { dragging = null; dragOffset = 0f },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        dragOffset += amount.y
+                                        val list = vm.allTopics.value
+                                        val idx = list.indexOfFirst { it.id == t.id }
+                                        val h = (rowHeights[t.id] ?: 120).toFloat()
+                                        if (dragOffset > h / 2 && idx < list.lastIndex) {
+                                            vm.moveTopic(t.id, up = false); dragOffset -= (rowHeights[list[idx + 1].id] ?: h.toInt())
+                                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                        } else if (dragOffset < -h / 2 && idx > 0) {
+                                            vm.moveTopic(t.id, up = true); dragOffset += (rowHeights[list[idx - 1].id] ?: h.toInt())
+                                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                        }
+                                    },
+                                )
                             },
-                            style = sans(11.sp), color = Glass.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
+                        Spacer(Modifier.width(6.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(t.label, style = sans(14.sp, FontWeight.SemiBold), color = if (t.isVisible) Glass.textPrimary else Glass.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                when {
+                                    t.isCustom && t.keywords.isNotEmpty() -> tr(R.string.topic_keywords, t.keywords.joinToString())
+                                    t.isCustom -> tr(R.string.topic_sources, t.sources.size)
+                                    t.liveOnly -> tr(R.string.topic_live)
+                                    else -> tr(R.string.topic_snapshot)
+                                },
+                                style = sans(11.sp), color = Glass.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        val notify = t.id in s.notifyTopics
+                        SmallIcon(
+                            if (notify) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsNone,
+                            tr(if (notify) R.string.cd_stop_notify else R.string.cd_notify_me), tint = if (notify) Glass.accent else null,
+                        ) { vm.setNotifyTopic(t.id, !notify) }
+                        if (t.isCustom) SmallIcon(Icons.Outlined.Delete, tr(R.string.cd_delete_topic)) { vm.deleteTopic(t.id) }
+                        GlassSwitch(t.isVisible) { vm.setTopicVisible(t.id, it) }
                     }
-                    SmallIcon(Icons.Filled.KeyboardArrowUp, tr(R.string.cd_move_up), enabled = i > 0) { vm.moveTopic(t.id, up = true) }
-                    SmallIcon(Icons.Filled.KeyboardArrowDown, tr(R.string.cd_move_down), enabled = i < topics.lastIndex) { vm.moveTopic(t.id, up = false) }
-                    val notify = t.id in s.notifyTopics
-                    SmallIcon(
-                        if (notify) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsNone,
-                        tr(if (notify) R.string.cd_stop_notify else R.string.cd_notify_me), tint = if (notify) Glass.accent else null,
-                    ) { vm.setNotifyTopic(t.id, !notify) }
-                    if (t.isCustom) SmallIcon(Icons.Outlined.Delete, tr(R.string.cd_delete_topic)) { vm.deleteTopic(t.id) }
-                    GlassSwitch(t.isVisible) { vm.setTopicVisible(t.id, it) }
                 }
             }
         }
@@ -589,26 +647,59 @@ private fun AddTopicPage(vm: SettingsViewModel, onDone: () -> Unit) {
             }
             Spacer(Modifier.height(10.dp))
             Field(tr(R.string.keywords_field), keywords, { keywords = it }, placeholder = tr(R.string.keywords_eg))
-            // Not a preset: offer keywords drawn from today's headlines about it.
-            if (name.trim().length >= 3 && exact == null) {
-                Spacer(Modifier.height(10.dp))
-                when (val i = ideas) {
-                    is KeywordIdeas.Loading -> Text(tr(R.string.ideas_loading, i.topic), style = sans(12.sp), color = Glass.textSecondary)
-                    is KeywordIdeas.Ready -> {
-                        Text(tr(R.string.ideas_found, i.topic), style = sans(11.sp), color = Glass.textSecondary)
-                        Spacer(Modifier.height(6.dp))
-                        val current = TopicRegistry.parseCommaKeywords(keywords).map { it.lowercase() }.toSet()
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            i.keywords.forEach { k ->
-                                val added = k.lowercase() in current
-                                Chip(if (added) "✓ $k" else "+ $k", selected = added) {
-                                    if (!added) keywords = (TopicRegistry.parseCommaKeywords(keywords) + k).joinToString(", ")
-                                }
-                            }
+            // Related keywords, live: each keyword typed or picked brings its own headlines, and
+            // terms that recur across them surface next (a chain that sharpens as the topic grows).
+            val sug by vm.topicSuggest.collectAsState()
+            LaunchedEffect(name, keywords) {
+                kotlinx.coroutines.delay(650)
+                vm.updateTopicSeeds(name, TopicRegistry.parseCommaKeywords(keywords))
+            }
+            val current = TopicRegistry.parseCommaKeywords(keywords).map { it.lowercase() }.toSet()
+            val fresh = sug.keywords.filter { it.lowercase() !in current }
+            if (name.isNotBlank() || keywords.isNotBlank()) {
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(tr(R.string.related_keywords).uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = Glass.accentSoft, modifier = Modifier.weight(1f))
+                    if (sug.loading) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = Glass.accent)
+                }
+                Spacer(Modifier.height(6.dp))
+                if (fresh.isEmpty() && !sug.loading) Text(tr(R.string.related_keywords_hint), style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary)
+                androidx.compose.animation.AnimatedContent(fresh, label = "ideas") { list ->
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        list.forEach { k ->
+                            Chip("+ $k", selected = false) { keywords = (TopicRegistry.parseCommaKeywords(keywords) + k).joinToString(", ") }
                         }
                     }
-                    is KeywordIdeas.Failed -> Text(tr(R.string.ideas_failed, i.topic), style = sans(12.sp), color = Glass.textSecondary)
-                    KeywordIdeas.Idle -> Chip(tr(R.string.ideas_suggest), selected = false) { vm.suggestKeywords(name) }
+                }
+            }
+        }
+        // Outlets that cover these keywords most, across all of them (logos, how many stories).
+        val sug2 by vm.topicSuggest.collectAsState()
+        val pickedOutlets = remember { mutableStateListOf<String>() }
+        if (sug2.outlets.isNotEmpty()) {
+            Section {
+                Label(tr(R.string.suggested_sources))
+                Text(tr(R.string.suggested_sources_hint), style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary)
+                Spacer(Modifier.height(6.dp))
+                sug2.outlets.forEach { o ->
+                    // An installed source is chosen as one; any other outlet is added for this topic.
+                    val lib = library.firstOrNull { !it.isPrimary && it.domain.removePrefix("www.").equals(o.domain, true) }
+                    val on = if (lib != null) lib.id in chosen else o.domain in pickedOutlets
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
+                            if (lib != null) { if (on) chosen.remove(lib.id) else chosen.add(lib.id) }
+                            else if (on) pickedOutlets.remove(o.domain) else pickedOutlets.add(o.domain)
+                        }.padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SourceLogo(o.domain, o.name, size = 22.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(o.name, style = sans(13.sp, FontWeight.Medium), color = Glass.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(tr(R.string.suggested_source_hits, o.hits, o.domain), style = sans(11.sp), color = Glass.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        CheckDot(on)
+                    }
                 }
             }
         }
@@ -631,7 +722,10 @@ private fun AddTopicPage(vm: SettingsViewModel, onDone: () -> Unit) {
                     }
                 }
         }
-        PrimaryButton(tr(R.string.create_topic)) { if (vm.addTopic(name, keywords, chosen.toList())) onDone() }
+        PrimaryButton(tr(R.string.create_topic)) {
+            val extra = vm.topicSuggest.value.outlets.filter { it.domain in pickedOutlets }
+            if (vm.addTopic(name, keywords, chosen.toList(), extra)) onDone()
+        }
     }
 }
 
@@ -714,6 +808,7 @@ private fun AddSourcePage(vm: SettingsViewModel, onDone: () -> Unit) {
             Spacer(Modifier.height(10.dp))
             Field(tr(R.string.feed_url), url, { url = it }, placeholder = "https://www.polygon.com/rss/index.xml", keyboard = KeyboardType.Uri)
         }
+        SourcesByCountry(vm)
         Section {
             Label(tr(R.string.weave_into))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -727,6 +822,186 @@ private fun AddSourcePage(vm: SettingsViewModel, onDone: () -> Unit) {
             if (busy) return@PrimaryButton
             busy = true
             vm.addSource(name, url, chosen.toList(), quota) { ok -> busy = false; if (ok) onDone() }
+        }
+    }
+}
+
+/**
+ * "Add sources by country": a country (Global by default) and a topic (all by default), then
+ * that country's news media for each section, to pick several at once. The results scroll
+ * inside the card, so the page stays as it was.
+ */
+@Composable
+private fun SourcesByCountry(vm: SettingsViewModel) {
+    val g = Glass
+    var on by rememberSaveable { mutableStateOf(false) }
+    var country by rememberSaveable { mutableStateOf<String?>(null) }
+    var sectionName by rememberSaveable { mutableStateOf<String?>(null) }
+    val section = sectionName?.let { n -> news.openwire.data.remote.SourceDirectory.Section.entries.firstOrNull { it.name == n } }
+    val state by vm.directoryState.collectAsState()
+    val s by vm.settings.collectAsState()
+    val picked = remember { mutableStateListOf<news.openwire.data.remote.SourceDirectory.Outlet>() }
+    val app = news.openwire.domain.engine.Languages.effective(s.language)
+    LaunchedEffect(on, country, sectionName) { if (on) { picked.clear(); vm.loadDirectory(country, section) } }
+    Section {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(tr(R.string.by_country_title), style = sans(14.sp, FontWeight.SemiBold), color = g.textPrimary)
+                Text(tr(R.string.by_country_hint), style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary)
+            }
+            GlassSwitch(on) { on = it }
+        }
+        androidx.compose.animation.AnimatedVisibility(on) {
+            Column {
+                Spacer(Modifier.height(12.dp))
+                val countries = remember(app) {
+                    listOf<Pair<String?, String>>(null to tr(R.string.global)) +
+                        TopicRegistry.COUNTRIES.map { it.code to news.openwire.domain.engine.Languages.countryName(it.code, app) }.sortedBy { it.second }
+                }
+                val sections = listOf<Pair<String?, String>>(null to tr(R.string.all_topics)) +
+                    news.openwire.data.remote.SourceDirectory.Section.entries.map { it.name to sectionLabel(it, app) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GlassDropdown(tr(R.string.country_label), countries, country, Modifier.weight(1f)) { country = it }
+                    GlassDropdown(tr(R.string.topic_label), sections, sectionName, Modifier.weight(1f)) { sectionName = it }
+                }
+                Spacer(Modifier.height(12.dp))
+                when (val st = state) {
+                    SettingsViewModel.Directory.Idle, SettingsViewModel.Directory.Loading -> {
+                        news.openwire.ui.home.SweepBar()
+                        Text(tr(R.string.dir_loading), style = sans(12.sp), color = g.textSecondary, modifier = Modifier.padding(top = 8.dp))
+                    }
+                    SettingsViewModel.Directory.Failed -> Text(tr(R.string.dir_failed), style = sans(12.sp, lineHeight = 18.sp), color = g.textSecondary)
+                    is SettingsViewModel.Directory.Ready -> {
+                        // Results scroll within the card.
+                        Column(
+                            Modifier.fillMaxWidth().heightIn(max = 380.dp).clip(RoundedCornerShape(14.dp)).background(g.chipFill.copy(alpha = g.chipFill.alpha / 2))
+                                .verticalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 6.dp),
+                        ) {
+                            st.sections.forEach { (sec, outlets) ->
+                                Text(sectionLabel(sec, app).uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+                                outlets.forEach { o ->
+                                    val have = remember(s.customFeeds, o) { vm.hasOutlet(o.domain) }
+                                    val sel = picked.any { it.domain == o.domain && it.section == o.section }
+                                    Row(
+                                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                            .clickable(enabled = !have) { if (sel) picked.removeAll { it.domain == o.domain && it.section == o.section } else picked.add(o) }
+                                            .padding(vertical = 7.dp, horizontal = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        SourceLogo(o.domain, o.name, size = 22.dp)
+                                        Spacer(Modifier.width(10.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(o.name, style = sans(13.sp, FontWeight.Medium), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text(
+                                                if (have) tr(R.string.dir_added) else "${o.domain} · " + if (o.stories == 1) tr(R.string.dir_story_one) else tr(R.string.dir_stories, o.stories),
+                                                style = sans(11.sp), color = g.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        if (have) Icon(Icons.Filled.Check, null, tint = Emerald400, modifier = Modifier.size(18.dp)) else CheckDot(sel)
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        PrimaryButton(tr(R.string.add_selected, picked.size)) {
+                            if (picked.isNotEmpty()) { vm.addDirectoryOutlets(picked.toList()); picked.clear() }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun sectionLabel(s: news.openwire.data.remote.SourceDirectory.Section, lang: String): String = when (s) {
+    news.openwire.data.remote.SourceDirectory.Section.GENERAL -> tr(R.string.dir_general)
+    news.openwire.data.remote.SourceDirectory.Section.HEALTH -> tr(R.string.dir_health)
+    else -> news.openwire.domain.engine.Languages.topicName(s.topicId, lang) ?: s.name.lowercase().replaceFirstChar { it.uppercase() }
+}
+
+/**
+ * A labelled glass dropdown: the field shows the choice; tapped, a frosted panel the field's
+ * width unfolds beneath it (fade and scale from the top), the current choice tinted and
+ * ticked and scrolled into view.
+ */
+@Composable
+private fun GlassDropdown(label: String, options: List<Pair<String?, String>>, selected: String?, modifier: Modifier = Modifier, onSelect: (String?) -> Unit) {
+    val g = Glass
+    var open by remember { mutableStateOf(false) }
+    var fieldWidth by remember { mutableStateOf(0) }
+    var fieldHeight by remember { mutableStateOf(0) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val chevron by androidx.compose.animation.core.animateFloatAsState(if (open) 180f else 0f, label = "chevron")
+    val fieldShape = RoundedCornerShape(16.dp)
+    Column(modifier) {
+        Text(label.uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.textSecondary, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+        Box {
+            Row(
+                Modifier.fillMaxWidth()
+                    .onGloballyPositioned { fieldWidth = it.size.width; fieldHeight = it.size.height }
+                    .clip(fieldShape)
+                    .background(if (open) g.accent.copy(alpha = 0.10f) else g.chipFill)
+                    .border(1.dp, if (open) g.accent.copy(alpha = 0.45f) else g.hairline, fieldShape)
+                    .clickable { open = !open }
+                    .padding(start = 14.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    options.firstOrNull { it.first == selected }?.second.orEmpty(),
+                    style = sans(14.sp, FontWeight.SemiBold), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                )
+                Icon(Icons.Filled.KeyboardArrowDown, null, tint = if (open) g.accentSoft else g.textSecondary, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = chevron })
+            }
+            if (open) {
+                androidx.compose.ui.window.Popup(
+                    offset = androidx.compose.ui.unit.IntOffset(0, fieldHeight + with(density) { 6.dp.roundToPx() }),
+                    onDismissRequest = { open = false },
+                    properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+                ) {
+                    val shown = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                    androidx.compose.animation.AnimatedVisibility(
+                        shown,
+                        enter = fadeIn(tween(140)) + androidx.compose.animation.scaleIn(tween(180), initialScale = 0.94f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)),
+                    ) {
+                        val panel = RoundedCornerShape(18.dp)
+                        val scroll = rememberScrollState()
+                        val rowPx = with(density) { 46.dp.toPx() }
+                        LaunchedEffect(Unit) {
+                            val k = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
+                            scroll.scrollTo(((k - 2) * rowPx).toInt().coerceAtLeast(0))
+                        }
+                        Column(
+                            Modifier.width(with(density) { fieldWidth.toDp() })
+                                .shadow(18.dp, panel, ambientColor = Color.Black, spotColor = Color.Black)
+                                .clip(panel)
+                                // Solid, a step lighter than the page: it floats above the list, nothing shows through.
+                                // The page's own dark (light) colour, made fully solid so nothing shows through.
+                                .background(g.deviceBg.copy(alpha = 1f).compositeOver(if (g.isDark) Color.Black else Color.White))
+                                .border(1.dp, g.hairline, panel)
+                                .heightIn(max = 330.dp)
+                                .verticalScroll(scroll)
+                                .padding(6.dp),
+                        ) {
+                            options.forEach { (key, name) ->
+                                val on = key == selected
+                                Row(
+                                    Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(12.dp))
+                                        .background(if (on) g.accent.copy(alpha = 0.14f) else Color.Transparent)
+                                        .clickable { onSelect(key); open = false }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        name, style = sans(14.sp, if (on) FontWeight.SemiBold else FontWeight.Medium),
+                                        color = if (on) g.accentSoft else g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                                    )
+                                    if (on) Icon(Icons.Filled.Check, null, tint = g.accentSoft, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

@@ -173,7 +173,7 @@
     <string name="theme_system">Sistema</string>
     <string name="theme_dark">Cristal negro</string>
     <string name="theme_light">Papel editorial</string>
-    <string name="topics_hint">Reordena con las flechas, oculta los temas que no lees y toca la campana para recibir una notificación local cuando lleguen noticias nuevas.</string>
+    <string name="topics_hint">Arrastra un tema por su asa para reordenarlo, oculta los que no lees y toca la campana para recibir una notificación local cuando lleguen noticias nuevas.</string>
     <string name="topics_new_button">Nuevo tema con palabras clave o fuentes</string>
     <string name="topic_keywords">Palabras clave: %1$s</string>
     <string name="topic_sources">%1$d fuentes</string>
@@ -579,4 +579,28 @@
     <string name="presenter_correspondent_hint">Conciso e informativo: las mínimas palabras entre tú y la noticia.</string>
     <string name="presenter_conversational_hint">Te habla directamente, con un tono cálido y relajado.</string>
     <string name="presenter_sample_topic">Portada</string>
+    <string name="msg_added_sources">%1$d fuentes añadidas</string>
+    <string name="by_country_title">Añadir fuentes por país</string>
+    <string name="by_country_hint">Explora los medios de un país por tema y añade varios a la vez.</string>
+    <string name="country_label">País</string>
+    <string name="topic_label">Tema</string>
+    <string name="global">Global</string>
+    <string name="all_topics">Todos los temas</string>
+    <string name="dir_loading">Buscando los medios de hoy…</string>
+    <string name="dir_failed">No se pudieron cargar los medios. Revisa la conexión e inténtalo de nuevo.</string>
+    <string name="dir_stories">%1$d noticias hoy</string>
+    <string name="dir_added">Ya es una fuente</string>
+    <string name="add_selected">Añadir %1$d</string>
+    <string name="dir_general">Portada</string>
+    <string name="dir_health">Salud</string>
+    <string name="cd_drag_topic">Arrastra para reordenar</string>
+    <string name="related_keywords">Palabras relacionadas</string>
+    <string name="related_keywords_hint">Escribe un nombre o algunas palabras clave: aquí aparecen otras relacionadas, y cada una que añades trae más.</string>
+    <string name="suggested_sources">Fuentes sugeridas</string>
+    <string name="suggested_sources_hint">Los medios que más cubren estas palabras clave, en conjunto.</string>
+    <string name="suggested_source_hits">%1$d noticias · %2$s</string>
+    <string name="op_discover_title">Firmas y voces para seguir</string>
+    <string name="op_discover_sub">Columnistas, comentaristas y los temas sobre los que se escribe.</string>
+    <string name="op_discover_cta">Encuentra firmas, columnas y voces para seguir</string>
+    <string name="dir_story_one">1 noticia hoy</string>
 </resources>

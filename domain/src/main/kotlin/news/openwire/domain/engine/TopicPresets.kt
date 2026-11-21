@@ -177,6 +177,34 @@ object KeywordMiner {
             .take(limit)
     }
 
+    /** The names and terms in one headline (proper names; for Arabic, its content words), minus [own] words. */
+    internal fun terms(title: String, own: Set<String>): Set<String> {
+        val clean = title.substringBeforeLast(" - ").trim()
+        val words = clean.split(TOKEN_SPLIT).map { it.trim('\'', '’', '.', '-') }.filter { it.isNotEmpty() }
+        val out = LinkedHashSet<String>()
+        if (clean.count { it in '\u0600'..'\u06FF' } > clean.length / 4) {
+            // No capitals in Arabic: content words (and pairs of them) carry the names.
+            val content = words.filter { it.length >= 3 && it !in AR_STOP && it.lowercase() !in own }
+            content.forEach(out::add)
+            content.zipWithNext().forEach { (a, b) -> out += "$a $b" }
+            return out
+        }
+        var i = 0
+        while (i < words.size) {
+            if (isName(words[i], i == 0)) {
+                var j = i
+                while (j + 1 < words.size && isName(words[j + 1], false) && j - i < 2) j++
+                val phrase = words.subList(i, j + 1).joinToString(" ")
+                val key = phrase.lowercase()
+                if (key !in STOP && key.split(' ').none { it in own } && phrase.length > 2) out += phrase
+                i = j + 1
+            } else i++
+        }
+        return out
+    }
+
+    private val AR_STOP = setOf("في", "من", "على", "إلى", "عن", "مع", "بعد", "قبل", "هذا", "هذه", "التي", "الذي", "حول", "خلال", "بين", "عند", "كما", "أن", "إن", "ما", "لا", "لم", "لن", "قد", "كل", "أو", "ثم", "حتى", "منذ", "عبر", "يوم", "اليوم", "أمس", "عاجل", "فيديو", "بالصور", "شاهد")
+
     private fun isName(w: String, sentenceStart: Boolean): Boolean {
         if (w.length < 2 || w.lowercase() in STOP) return false
         if (w.all { it.isUpperCase() || it.isDigit() || it == '&' } && w.length <= 6 && w.any { it.isLetter() }) return true // acronyms: NATO, OPEC, F1

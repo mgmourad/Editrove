@@ -33,6 +33,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Search
@@ -102,7 +108,18 @@ class OpinionActions(
     val toggleAccount: (String) -> Unit,
     val addTab: (String) -> Unit,
     val removeTab: (String) -> Unit,
+    /** Alerts on/off for a followed writer ("a:"), account ("b:") or topic ("t:"). */
+    val toggleMute: (String) -> Unit = {},
 )
+
+/** Alert keys: a writer, a Bluesky account, an opinion topic. */
+internal fun writerKey(name: String) = "a:" + OpinionCatalog.authorKey(name)
+internal fun accountKey(handle: String) = "b:$handle"
+internal fun topicKey(topic: String) = "t:" + topic.trim().lowercase()
+
+/** What a card's bell shows and does: off (not followed), on, or muted. */
+private class Bells(val authors: Set<String>, val accounts: Set<String>, val tabs: List<String>, val muted: Set<String>)
+private val LocalBells = androidx.compose.runtime.staticCompositionLocalOf { Bells(emptySet(), emptySet(), emptyList(), emptySet()) }
 
 private const val FOLLOWING = "\u0000following"
 private const val ALL = "\u0000all"
@@ -118,22 +135,30 @@ fun OpinionScreen(
     followedAccounts: Set<String>,
     tabs: List<String>,
     actions: OpinionActions,
+    muted: Set<String> = emptySet(),
 ) {
     val c = if (Glass.isDark) Night else Day
+    var discover by rememberSaveable { mutableStateOf(false) }
+    var refreshing by remember { mutableStateOf(false) }
     var tab by rememberSaveable { mutableStateOf(if (followedAuthors.isEmpty() && followedAccounts.isEmpty()) ALL else FOLLOWING) }
     var refresh by remember { mutableIntStateOf(0) }
     var query by rememberSaveable { mutableStateOf("") }
 
-    val columns by produceState<List<OpinionSource.Column>?>(null, appLanguage, refresh) { value = source.columns(appLanguage, force = refresh > 0) }
+    val columns by produceState<List<OpinionSource.Column>?>(null, appLanguage, refresh) {
+        refreshing = refresh > 0
+        value = source.columns(appLanguage, force = refresh > 0)
+        refreshing = false
+    }
     // Suggestions in the page's own script (an English headline doesn't suggest a tab on an Arabic page).
     val trending = remember(news, appLanguage) {
         Trending.topics(news, max = 12).filter { t -> tabs.none { it.equals(t, true) } }
             .filter { t -> (appLanguage == "ar") == t.any { it in '\u0600'..'\u06FF' } }.take(10)
     }
 
+    androidx.compose.runtime.CompositionLocalProvider(LocalBells provides Bells(followedAuthors.map(OpinionCatalog::authorKey).toSet(), followedAccounts, tabs, muted)) {
     Box(Modifier.fillMaxSize().background(c.bg)) {
         LazyColumn(contentPadding = padding, modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-            item("head") { Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) { Header(c) { refresh++ } } }
+            item("head") { Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) { Header(c, refreshing, onDiscover = { discover = true }) { refresh++ } } }
             item("tabs") {
                 Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
                     Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -153,7 +178,7 @@ fun OpinionScreen(
                 searchResults(c, source, query.trim(), columns, appLanguage, followedAuthors, followedAccounts, actions,
                     onAddTab = { q -> actions.addTab(q); tab = q; query = "" })
             } else when (tab) {
-                FOLLOWING -> followingTab(c, source, columns, followedAuthors, followedAccounts, appLanguage, actions, refresh)
+                FOLLOWING -> followingTab(c, source, columns, followedAuthors, followedAccounts, appLanguage, actions, refresh) { discover = true }
                 ALL, ANALYSIS -> {
                     val kind = if (tab == ALL) OpinionKind.OPINION else OpinionKind.ANALYSIS
                     val list = columns
@@ -176,18 +201,87 @@ fun OpinionScreen(
                     modifier = Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(vertical = 16.dp))
             }
         }
+        // Writers, columns, voices and trending topics to follow: a page of their own.
+        if (discover) DiscoverSheet(c, columns, appLanguage, followedAuthors, followedAccounts, trending, actions, onClose = { discover = false }) { t -> tab = t }
     }
+    }
+}
+
+/** The (+) page: everything there is to follow, without pushing what you follow down the page. */
+@Composable
+private fun DiscoverSheet(
+    c: OpEdPalette, columns: List<OpinionSource.Column>?, appLanguage: String, authors: Set<String>, accounts: Set<String>,
+    trending: List<String>, actions: OpinionActions, onClose: () -> Unit, onTab: (String) -> Unit,
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(Modifier.fillMaxSize().background(c.bg)) {
+            LazyColumn(
+                Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(),
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                item("d-head") {
+                    Row(Modifier.widthIn(max = 760.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(tr(R.string.op_discover_title), style = serif(28.sp, FontWeight.Bold), color = c.text, modifier = Modifier.weight(1f))
+                        Icon(Icons.Filled.Close, tr(R.string.action_close), tint = c.text, modifier = Modifier.clip(CircleShape).clickable(onClick = onClose).padding(8.dp).size(22.dp))
+                    }
+                    Text(tr(R.string.op_discover_sub), style = serif(15.sp, lineHeight = 21.sp).copy(fontStyle = FontStyle.Italic), color = c.dim, modifier = Modifier.widthIn(max = 760.dp).fillMaxWidth())
+                }
+                if (trending.isNotEmpty()) item("d-trend") {
+                    Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) { Trending(c, trending) { t -> actions.addTab(t); onTab(t); onClose() } }
+                }
+                val writers = columnists(columns.orEmpty(), appLanguage, authors)
+                if (columns == null) item("d-load") { Status(c, tr(R.string.op_loading)) }
+                writers.groupBy { it.language }.forEach { (lang, list) ->
+                    item("d-cw-$lang") { Rule(c, tr(R.string.op_columnists, news.openwire.domain.engine.Languages.of(lang)?.nativeName ?: lang)) }
+                    items(list.take(20), key = { "dw" + it.key }) { w ->
+                        val on = OpinionCatalog.authorKey(w.name) in authors.map(OpinionCatalog::authorKey)
+                        WriterRow(c, w, followed = on) { actions.toggleAuthor(w.name) }
+                    }
+                }
+                val voices = OpinionCatalog.voicesFor(appLanguage)
+                if (voices.isNotEmpty()) {
+                    item("d-voices") { Rule(c, tr(R.string.op_on_bluesky)) }
+                    items(voices, key = { "dv" + it.handle }) { v -> VoiceRow(c, v, followed = v.handle in accounts) { actions.toggleAccount(v.handle) } }
+                }
+            }
+        }
+    }
+}
+
+/** The alerts bell on a card: on for what you follow (tap to mute), off otherwise (tap to follow, with alerts). */
+@Composable
+private fun CardBell(c: OpEdPalette, key: String, followed: Boolean, onFollow: () -> Unit, onToggle: () -> Unit) {
+    val bells = LocalBells.current
+    val on = followed && key !in bells.muted
+    Icon(
+        if (on) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsNone,
+        tr(if (on) R.string.cd_stop_notify else R.string.cd_notify_me),
+        tint = if (on) c.accent else c.dim,
+        modifier = Modifier.clip(CircleShape).clickable { if (!followed) onFollow() else onToggle() }.padding(6.dp).size(16.dp),
+    )
 }
 
 private fun LazyListScope.followingTab(
     c: OpEdPalette, source: OpinionSource, columns: List<OpinionSource.Column>?, authors: Set<String>, accounts: Set<String>,
-    appLanguage: String, actions: OpinionActions, refresh: Int,
+    appLanguage: String, actions: OpinionActions, refresh: Int, onDiscover: () -> Unit,
 ) {
     val byWriters = OpinionCatalog.byAuthors(columns.orEmpty().map { it.article }, authors)
     if (authors.isEmpty() && accounts.isEmpty()) item("f-empty") {
         Column(Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(vertical = 18.dp)) {
             Text("“", style = serif(64.sp, FontWeight.Bold, lineHeight = 50.sp), color = c.accent)
             Text(tr(R.string.op_follow_empty), style = serif(19.sp, lineHeight = 27.sp).copy(fontStyle = FontStyle.Italic), color = c.text)
+        }
+    }
+    item("f-discover") {
+        Row(
+            Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, c.rule, RoundedCornerShape(12.dp))
+                .clickable(onClick = onDiscover).padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Filled.Add, null, tint = c.accent, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(tr(R.string.op_discover_cta), style = sans(14.sp, FontWeight.SemiBold), color = c.text)
         }
     }
     if (byWriters.isNotEmpty()) {
@@ -207,17 +301,6 @@ private fun LazyListScope.followingTab(
             }
         }
     }
-    // Columnists from the outlets' own opinion pages, in this page's language first, then English.
-    val writers = columnists(columns.orEmpty(), appLanguage, authors)
-    writers.groupBy { it.language }.forEach { (lang, list) ->
-        item("cw-$lang") { Rule(c, tr(R.string.op_columnists, news.openwire.domain.engine.Languages.of(lang)?.nativeName ?: lang)) }
-        items(list.take(12), key = { "w" + it.key }) { w -> WriterRow(c, w, followed = false) { actions.toggleAuthor(w.name) } }
-    }
-    val voices = OpinionCatalog.voicesFor(appLanguage).filter { it.handle !in accounts }
-    if (voices.isNotEmpty()) {
-        item("voices") { Rule(c, tr(R.string.op_on_bluesky)) }
-        items(voices, key = { "v" + it.handle }) { v -> VoiceRow(c, v, followed = false) { actions.toggleAccount(v.handle) } }
-    }
 }
 
 private fun LazyListScope.topicTab(
@@ -231,7 +314,10 @@ private fun LazyListScope.topicTab(
         }
         val list = (matching + searched.orEmpty()).distinctBy { it.title.lowercase() }.take(30)
         Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
-            Rule(c, tr(R.string.op_on_topic, topic))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { Rule(c, tr(R.string.op_on_topic, topic)) }
+                CardBell(c, topicKey(topic), followed = true, onFollow = {}) { actions.toggleMute(topicKey(topic)) }
+            }
             when {
                 searched == null && matching.isEmpty() -> Status(c, tr(R.string.op_loading))
                 list.isEmpty() -> Status(c, tr(R.string.op_nothing))
@@ -262,12 +348,25 @@ private fun LazyListScope.columnItems(c: OpEdPalette, prefix: String, list: List
 }
 
 @Composable
-private fun Header(c: OpEdPalette, onRefresh: () -> Unit) {
-    Column(Modifier.padding(top = 8.dp, bottom = 8.dp)) {
+private fun Header(c: OpEdPalette, refreshing: Boolean, onDiscover: () -> Unit, onRefresh: () -> Unit) {
+    // Spins while the pages reload.
+    val spin = androidx.compose.animation.core.rememberInfiniteTransition(label = "spin")
+    val angle by spin.animateFloat(0f, 360f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing)), label = "angle")
+    Column(Modifier.padding(bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(tr(R.string.op_kicker), style = mono(11.sp, FontWeight.SemiBold, 0.2.em), color = c.accent, modifier = Modifier.weight(1f))
-            Icon(Icons.Filled.Refresh, tr(R.string.action_refresh), tint = c.dim, modifier = Modifier.clip(CircleShape).clickable(onClick = onRefresh).padding(8.dp).size(20.dp))
+            Icon(
+                Icons.Filled.Refresh, tr(R.string.action_refresh), tint = if (refreshing) c.accent else c.dim,
+                modifier = Modifier.clip(CircleShape).clickable(enabled = !refreshing, onClick = onRefresh).padding(8.dp).size(22.dp)
+                    .graphicsLayer { rotationZ = if (refreshing) angle else 0f },
+            )
+            // Writers, columns and voices to follow.
+            Icon(
+                Icons.Filled.Add, tr(R.string.op_discover_title), tint = c.onAccent,
+                modifier = Modifier.padding(start = 4.dp).clip(CircleShape).background(c.accent).clickable(onClick = onDiscover).padding(5.dp).size(18.dp),
+            )
         }
+        Spacer(Modifier.height(6.dp))
         Box(Modifier.fillMaxWidth().height(3.dp).background(c.text))
         Spacer(Modifier.height(10.dp))
         Text(tr(R.string.op_title), style = serif(40.sp, FontWeight.Bold, lineHeight = 44.sp), color = c.text)
@@ -400,6 +499,10 @@ private fun ColumnCard(c: OpEdPalette, a: Article, followed: Boolean, actions: O
                 listOfNotNull(a.source, NewsProcessor.formatRelativeTime(a.publishedAt).ifBlank { null }).joinToString("  ·  "),
                 style = mono(10.sp, tracking = 0.04.em), color = c.dim, maxLines = 1,
             )
+            a.author?.let { name ->
+                Spacer(Modifier.width(4.dp))
+                CardBell(c, writerKey(name), followed, onFollow = { actions.toggleAuthor(name) }) { actions.toggleMute(writerKey(name)) }
+            }
         }
     }
     Box(Modifier.fillMaxWidth().height(1.dp).background(c.rule))
@@ -454,6 +557,10 @@ private fun PostCard(c: OpEdPalette, p: SocialPost, followed: Boolean, actions: 
             Spacer(Modifier.width(14.dp))
             Icon(Icons.Outlined.Repeat, null, tint = c.dim, modifier = Modifier.size(14.dp))
             Text(" ${p.reposts}", style = mono(11.sp), color = c.dim)
+            if (p.network == "Bluesky") {
+                Spacer(Modifier.weight(1f))
+                CardBell(c, accountKey(p.authorHandle), followed, onFollow = { actions.toggleAccount(p.authorHandle) }) { actions.toggleMute(accountKey(p.authorHandle)) }
+            }
         }
     }
 }

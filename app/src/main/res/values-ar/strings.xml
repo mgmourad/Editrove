@@ -173,7 +173,7 @@
     <string name="theme_system">النظام</string>
     <string name="theme_dark">الزجاج الأسود</string>
     <string name="theme_light">الورق التحريري</string>
-    <string name="topics_hint">أعد الترتيب بالأسهم، وأخفِ المواضيع التي لا تقرؤها، واضغط على الجرس لتلقي إشعار محلي عند وصول أخبار جديدة.</string>
+    <string name="topics_hint">اسحب الموضوع من مقبضه لإعادة ترتيبه، وأخفِ المواضيع التي لا تقرؤها، واضغط على الجرس لتلقي إشعار محلي عند وصول أخبار جديدة.</string>
     <string name="topics_new_button">موضوع جديد من كلمات مفتاحية أو مصادر</string>
     <string name="topic_keywords">الكلمات المفتاحية: %1$s</string>
     <string name="topic_sources">%1$d مصادر</string>
@@ -579,4 +579,28 @@
     <string name="presenter_correspondent_hint">موجز ومباشر: أقل الكلمات بينك وبين الخبر.</string>
     <string name="presenter_conversational_hint">يخاطبك مباشرة بأسلوب دافئ وهادئ، ويودّعك بلطف.</string>
     <string name="presenter_sample_topic">أهم الأخبار</string>
+    <string name="msg_added_sources">تمت إضافة %1$d مصادر</string>
+    <string name="by_country_title">إضافة مصادر حسب البلد</string>
+    <string name="by_country_hint">تصفّح وسائل إعلام بلد ما حسب الموضوع وأضف عدة مصادر دفعة واحدة.</string>
+    <string name="country_label">البلد</string>
+    <string name="topic_label">الموضوع</string>
+    <string name="global">عالمي</string>
+    <string name="all_topics">كل المواضيع</string>
+    <string name="dir_loading">جارٍ البحث عن وسائل الإعلام اليوم…</string>
+    <string name="dir_failed">تعذّر تحميل وسائل الإعلام. تحقق من الاتصال وحاول مجدداً.</string>
+    <string name="dir_stories">%1$d أخبار اليوم</string>
+    <string name="dir_added">مضاف بالفعل</string>
+    <string name="add_selected">إضافة %1$d مختارة</string>
+    <string name="dir_general">أهم الأخبار</string>
+    <string name="dir_health">الصحة</string>
+    <string name="cd_drag_topic">اسحب لإعادة الترتيب</string>
+    <string name="related_keywords">كلمات مرتبطة</string>
+    <string name="related_keywords_hint">اكتب اسماً أو بضع كلمات مفتاحية: تظهر هنا كلمات مرتبطة، وكل كلمة تضيفها تجلب المزيد.</string>
+    <string name="suggested_sources">مصادر مقترحة</string>
+    <string name="suggested_sources_hint">الوسائل الأكثر تغطية لهذه الكلمات مجتمعة.</string>
+    <string name="suggested_source_hits">%1$d أخبار · %2$s</string>
+    <string name="op_discover_title">كتّاب وأصوات لمتابعتها</string>
+    <string name="op_discover_sub">كتّاب أعمدة ومعلّقون والمواضيع التي يكتب عنها الناس.</string>
+    <string name="op_discover_cta">ابحث عن كتّاب وأعمدة وأصوات لمتابعتها</string>
+    <string name="dir_story_one">خبر واحد اليوم</string>
 </resources>

@@ -131,7 +131,8 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_VIEW -> intent.dataString?.let { vm.openLink(it) }
             else -> {
                 intent.getStringExtra(EXTRA_TAB)?.let { t -> news.openwire.ui.home.NavTab.entries.firstOrNull { it.name == t }?.let(vm::selectTab) }
-                intent.getStringExtra(EXTRA_TOPIC)?.let { vm.selectTopicId(it) }
+                // Opinion alerts open the Analysis & Opinion page; topic alerts their topic.
+                intent.getStringExtra(EXTRA_TOPIC)?.let { if (it == "OPINION") vm.selectTab(news.openwire.ui.home.NavTab.OPINION) else vm.selectTopicId(it) }
                 // Deep links into Settings (also used for the user guide's screenshots).
                 intent.getStringExtra(EXTRA_SETTINGS)?.let { page ->
                     intent.getStringExtra(EXTRA_QUERY)?.let { vm.setSettingsQuery(it) }

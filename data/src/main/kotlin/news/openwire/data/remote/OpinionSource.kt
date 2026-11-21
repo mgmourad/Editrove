@@ -60,7 +60,8 @@ class OpinionSource(
     private suspend fun read(feed: OpinionFeed, i: Int): List<Column> = runCatching {
         rss.fetchFeed(feed.url).items.take(25).mapIndexed { idx, item ->
             val a = normalizer.normalize(item, "OPINION", idx, feedName = feed.name, feedUrl = feed.url, idPrefix = "op$i")
-            Column(a.copy(source = if (item.sourceName != null) a.source else feed.name.substringBefore(" · ")), feed.kind, feed.language)
+            // Some feeds put markup in titles ("<em>Grand Theft Auto VI</em> Is …"): plain text only.
+            Column(a.copy(title = a.title.replace(TAGS, "").trim(), source = if (item.sourceName != null) a.source else feed.name.substringBefore(" · ")), feed.kind, feed.language)
         }
     }.getOrDefault(emptyList())
 
@@ -116,3 +117,5 @@ class OpinionSource(
 
     private companion object { const val TTL = 10 * 60_000L }
 }
+
+private val TAGS = Regex("<[^>]{1,40}>")

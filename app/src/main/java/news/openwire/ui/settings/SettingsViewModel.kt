@@ -174,9 +174,20 @@ class SettingsViewModel(
 
     fun clearKeywordIdeas() { _keywordIdeas.value = KeywordIdeas.Idle }
 
-    fun addTopic(label: String, keywords: String, sources: List<String>): Boolean = try {
-        val topic = TopicRegistry.newCustomTopic(label, TopicRegistry.parseCommaKeywords(keywords), sources, settings.value.edition, clock())
-        settingsRepo.update { s -> s.copy(customTopics = s.customTopics + topic, topicOrder = s.topicOrder?.plus(topic.id)) }
+    fun addTopic(label: String, keywords: String, sources: List<String>, outlets: List<news.openwire.domain.engine.TopicGraph.Outlet> = emptyList()): Boolean = try {
+        val words = TopicRegistry.parseCommaKeywords(keywords)
+        val topic = TopicRegistry.newCustomTopic(label, words, sources, settings.value.edition, clock())
+        // Suggested outlets not among the installed sources: their stories on these keywords.
+        val country = TopicRegistry.country(settings.value.edition.country)
+        val query = (words.ifEmpty { listOf(label) }).take(6).joinToString(" OR ") { if (' ' in it) "\"$it\"" else it }
+        val feeds = outlets.map { o ->
+            FeedSource(
+                id = "topic_${o.domain.replace(Regex("[^a-z0-9]"), "_")}_${clock().toString().takeLast(4)}",
+                name = o.name, url = TopicRegistry.googleNewsSearchUrl("site:${o.domain} ($query) when:7d", country),
+                domain = o.domain, topics = listOf(topic.id), maxArticles = 8, category = "Custom", isCustom = true,
+            )
+        }
+        settingsRepo.update { s -> s.copy(customTopics = s.customTopics + topic, topicOrder = s.topicOrder?.plus(topic.id), customFeeds = s.customFeeds + feeds) }
         _message.value = tr(R.string.msg_added_topic, topic.label)
         true
     } catch (e: IllegalArgumentException) {
@@ -254,6 +265,107 @@ class SettingsViewModel(
         }
         val where = topicsFor(s0).filter { it.id in topics }.joinToString(" · ") { it.label }
         _message.value = tr(R.string.msg_added_to, f.name, where)
+    }
+
+    // ---- Sources by country ----
+
+    /** Outlets of a country (or, for "Global", the main countries in Editrove's language), by section. */
+    sealed interface Directory {
+        data object Idle : Directory
+        data object Loading : Directory
+        data class Ready(val sections: Map<news.openwire.data.remote.SourceDirectory.Section, List<news.openwire.data.remote.SourceDirectory.Outlet>>) : Directory
+        data object Failed : Directory
+    }
+
+    private val directory = news.openwire.data.remote.SourceDirectory()
+    private val _directoryState = MutableStateFlow<Directory>(Directory.Idle)
+    val directoryState: StateFlow<Directory> = _directoryState
+    private var directoryJob: kotlinx.coroutines.Job? = null
+
+    /** [country] null = Global; [section] null = all sections. */
+    fun loadDirectory(country: String?, section: news.openwire.data.remote.SourceDirectory.Section?) {
+        directoryJob?.cancel()
+        _directoryState.value = Directory.Loading
+        directoryJob = viewModelScope.launch {
+            val app = news.openwire.domain.engine.Languages.effective(settings.value.language)
+            val countries = if (country != null) listOf(TopicRegistry.country(country))
+            else TopicRegistry.COUNTRIES.filter { it.language == app }.take(3).ifEmpty { TopicRegistry.COUNTRIES.take(3) }
+            val sections = section?.let(::listOf) ?: news.openwire.data.remote.SourceDirectory.Section.entries
+            val found = runCatching { directory.outlets(countries, sections) }.getOrDefault(emptyMap())
+            _directoryState.value = if (found.isEmpty()) Directory.Failed else Directory.Ready(found)
+        }
+    }
+
+    /** True when an outlet's site is already one of the reader's sources. */
+    fun hasOutlet(domain: String): Boolean {
+        val s = settings.value
+        return s.customFeeds.any { it.domain.equals(domain, true) || it.url.contains("site:$domain") || it.url.contains("site%3A$domain") }
+    }
+
+    /** Adds the chosen outlets, each to the tab for its section (general news: the national tab, or International). */
+    fun addDirectoryOutlets(outlets: List<news.openwire.data.remote.SourceDirectory.Outlet>) {
+        if (outlets.isEmpty()) return
+        val s0 = settings.value
+        val app = news.openwire.domain.engine.Languages.effective(s0.language)
+        settingsRepo.update { s ->
+            val add = outlets.filter { o -> s.customFeeds.none { it.url == directory.feedUrl(o) } }.map { o ->
+                val lang = TopicRegistry.country(o.country).hl.substringBefore('-')
+                val topics = when (o.section) {
+                    news.openwire.data.remote.SourceDirectory.Section.GENERAL ->
+                        if (o.country == s.edition.country) news.openwire.domain.engine.FeedDiscovery.topicsFor(lang, app, o.country)
+                        else listOfNotNull("INTERNATIONAL", "TOP".takeIf { lang == app })
+                    else -> listOf(o.section.topicId)
+                }
+                FeedSource(
+                    id = "dir_${o.section.name.lowercase()}_${o.domain.replace(Regex("[^a-z0-9]"), "_")}_${clock().toString().takeLast(4)}",
+                    name = o.name, url = directory.feedUrl(o), domain = o.domain, topics = topics, maxArticles = 8, category = "Custom", isCustom = true,
+                )
+            }
+            s.copy(customFeeds = s.customFeeds + add)
+        }
+        _message.value = tr(R.string.msg_added_sources, outlets.size)
+    }
+
+    // ---- Topic suggestions (keywords and outlets, from live headlines) ----
+
+    data class TopicSuggest(val keywords: List<String> = emptyList(), val outlets: List<news.openwire.domain.engine.TopicGraph.Outlet> = emptyList(), val loading: Boolean = false)
+
+    private val _topicSuggest = MutableStateFlow(TopicSuggest())
+    val topicSuggest: StateFlow<TopicSuggest> = _topicSuggest
+    private val seedCache = java.util.concurrent.ConcurrentHashMap<String, List<news.openwire.domain.engine.TopicGraph.Headline>>()
+    private var suggestJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Re-reads the topic's seeds (its name and keywords): each new seed's live headlines are
+     * fetched once, and keywords and outlets are scored across all of them.
+     */
+    fun updateTopicSeeds(name: String, keywords: List<String>) {
+        val seeds = (listOf(name) + keywords).map { it.trim() }.filter { it.length >= 2 }.distinctBy { it.lowercase() }.take(10)
+        suggestJob?.cancel()
+        if (seeds.isEmpty()) { _topicSuggest.value = TopicSuggest(); return }
+        suggestJob = viewModelScope.launch {
+            val missing = seeds.filter { !seedCache.containsKey(it.lowercase()) }
+            if (missing.isNotEmpty()) _topicSuggest.value = _topicSuggest.value.copy(loading = true)
+            val country = TopicRegistry.country(settings.value.edition.country)
+            kotlinx.coroutines.coroutineScope {
+                missing.map { k ->
+                    async {
+                        val heads = runCatching {
+                            news.openwire.data.remote.GoogleNewsRssSource().fetchFeed(TopicRegistry.googleNewsSearchUrl("$k when:7d", country)).items.map { item ->
+                                news.openwire.domain.engine.TopicGraph.Headline(
+                                    item.title.substringBeforeLast(" - "), item.sourceName,
+                                    item.source?.let { news.openwire.domain.engine.FeedDiscovery.domainOf(it) },
+                                )
+                            }
+                        }.getOrDefault(emptyList())
+                        seedCache[k.lowercase()] = heads
+                    }
+                }.forEach { it.await() }
+            }
+            val map = seeds.associateWith { seedCache[it.lowercase()].orEmpty() }
+            val sug = news.openwire.domain.engine.TopicGraph.suggest(map, keywords + name)
+            _topicSuggest.value = TopicSuggest(sug.keywords, sug.outlets, loading = false)
+        }
     }
 
     fun removeFound(url: String) = settingsRepo.update { s -> s.copy(customFeeds = s.customFeeds.filterNot { it.url == url }) }

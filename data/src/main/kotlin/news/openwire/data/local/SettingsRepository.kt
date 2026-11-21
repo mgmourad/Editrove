@@ -96,6 +96,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         val realtimeAlerts: Boolean = false,
         val briefingEngine: String? = null,
         val briefingPresenter: String? = null,
+        val opinionMuted: Set<String> = emptySet(),
     ) {
         fun toSettings() = UserSettings(
             edition = LocalEdition(city, region, country),
@@ -106,6 +107,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
             followedAuthors = followedAuthors,
             followedAccounts = followedAccounts,
             opinionTabs = opinionTabs,
+            opinionMuted = opinionMuted,
             realtimeAlerts = realtimeAlerts,
             customTopics = customTopics.map { Topic(it.id, it.label, liveUrl = it.liveUrl, liveOnly = true, keywords = it.keywords, sources = it.sources, isCustom = true) },
             hiddenTopics = hiddenTopics,
@@ -156,6 +158,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 s.realtimeAlerts,
                 s.briefing.engine,
                 s.briefing.presenter.name,
+                s.opinionMuted,
             )
         }
     }

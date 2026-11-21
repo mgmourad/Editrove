@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire
 
+import news.openwire.i18n.tr
 import android.app.Application
 import android.content.Context
 import android.content.Intent
@@ -52,7 +53,10 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
         // Keep the periodic refresh in step with the user's preferences.
         appScope.launch {
             container.settingsRepository.settings
-                .map { (it.backgroundRefresh || (it.notificationsEnabled && (it.notifyTopics.isNotEmpty() || it.breakingEnabled))) to it.refreshMinutes }
+                .map {
+                    val followsOpinion = it.followedAuthors.isNotEmpty() || it.followedAccounts.isNotEmpty() || it.opinionTabs.isNotEmpty()
+                    (it.backgroundRefresh || (it.notificationsEnabled && (it.notifyTopics.isNotEmpty() || it.breakingEnabled || followsOpinion))) to it.refreshMinutes
+                }
                 .distinctUntilChanged()
                 .collect { (on, minutes) -> RefreshScheduler.schedule(this@OpenWireApp, on, minutes.toLong()) }
         }
@@ -86,7 +90,38 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
                         updates += TopicUpdate(topic.id, topic.label, fresh.take(8).map { NewHeadline(it.title, it.source, it.originalUrl) })
                     }
                 }
+                runCatching { opinionUpdate(s) }.getOrNull()?.let { updates += it }
                 return updates
+            }
+
+            /**
+             * New pieces from followed writers, Bluesky accounts and opinion topics (alerts on by
+             * default; a muted one is skipped). The first check only remembers what's there.
+             */
+            private suspend fun opinionUpdate(s: news.openwire.domain.model.UserSettings): TopicUpdate? {
+                if (!s.notificationsEnabled) return null
+                val authors = s.followedAuthors.filter { news.openwire.opinion.writerKey(it) !in s.opinionMuted }.toSet()
+                val accounts = s.followedAccounts.filter { news.openwire.opinion.accountKey(it) !in s.opinionMuted }.toSet()
+                val tabs = s.opinionTabs.filter { news.openwire.opinion.topicKey(it) !in s.opinionMuted }
+                if (authors.isEmpty() && accounts.isEmpty() && tabs.isEmpty()) return null
+                val lang = news.openwire.domain.engine.Languages.effective(s.language)
+                val src = container.opinion
+                val found = ArrayList<NewHeadline>()
+                if (authors.isNotEmpty()) {
+                    val cols = src.columns(lang, force = true).map { it.article }
+                    news.openwire.domain.opinion.OpinionCatalog.byAuthors(cols, authors).forEach { a -> found += NewHeadline(a.title, a.author ?: a.source, a.originalUrl) }
+                }
+                if (accounts.isNotEmpty()) {
+                    src.following(accounts, force = true).forEach { p -> found += NewHeadline(p.text.take(160), p.authorName, p.url) }
+                }
+                tabs.forEach { t -> src.topicColumns(t, lang, force = true).take(5).forEach { a -> found += NewHeadline(a.title, a.source, a.originalUrl) } }
+                val keys = found.mapNotNull { it.url }
+                val seen = container.feedState.seen(OPINION_ID)
+                container.feedState.setSeen(OPINION_ID, (keys + seen.orEmpty()).toSet())
+                if (seen == null) return null
+                val fresh = found.filter { it.url != null && it.url !in seen }.distinctBy { it.url }
+                if (fresh.isEmpty()) return null
+                return TopicUpdate(OPINION_ID, tr(R.string.op_title), fresh.take(8))
             }
 
             override fun notificationsEnabled(): Boolean = container.settingsRepository.settings.value.notificationsEnabled
@@ -142,5 +177,5 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
         }
     }
 
-    private companion object { const val BREAKING_ID = "BREAKING" }
+    private companion object { const val BREAKING_ID = "BREAKING"; const val OPINION_ID = "OPINION" }
 }

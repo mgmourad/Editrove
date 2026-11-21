@@ -173,7 +173,7 @@
     <string name="theme_system">System</string>
     <string name="theme_dark">Schwarzglas</string>
     <string name="theme_light">Redaktionspapier</string>
-    <string name="topics_hint">Ordne mit den Pfeilen, blende Themen aus, die du nicht liest, und tippe auf die Glocke für eine lokale Benachrichtigung bei neuen Meldungen.</string>
+    <string name="topics_hint">Ziehe ein Thema am Griff, um es zu verschieben, blende Themen aus, die du nicht liest, und tippe auf die Glocke für eine lokale Benachrichtigung bei neuen Meldungen.</string>
     <string name="topics_new_button">Neues Thema aus Stichwörtern oder Quellen</string>
     <string name="topic_keywords">Stichwörter: %1$s</string>
     <string name="topic_sources">%1$d Quellen</string>
@@ -579,4 +579,28 @@
     <string name="presenter_correspondent_hint">Knapp und sachlich: so wenige Worte wie möglich zwischen Ihnen und der Nachricht.</string>
     <string name="presenter_conversational_hint">Spricht Sie direkt an, warm und entspannt, mit freundlicher Verabschiedung.</string>
     <string name="presenter_sample_topic">Top-Meldungen</string>
+    <string name="msg_added_sources">%1$d Quellen hinzugefügt</string>
+    <string name="by_country_title">Quellen nach Land hinzufügen</string>
+    <string name="by_country_hint">Die Medien eines Landes nach Thema durchsehen und mehrere auf einmal hinzufügen.</string>
+    <string name="country_label">Land</string>
+    <string name="topic_label">Thema</string>
+    <string name="global">Global</string>
+    <string name="all_topics">Alle Themen</string>
+    <string name="dir_loading">Medien von heute werden gesucht…</string>
+    <string name="dir_failed">Medien konnten nicht geladen werden. Verbindung prüfen und erneut versuchen.</string>
+    <string name="dir_stories">%1$d Meldungen heute</string>
+    <string name="dir_added">Bereits eine Quelle</string>
+    <string name="add_selected">%1$d hinzufügen</string>
+    <string name="dir_general">Top-Nachrichten</string>
+    <string name="dir_health">Gesundheit</string>
+    <string name="cd_drag_topic">Zum Sortieren ziehen</string>
+    <string name="related_keywords">Verwandte Stichwörter</string>
+    <string name="related_keywords_hint">Gib einen Namen oder ein paar Stichwörter ein: verwandte erscheinen hier, und jedes hinzugefügte bringt weitere.</string>
+    <string name="suggested_sources">Vorgeschlagene Quellen</string>
+    <string name="suggested_sources_hint">Die Medien, die über diese Stichwörter am meisten berichten.</string>
+    <string name="suggested_source_hits">%1$d Meldungen · %2$s</string>
+    <string name="op_discover_title">Autoren &amp; Stimmen zum Folgen</string>
+    <string name="op_discover_sub">Kolumnisten, Kommentatoren und die Themen, über die geschrieben wird.</string>
+    <string name="op_discover_cta">Autoren, Kolumnen und Stimmen zum Folgen finden</string>
+    <string name="dir_story_one">1 Meldung heute</string>
 </resources>

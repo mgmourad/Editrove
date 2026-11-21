@@ -27,10 +27,10 @@ data class AppVersion(val parts: List<Int>, val pre: List<String> = emptyList())
         return pre.size.compareTo(other.pre.size)
     }
 
-    /** A dated build ("build.112026", MMddYY) compares by its date: YYMMdd. */
+    /** A dated build ("build.112026" or "beta.112026", MMddYY) compares by its date: YYMMdd. */
     private fun sortKey(p: List<String>): List<String> {
         val d = p.getOrNull(1)
-        return if (p.size == 2 && p[0] == "build" && d != null && d.length == 6 && d.all(Char::isDigit)) {
+        return if (p.size == 2 && (p[0] == "build" || p[0] == "beta") && d != null && d.length == 6 && d.all(Char::isDigit)) {
             listOf("build", d.substring(4, 6) + d.substring(0, 2) + d.substring(2, 4))
         } else p
     }

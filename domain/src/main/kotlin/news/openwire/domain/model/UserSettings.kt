@@ -20,6 +20,8 @@ data class UserSettings(
     val followedAccounts: Set<String> = emptySet(),
     /** Topic tabs added there (from trending suggestions or typed). */
     val opinionTabs: List<String> = emptyList(),
+    /** Followed writers ("a:"), accounts ("b:") and opinion topics ("t:") whose alerts are off (on by default when followed). */
+    val opinionMuted: Set<String> = emptySet(),
     val customTopics: List<Topic> = emptyList(),
     val hiddenTopics: Set<String> = emptySet(),
     /** Topic ids in display order; null = default order. */

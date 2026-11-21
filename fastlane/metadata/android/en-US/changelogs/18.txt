@@ -1,0 +1,6 @@
+Editrove 0.9.1 Beta (112026) — Smarter topics and sources
+• Add sources by country: pick a country and a topic, and add its news media several at once.
+• New topics suggest related keywords as you type; every keyword you add brings more, with suggested sources that cover them.
+• Drag topics to reorder them.
+• Analysis & Opinion: a (+) page for writers, columns and voices to follow; alerts for what you follow, with a bell on every card; refresh shows it's working.
+• Folded-screen polish: the time on articles, tidier buttons, and a larger edition pill.

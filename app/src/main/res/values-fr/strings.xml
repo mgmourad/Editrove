@@ -173,7 +173,7 @@
     <string name="theme_system">Système</string>
     <string name="theme_dark">Verre noir</string>
     <string name="theme_light">Papier éditorial</string>
-    <string name="topics_hint">Réorganisez avec les flèches, masquez les sujets que vous ne lisez pas et touchez la cloche pour recevoir une notification locale à l’arrivée de nouveaux articles.</string>
+    <string name="topics_hint">Faites glisser un sujet par sa poignée pour le déplacer, masquez ceux que vous ne lisez pas et touchez la cloche pour recevoir une notification locale à l’arrivée de nouveaux articles.</string>
     <string name="topics_new_button">Nouveau sujet à partir de mots-clés ou de sources</string>
     <string name="topic_keywords">Mots-clés : %1$s</string>
     <string name="topic_sources">%1$d sources</string>
@@ -579,4 +579,28 @@
     <string name="presenter_correspondent_hint">Concis et factuel : le moins de mots possible entre vous et l’info.</string>
     <string name="presenter_conversational_hint">Il s’adresse directement à vous, sur un ton chaleureux et détendu.</string>
     <string name="presenter_sample_topic">À la une</string>
+    <string name="msg_added_sources">%1$d sources ajoutées</string>
+    <string name="by_country_title">Ajouter des sources par pays</string>
+    <string name="by_country_hint">Parcourez les médias d’un pays par thème et ajoutez-en plusieurs d’un coup.</string>
+    <string name="country_label">Pays</string>
+    <string name="topic_label">Thème</string>
+    <string name="global">Monde</string>
+    <string name="all_topics">Tous les thèmes</string>
+    <string name="dir_loading">Recherche des médias du jour…</string>
+    <string name="dir_failed">Impossible de charger les médias. Vérifiez la connexion et réessayez.</string>
+    <string name="dir_stories">%1$d articles aujourd’hui</string>
+    <string name="dir_added">Déjà une source</string>
+    <string name="add_selected">Ajouter (%1$d)</string>
+    <string name="dir_general">À la une</string>
+    <string name="dir_health">Santé</string>
+    <string name="cd_drag_topic">Faire glisser pour réordonner</string>
+    <string name="related_keywords">Mots-clés liés</string>
+    <string name="related_keywords_hint">Saisissez un nom ou quelques mots-clés : des mots liés apparaissent ici, et chacun que vous ajoutez en amène d’autres.</string>
+    <string name="suggested_sources">Sources suggérées</string>
+    <string name="suggested_sources_hint">Les médias qui couvrent le plus ces mots-clés, tous confondus.</string>
+    <string name="suggested_source_hits">%1$d articles · %2$s</string>
+    <string name="op_discover_title">Plumes et voix à suivre</string>
+    <string name="op_discover_sub">Chroniqueurs, commentateurs et sujets dont on parle.</string>
+    <string name="op_discover_cta">Trouver des plumes, chroniques et voix à suivre</string>
+    <string name="dir_story_one">1 article aujourd’hui</string>
 </resources>

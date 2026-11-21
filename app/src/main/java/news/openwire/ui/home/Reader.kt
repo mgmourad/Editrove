@@ -322,9 +322,10 @@ internal fun ArticleBody(
         // Reader-service pill: tells you how this story is unlocked and opens that page.
         val context = LocalContext.current
         val service = remember(article.id) { actions.router.serviceFor(article) }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         androidx.compose.foundation.layout.FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(bottom = 12.dp),
+            modifier = Modifier.weight(1f).padding(bottom = 12.dp),
         ) {
         if (service != null) {
             Row(
@@ -338,6 +339,11 @@ internal fun ArticleBody(
                 Spacer(Modifier.width(4.dp))
                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = g.indigo, modifier = Modifier.size(12.dp))
             }
+        }
+        }
+        // Without the top bar (folded): how long ago, across from the reader-service pill.
+        if (!showMetaBar) NewsProcessor.formatRelativeTime(article.publishedAt).takeIf { it.isNotBlank() }?.let {
+            Text(it, style = mono(11.sp, tracking = 0.04.em), color = g.textPrimary.copy(alpha = 0.6f), modifier = Modifier.padding(start = 8.dp, bottom = 12.dp))
         }
         }
 
@@ -394,7 +400,7 @@ internal fun ArticleBody(
         }
 
         if (narrowByline) {
-            Box(Modifier.padding(start = 48.dp, bottom = 18.dp)) {
+            Box(Modifier.padding(bottom = 18.dp)) {
                 OtherOutletsPill(showing = useOthers, original = article.source ?: article.domain ?: "") { if (useOthers) useOthers = false else openOthers() }
             }
         }
@@ -610,16 +616,27 @@ private fun SlowArticleCard(failed: Boolean, onRetry: () -> Unit, onOthers: (() 
             Text(tr(R.string.reader_slow_b), style = sans(13.sp, lineHeight = 20.sp), color = g.textSecondary)
             Spacer(Modifier.height(14.dp))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            Text(
-                tr(R.string.reader_retry), style = sans(13.sp, FontWeight.SemiBold), color = g.textPrimary, textAlign = TextAlign.Center,
-                modifier = Modifier.weight(1f).clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape).clickable(onClick = onRetry).padding(vertical = 11.dp),
-            )
-            onOthers?.let {
-                Text(
-                    tr(R.string.reader_other), style = sans(13.sp, FontWeight.SemiBold), color = Color.White, textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1.6f).clip(CircleShape).background(g.accent).clickable(onClick = it).padding(vertical = 11.dp),
-                )
+        // Two full-width, round-cornered buttons (stacked on a narrow screen, side by side otherwise).
+        val shape = RoundedCornerShape(14.dp)
+        @Composable
+        fun RetryButton(m: Modifier) = Text(
+            tr(R.string.reader_retry), style = sans(14.sp, FontWeight.SemiBold), color = g.textPrimary, textAlign = TextAlign.Center,
+            modifier = m.clip(shape).background(g.chipFill).border(1.dp, g.hairline, shape).clickable(onClick = onRetry).padding(vertical = 13.dp),
+        )
+        @Composable
+        fun OthersButton(m: Modifier, go: () -> Unit) = Text(
+            tr(R.string.reader_other), style = sans(14.sp, FontWeight.SemiBold), color = Color.White, textAlign = TextAlign.Center,
+            modifier = m.clip(shape).background(g.accent).clickable(onClick = go).padding(vertical = 13.dp),
+        )
+        if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 520) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                onOthers?.let { OthersButton(Modifier.fillMaxWidth(), it) }
+                RetryButton(Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                RetryButton(Modifier.weight(1f))
+                onOthers?.let { OthersButton(Modifier.weight(1.6f), it) }
             }
         }
         if (smryUrl.isNotEmpty()) {

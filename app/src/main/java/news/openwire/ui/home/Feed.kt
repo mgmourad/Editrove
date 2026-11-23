@@ -105,10 +105,11 @@ fun mono(size: TextUnit, weight: FontWeight = FontWeight.Normal, tracking: TextU
     TextStyle(fontFamily = JetBrainsMonoFamily, fontSize = size, fontWeight = weight, letterSpacing = tracking)
 
 fun sans(size: TextUnit, weight: FontWeight = FontWeight.Normal, lineHeight: TextUnit = TextUnit.Unspecified) =
-    TextStyle(fontFamily = InterFamily, fontSize = size, fontWeight = weight, lineHeight = lineHeight)
+    // Content direction: Arabic (or Hebrew) text reads right to left and sits on the right, whatever the app's language.
+    TextStyle(fontFamily = InterFamily, fontSize = size, fontWeight = weight, lineHeight = lineHeight, textDirection = androidx.compose.ui.text.style.TextDirection.Content)
 
 fun serif(size: TextUnit, weight: FontWeight = FontWeight.Bold, lineHeight: TextUnit = TextUnit.Unspecified, tracking: TextUnit = 0.sp) =
-    TextStyle(fontFamily = NewsreaderFamily, fontSize = size, fontWeight = weight, lineHeight = lineHeight, letterSpacing = tracking)
+    TextStyle(fontFamily = NewsreaderFamily, fontSize = size, fontWeight = weight, lineHeight = lineHeight, letterSpacing = tracking, textDirection = androidx.compose.ui.text.style.TextDirection.Content)
 
 fun Article.publication(): String = (source ?: domain ?: "").uppercase()
 
@@ -324,10 +325,12 @@ fun LazyGridScope.feedItems(
     magazine: Boolean = false,
     /** Business tab: the market-watch bar under the LIVE ticker. */
     marketWatch: Boolean = false,
+    /** The live bar's stories across topics (null: this feed's own). */
+    ticker: List<TickerItem>? = null,
 ) {
     if (articles.isEmpty()) return
     fun state(a: Article) = a.originalUrl?.let { archive[it] }
-    if (showTicker) fullRow("ticker") { LiveTicker(articles, onOpen) }
+    if (showTicker) fullRow("ticker") { LiveTicker(ticker ?: articles.drop(1).take(12).map { TickerItem(it, category, category) }, onOpen) }
     if (showTicker && marketWatch) fullRow("markets") { MarketBar() }
     val hero = articles.first()
     fullRow("hero-${hero.id}") {
@@ -396,62 +399,116 @@ fun LazyGridScope.feedItems(
 
 // ---- Live ticker -----------------------------------------------------------------
 
-private val TickerColors = listOf(Indigo400, Emerald400, Amber400, Fuchsia400, Rose400)
 
-/** Swipeable live strip of real headlines (slow auto-scroll; tap to open). */
+/** One story in the live bar, with the topic it comes from. */
+data class TickerItem(val article: Article, val topicId: String, val topicLabel: String)
+
+object TickerFeed {
+    private val LIVE = Regex("(?i)\\b(live|live updates|breaking|just in|developing)\\b|مباشر|عاجل|en direct|en vivo|liveticker")
+
+    /**
+     * The newest stories from every topic shown: live coverage and breaking stories first, then
+     * by time, one story per headline, topics interleaved so no single one fills the bar.
+     */
+    fun build(topics: List<Pair<news.openwire.domain.model.Topic, List<Article>>>, now: Long = System.currentTimeMillis(), max: Int = 24): List<TickerItem> {
+        val seen = HashSet<String>()
+        val all = topics.flatMap { (t, list) -> list.take(15).map { TickerItem(it, t.id, t.label) } }
+            .filter { (it.article.publishedAt ?: 0L) > now - 36 * 3_600_000L || it.article.publishedAt == null }
+        val live = all.filter { LIVE.containsMatchIn(it.article.title) && (it.article.publishedAt ?: now) > now - 6 * 3_600_000L }
+            .sortedByDescending { it.article.publishedAt ?: 0L }
+        val rest = all.sortedByDescending { it.article.publishedAt ?: 0L }
+        val out = ArrayList<TickerItem>()
+        val perTopic = HashMap<String, Int>()
+        for (it in live + rest) {
+            val key = it.article.title.lowercase().take(60)
+            if (!seen.add(key)) continue
+            val n = perTopic[it.topicId] ?: 0
+            if (n >= 4 && it !in live) continue
+            perTopic[it.topicId] = n + 1
+            out += it
+            if (out.size >= max) break
+        }
+        return out
+    }
+}
+
+/** Topic colours for the live bar, in the app's palette. */
+private val TopicTint = listOf(Rose400, Indigo400, Emerald400, Amber400, Fuchsia400, Color(0xFF38BDF8), Color(0xFFA3E635), Color(0xFFF472B6))
+
+private fun tintFor(topicId: String) = TopicTint[Math.floorMod(topicId.hashCode(), TopicTint.size)]
+
+/**
+ * The live bar: the latest across your topics, drifting continuously (Arabic headlines drift the
+ * other way); swipe it back and forth, and it carries on a moment after you let go.
+ */
 @Composable
-fun LiveTicker(articles: List<Article>, onOpen: (Article) -> Unit) {
+fun LiveTicker(items: List<TickerItem>, onOpen: (Article) -> Unit) {
     val g = Glass
-    val items = remember(articles) { articles.drop(1).take(10) }
-    val listState = rememberLazyListState()
-    // The strip drifts for half a minute, then rests: an endless marquee keeps the whole glass
-    // UI redrawing even when nobody is reading it. New headlines or a swipe start it again.
-    var moving by remember(items) { mutableStateOf(true) }
+    if (items.isEmpty()) return
+    // Repeated, so the drift never runs out and you can swipe back past the start.
+    val loop = remember(items) { List(LOOPS) { r -> items.mapIndexed { i, it -> Triple(r * items.size + i, it, i) } }.flatten() }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = items.size * (LOOPS / 2))
     val dragged by listState.interactionSource.collectIsDraggedAsState()
-    LaunchedEffect(dragged) { if (dragged) moving = true }
-    LaunchedEffect(items, moving) {
-        if (!moving) return@LaunchedEffect
-        val until = System.currentTimeMillis() + 30_000
-        while (isActive && System.currentTimeMillis() < until) {
-            delay(32)
-            try {
-                if (listState.canScrollForward) listState.scrollBy(1.2f) else { delay(1500); listState.scrollToItem(0) }
-            } catch (e: CancellationException) {
-                if (!isActive) throw e // the user grabbed the strip; resume after they let go
-                delay(2500)
+    val arabic = remember(items) { items.count { RX_AR.containsMatchIn(it.article.title) } * 2 > items.size }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val speed = with(density) { TICKER_DP_PER_SEC.dp.toPx() }
+    LaunchedEffect(items, dragged) {
+        if (dragged) return@LaunchedEffect
+        delay(if (listState.firstVisibleItemScrollOffset == 0 && listState.firstVisibleItemIndex == items.size * (LOOPS / 2)) 400 else 1800)
+        var last = 0L
+        while (isActive) {
+            val t = androidx.compose.runtime.withFrameNanos { it }
+            val dt = if (last == 0L) 0f else ((t - last) / 1e9f).coerceAtMost(0.05f)
+            last = t
+            try { listState.scrollBy(speed * dt) } catch (e: CancellationException) { if (!isActive) throw e }
+            // Far along the loop: jump back by whole copies (invisible), so it never ends.
+            if (listState.firstVisibleItemIndex > items.size * (LOOPS - 1)) {
+                listState.scrollToItem(listState.firstVisibleItemIndex - items.size * (LOOPS / 2), listState.firstVisibleItemScrollOffset)
             }
         }
-        moving = false
+    }
+    LaunchedEffect(dragged) {
+        if (!dragged && listState.firstVisibleItemIndex < items.size) {
+            listState.scrollToItem(listState.firstVisibleItemIndex + items.size * (LOOPS / 2), listState.firstVisibleItemScrollOffset)
+        }
     }
     GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            LivePill(pulsing = moving)
+            LivePill(pulsing = true)
             Spacer(Modifier.width(10.dp))
-            LazyRow(state = listState, modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                itemsIndexed(items, key = { _, a -> a.id }) { index, article ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (index > 0) {
-                            Text("•", style = sans(12.sp), color = g.textPrimary.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 8.dp))
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalLayoutDirection provides if (arabic) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr,
+            ) {
+                LazyRow(state = listState, modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    items(loop.size, key = { loop[it].first }) { k ->
+                        val item = loop[k].second
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("•", style = sans(12.sp), color = g.textPrimary.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 10.dp))
+                            Text(
+                                buildAnnotatedString {
+                                    withStyle(SpanStyle(fontFamily = JetBrainsMonoFamily, fontWeight = FontWeight.Bold, color = tintFor(item.topicId))) {
+                                        append(item.topicLabel.uppercase())
+                                    }
+                                    append("  ")
+                                    append(item.article.title)
+                                    (item.article.source ?: item.article.domain)?.takeIf { it.isNotBlank() }?.let { src -> withStyle(SpanStyle(color = g.textSecondary)) { append("  · $src") } }
+                                },
+                                style = sans(12.sp),
+                                color = g.textPrimary.copy(alpha = 0.88f),
+                                maxLines = 1,
+                                modifier = Modifier.clickable { onOpen(item.article) },
+                            )
                         }
-                        Text(
-                            buildAnnotatedString {
-                                withStyle(SpanStyle(fontFamily = JetBrainsMonoFamily, fontWeight = FontWeight.Bold, color = TickerColors[index % TickerColors.size])) {
-                                    append(shortSource(article))
-                                }
-                                append("  ")
-                                append(article.title)
-                            },
-                            style = sans(12.sp),
-                            color = g.textPrimary.copy(alpha = 0.85f),
-                            maxLines = 1,
-                            modifier = Modifier.clickable { onOpen(article) },
-                        )
                     }
                 }
             }
         }
     }
 }
+
+private const val LOOPS = 40
+private const val TICKER_DP_PER_SEC = 42f
+private val RX_AR = Regex("[\\u0600-\\u06FF]")
 
 private fun shortSource(a: Article): String {
     val s = a.source ?: a.domain?.substringBefore('.') ?: "WIRE"
@@ -569,6 +626,7 @@ fun HeroCard(
                     color = if (selected) Rose200 else Color.White,
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 article.coverageLine()?.let {
                     Spacer(Modifier.height(6.dp))
@@ -622,7 +680,7 @@ fun LeadStoryCard(
                     Text(
                         article.title,
                         style = serif(30.sp, FontWeight.Bold, lineHeight = 34.sp, tracking = (-0.01).em),
-                        color = g.textPrimary, maxLines = 5, overflow = TextOverflow.Ellipsis,
+                        color = g.textPrimary, maxLines = 5, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(),
                     )
                     // The feed's excerpt, or (Google items carry none) the story's opening from its page.
                     val excerpt = article.summary?.takeIf { it.isNotBlank() && FeedWeaver.calculateTitleSimilarity(it, article.title) < 0.7 }
@@ -633,7 +691,7 @@ fun LeadStoryCard(
                     androidx.compose.animation.AnimatedVisibility(opening != null, enter = androidx.compose.animation.fadeIn()) {
                         Column {
                             Spacer(Modifier.height(10.dp))
-                            Text(opening.orEmpty(), style = sans(14.sp, lineHeight = 21.sp), color = g.textSecondary, maxLines = 6, overflow = TextOverflow.Ellipsis)
+                            Text(opening.orEmpty(), style = sans(14.sp, lineHeight = 21.sp), color = g.textSecondary, maxLines = 6, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
                         }
                     }
                     article.coverageLine(3)?.let {
@@ -715,6 +773,7 @@ fun BentoCard(
                 minLines = 3,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
         Spacer(Modifier.height(8.dp))

@@ -22,6 +22,12 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -141,7 +147,7 @@ import news.openwire.ui.theme.Emerald400
 import news.openwire.ui.theme.Glass
 
 private enum class Page(@androidx.annotation.StringRes private val res: Int) {
-    HOME(R.string.settings), EDITION(R.string.edition), LANGUAGE(R.string.language), TOPICS(R.string.topics), ADD_TOPIC(R.string.new_topic), SOURCES(R.string.sources),
+    HOME(R.string.settings), EDITION(R.string.edition), LANGUAGE(R.string.language), TOPICS(R.string.topics), ADD_TOPIC(R.string.new_topic), EDIT_TOPIC(R.string.edit_topic), SOURCES(R.string.sources),
     ADD_SOURCE(R.string.add_source), RULES(R.string.paywall_rules), NOTIFICATIONS(R.string.notifications_refresh),
     APPEARANCE(R.string.appearance), BRIEFING(R.string.audio_briefing), BACKUP(R.string.backup_restore), UPDATES(R.string.updates_changelog), GUIDE(R.string.g_title), ABOUT(R.string.about_editrove),
     ;
@@ -179,7 +185,7 @@ fun SettingsScreen(
     val back: () -> Unit = {
         page = when (page) {
             Page.HOME -> { onClose(); Page.HOME }
-            Page.ADD_TOPIC -> Page.TOPICS
+            Page.ADD_TOPIC, Page.EDIT_TOPIC -> Page.TOPICS
             Page.ADD_SOURCE -> Page.SOURCES
             else -> Page.HOME
         }
@@ -201,7 +207,8 @@ fun SettingsScreen(
         ) {
             RoundIcon(if (page == Page.HOME) Icons.Filled.Close else Icons.AutoMirrored.Filled.ArrowBack, tr(if (page == Page.HOME) R.string.cd_close_settings else R.string.cd_back), back)
             Spacer(Modifier.width(12.dp))
-            AnimatedContent(page.title, transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) }, label = "title") {
+            val editingTopic by vm.editingTopic.collectAsState()
+            AnimatedContent(if (page == Page.EDIT_TOPIC) editingTopic?.label ?: page.title else page.title, transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(120)) }, label = "title") {
                 Text(it, style = serif(24.sp, FontWeight.Bold), color = g.textPrimary)
             }
         }
@@ -226,8 +233,12 @@ fun SettingsScreen(
                         Page.HOME -> homePage(vm, themeMode, onOpenLink) { page = it }
                         Page.EDITION -> item { EditionPage(vm) }
                         Page.LANGUAGE -> item { LanguagePage(vm) }
-                        Page.TOPICS -> topicsPage(vm) { page = Page.ADD_TOPIC }
+                        Page.TOPICS -> topicsPage(vm, onAdd = { page = Page.ADD_TOPIC }) { t -> vm.editingTopic.value = t; page = Page.EDIT_TOPIC }
                         Page.ADD_TOPIC -> item { AddTopicPage(vm) { page = Page.TOPICS } }
+                        Page.EDIT_TOPIC -> item {
+                            val t by vm.editingTopic.collectAsState()
+                            t?.let { AddTopicPage(vm, editing = it) { page = Page.TOPICS } }
+                        }
                         Page.SOURCES -> sourcesPage(vm) { page = Page.ADD_SOURCE }
                         Page.ADD_SOURCE -> item { AddSourcePage(vm) { page = Page.SOURCES } }
                         Page.RULES -> rulesPage(vm)
@@ -524,14 +535,16 @@ private fun SelectRow(title: String, subtitle: String, selected: Boolean, onClic
 
 // ---- Topics -----------------------------------------------------------------------------
 
-private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit) {
-    item { Hint(tr(R.string.topics_hint)) }
+private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, onEdit: (news.openwire.domain.model.Topic) -> Unit) {
+    item { Hint(tr(R.string.topics_hint) + " " + tr(R.string.swipe_hint_topics)) }
     item { PrimaryButton(tr(R.string.topics_new_button), Icons.Filled.Add, onAdd) }
     item {
         val topics by vm.allTopics.collectAsState()
         val s by vm.settings.collectAsState()
         // Drag a topic by its handle to reorder (move up / down stay available to accessibility services).
         var dragging by remember { mutableStateOf<String?>(null) }
+        var renaming by remember { mutableStateOf<news.openwire.domain.model.Topic?>(null) }
+        renaming?.let { t -> RenameDialog(t.label, onDismiss = { renaming = null }) { vm.renameTopic(t.id, it); renaming = null } }
         var dragOffset by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
         val rowHeights = remember { androidx.compose.runtime.mutableStateMapOf<String, Int>() }
         val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -541,6 +554,15 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit) {
                     if (i > 0) Divider()
                     val lifted = dragging == t.id
                     val elevation by androidx.compose.animation.core.animateDpAsState(if (lifted) 10.dp else 0.dp, label = "lift")
+                    // Swipe right: rename / edit (your topics). Swipe left: delete (yours) or hide / show.
+                    SwipeActions(
+                        start = if (t.isCustom) listOf(
+                            SwipeAction(tr(R.string.rename_topic), Icons.Outlined.Edit, Glass.indigo) { renaming = t },
+                            SwipeAction(tr(R.string.edit_topic_action), Icons.Outlined.Tune, Glass.accent) { onEdit(t) },
+                        ) else emptyList(),
+                        end = if (t.isCustom) listOf(SwipeAction(tr(R.string.delete_topic_action), Icons.Outlined.Delete, Color(0xFFE5484D)) { vm.deleteTopic(t.id) })
+                        else listOf(SwipeAction(tr(if (t.isVisible) R.string.hide_topic_action else R.string.show_topic_action), if (t.isVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, Glass.indigo) { vm.setTopicVisible(t.id, !t.isVisible) }),
+                    ) {
                     Row(
                         Modifier.fillMaxWidth()
                             .onGloballyPositioned { rowHeights[t.id] = it.size.height }
@@ -600,8 +622,8 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit) {
                             if (notify) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsNone,
                             tr(if (notify) R.string.cd_stop_notify else R.string.cd_notify_me), tint = if (notify) Glass.accent else null,
                         ) { vm.setNotifyTopic(t.id, !notify) }
-                        if (t.isCustom) SmallIcon(Icons.Outlined.Delete, tr(R.string.cd_delete_topic)) { vm.deleteTopic(t.id) }
                         GlassSwitch(t.isVisible) { vm.setTopicVisible(t.id, it) }
+                    }
                     }
                 }
             }
@@ -610,105 +632,129 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit) {
     item { TextButton(tr(R.string.topics_reset)) { vm.resetTopics() } }
 }
 
+/**
+ * New topic, and editing one (same page, prefilled, "Save changes"). Suggestions only ever
+ * grow: keywords and sources found for each choice are added to what's shown, never replace
+ * it, in panels that scroll inside themselves.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AddTopicPage(vm: SettingsViewModel, onDone: () -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var keywords by rememberSaveable { mutableStateOf("") }
-    val chosen = remember { mutableStateListOf<String>() }
-    var filter by rememberSaveable { mutableStateOf("") }
+private fun AddTopicPage(vm: SettingsViewModel, editing: news.openwire.domain.model.Topic? = null, onDone: () -> Unit) {
+    val g = Glass
+    val key = editing?.id ?: "new"
+    var name by rememberSaveable(key) { mutableStateOf(editing?.label.orEmpty()) }
+    var keywords by rememberSaveable(key) { mutableStateOf(editing?.keywords?.joinToString(", ").orEmpty()) }
+    val chosen = remember(key) { mutableStateListOf<String>().apply { editing?.sources?.let(::addAll) } }
+    var filter by rememberSaveable(key) { mutableStateOf("") }
     val library by vm.library.collectAsState()
+    val s by vm.settings.collectAsState()
+    // Suggestions shown so far (appended to, never replaced).
+    val shownIdeas = remember(key) { mutableStateListOf<String>() }
+    val own = remember(key) { editing?.let { vm.topicOwnFeeds(it.id) }.orEmpty() }
+    val shownOutlets = remember(key) {
+        mutableStateListOf<news.openwire.domain.engine.TopicGraph.Outlet>().apply { own.forEach { add(news.openwire.domain.engine.TopicGraph.Outlet(it.name, it.domain, 0.0, 0)) } }
+    }
+    val pickedOutlets = remember(key) { mutableStateListOf<String>().apply { own.forEach { add(it.domain) } } }
+    val pickedFound = remember(key) { mutableStateListOf<news.openwire.data.remote.SourceFinder.Found>() }
+    val popular by vm.popularNow.collectAsState()
+    LaunchedEffect(key) { vm.clearKeywordIdeas(); vm.loadPopular() }
+    val sug by vm.topicSuggest.collectAsState()
+    LaunchedEffect(name, keywords) {
+        kotlinx.coroutines.delay(650)
+        vm.updateTopicSeeds(name, TopicRegistry.parseCommaKeywords(keywords))
+    }
+    LaunchedEffect(sug.keywords) { sug.keywords.forEach { k -> if (shownIdeas.none { it.equals(k, true) }) shownIdeas.add(k) } }
+    LaunchedEffect(sug.outlets) { sug.outlets.forEach { o -> if (shownOutlets.none { it.domain == o.domain }) shownOutlets.add(o) } }
+    val current = TopicRegistry.parseCommaKeywords(keywords).map { it.lowercase() }.toSet()
+    fun toggleKeyword(k: String) {
+        val list = TopicRegistry.parseCommaKeywords(keywords)
+        keywords = (if (list.any { it.equals(k, true) }) list.filterNot { it.equals(k, true) } else list + k).joinToString(", ")
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Hint(tr(R.string.add_topic_hint))
-        val ideas by vm.keywordIdeas.collectAsState()
-        // Presets matching what's typed ("Middle E" → Middle East with Iran, Israel, Lebanon, …).
         val matches = remember(name) { news.openwire.domain.engine.TopicPresets.suggest(name) }
         val exact = matches.firstOrNull { it.name.equals(name.trim(), ignoreCase = true) }
-        Section {
+        if (editing == null) Section {
             Label(tr(R.string.popular_topics))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                news.openwire.domain.engine.TopicPresets.POPULAR.forEach { p -> Chip(p.name, selected = name == p.name) { name = p.name; keywords = p.keywordText; vm.clearKeywordIdeas() } }
+                // In today's headlines first (refreshed on each visit), then the classics.
+                popular.take(6).forEach { t -> Chip("↗ $t", selected = name == t) { name = t; keywords = t } }
+                news.openwire.domain.engine.TopicPresets.POPULAR.forEach { p -> Chip(p.name, selected = name == p.name) { name = p.name; keywords = p.keywordText } }
             }
         }
         Section {
-            Field(tr(R.string.topic_name), name, { name = it; vm.clearKeywordIdeas() }, placeholder = tr(R.string.topic_name_eg))
+            Field(tr(R.string.topic_name), name, { name = it }, placeholder = tr(R.string.topic_name_eg))
             if (matches.isNotEmpty() && exact?.keywordText != keywords) {
                 Spacer(Modifier.height(6.dp))
                 matches.forEach { p ->
                     Column(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                            .clickable { name = p.name; keywords = p.keywordText; vm.clearKeywordIdeas() }
+                            .clickable { name = p.name; keywords = p.keywordText }
                             .padding(horizontal = 6.dp, vertical = 8.dp),
                     ) {
-                        Text(p.name, style = sans(14.sp, FontWeight.SemiBold), color = Glass.textPrimary)
-                        Text(p.keywordText, style = sans(11.sp, lineHeight = 15.sp), color = Glass.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(p.name, style = sans(14.sp, FontWeight.SemiBold), color = g.textPrimary)
+                        Text(p.keywordText, style = sans(11.sp, lineHeight = 15.sp), color = g.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
             Spacer(Modifier.height(10.dp))
             Field(tr(R.string.keywords_field), keywords, { keywords = it }, placeholder = tr(R.string.keywords_eg))
-            // Related keywords, live: each keyword typed or picked brings its own headlines, and
-            // terms that recur across them surface next (a chain that sharpens as the topic grows).
-            val sug by vm.topicSuggest.collectAsState()
-            LaunchedEffect(name, keywords) {
-                kotlinx.coroutines.delay(650)
-                vm.updateTopicSeeds(name, TopicRegistry.parseCommaKeywords(keywords))
-            }
-            val current = TopicRegistry.parseCommaKeywords(keywords).map { it.lowercase() }.toSet()
-            val fresh = sug.keywords.filter { it.lowercase() !in current }
             if (name.isNotBlank() || keywords.isNotBlank()) {
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(tr(R.string.related_keywords).uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = Glass.accentSoft, modifier = Modifier.weight(1f))
-                    if (sug.loading) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = Glass.accent)
+                    Text(tr(R.string.related_keywords).uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, modifier = Modifier.weight(1f))
+                    if (sug.loading) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = g.accent)
                 }
                 Spacer(Modifier.height(6.dp))
-                if (fresh.isEmpty() && !sug.loading) Text(tr(R.string.related_keywords_hint), style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary)
-                androidx.compose.animation.AnimatedContent(fresh, label = "ideas") { list ->
+                if (shownIdeas.isEmpty() && !sug.loading) Text(tr(R.string.related_keywords_hint), style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary)
+                // Grows as you pick; scrolls inside itself instead of stretching the page.
+                Box(Modifier.fillMaxWidth().heightIn(max = 196.dp).clip(RoundedCornerShape(14.dp)).verticalScroll(rememberScrollState())) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        list.forEach { k ->
-                            Chip("+ $k", selected = false) { keywords = (TopicRegistry.parseCommaKeywords(keywords) + k).joinToString(", ") }
+                        shownIdeas.forEach { k ->
+                            val on = k.lowercase() in current
+                            Chip(if (on) "✓ $k" else "+ $k", selected = on) { toggleKeyword(k) }
                         }
                     }
                 }
             }
         }
-        // Outlets that cover these keywords most, across all of them (logos, how many stories).
-        val sug2 by vm.topicSuggest.collectAsState()
-        val pickedOutlets = remember { mutableStateListOf<String>() }
-        if (sug2.outlets.isNotEmpty()) {
+        if (shownOutlets.isNotEmpty()) {
             Section {
                 Label(tr(R.string.suggested_sources))
-                Text(tr(R.string.suggested_sources_hint), style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary)
+                Text(tr(R.string.suggested_sources_hint), style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary)
                 Spacer(Modifier.height(6.dp))
-                sug2.outlets.forEach { o ->
-                    // An installed source is chosen as one; any other outlet is added for this topic.
-                    val lib = library.firstOrNull { !it.isPrimary && it.domain.removePrefix("www.").equals(o.domain, true) }
-                    val on = if (lib != null) lib.id in chosen else o.domain in pickedOutlets
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
-                            if (lib != null) { if (on) chosen.remove(lib.id) else chosen.add(lib.id) }
-                            else if (on) pickedOutlets.remove(o.domain) else pickedOutlets.add(o.domain)
-                        }.padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        SourceLogo(o.domain, o.name, size = 22.dp)
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(o.name, style = sans(13.sp, FontWeight.Medium), color = Glass.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(tr(R.string.suggested_source_hits, o.hits, o.domain), style = sans(11.sp), color = Glass.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
+                    shownOutlets.forEach { o ->
+                        // An installed source is chosen as one; any other outlet is added for this topic.
+                        val lib = library.firstOrNull { !it.isPrimary && it.domain.removePrefix("www.").equals(o.domain, true) }
+                        val on = if (lib != null) lib.id in chosen else o.domain in pickedOutlets
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
+                                if (lib != null) { if (on) chosen.remove(lib.id) else chosen.add(lib.id) }
+                                else if (on) pickedOutlets.remove(o.domain) else pickedOutlets.add(o.domain)
+                            }.padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            SourceLogo(o.domain, o.name, size = 22.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(o.name, style = sans(13.sp, FontWeight.Medium), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(if (o.hits > 0) tr(R.string.suggested_source_hits, o.hits, o.domain) else o.domain, style = sans(11.sp), color = g.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            CheckDot(on)
                         }
-                        CheckDot(on)
                     }
                 }
             }
         }
         Section {
-            Label(tr(R.string.sources_optional, chosen.size))
-            Field(tr(R.string.filter_sources), filter, { filter = it })
+            Label(tr(R.string.sources_optional, chosen.size + pickedFound.size))
+            Field(tr(R.string.filter_sources), filter, { filter = it }, placeholder = tr(R.string.find_sources_eg))
             Spacer(Modifier.height(6.dp))
+            // Yours first, then (as you type) newspapers found online, checked live.
             library.filter { !it.isPrimary && (filter.isBlank() || it.name.contains(filter, true) || it.domain.contains(filter, true)) }
-                .take(if (filter.isBlank()) 40 else 80)
+                .take(if (filter.isBlank()) 40 else 30)
                 .forEach { src ->
                     val on = src.id in chosen
                     Row(
@@ -717,14 +763,127 @@ private fun AddTopicPage(vm: SettingsViewModel, onDone: () -> Unit) {
                     ) {
                         SourceLogo(src.domain, src.name, size = 20.dp)
                         Spacer(Modifier.width(10.dp))
-                        Text(src.name, style = sans(13.sp), color = Glass.textPrimary, modifier = Modifier.weight(1f))
+                        Text(src.name, style = sans(13.sp), color = g.textPrimary, modifier = Modifier.weight(1f))
                         CheckDot(on)
                     }
                 }
+            if (filter.trim().length >= 2 && vm.finder != null) {
+                var found by remember { mutableStateOf<List<news.openwire.data.remote.SourceFinder.Found>>(emptyList()) }
+                var searching by remember { mutableStateOf(false) }
+                val lang = news.openwire.domain.engine.Languages.effective(s.language)
+                LaunchedEffect(filter.trim()) {
+                    searching = true
+                    kotlinx.coroutines.delay(500)
+                    vm.finder.search(filter.trim(), lang, s.edition.country).collect { found = it }
+                    searching = false
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(tr(R.string.find_sources_title, filter.trim()).uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (searching) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = g.accent)
+                }
+                found.filter { f -> library.none { it.url == f.url } }.forEach { f ->
+                    val on = pickedFound.any { it.url == f.url }
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { if (on) pickedFound.removeAll { it.url == f.url } else pickedFound.add(f) }.padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SourceLogo(f.domain, f.name, size = 20.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(f.name, style = sans(13.sp), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(f.domain, style = sans(11.sp), color = g.textSecondary, maxLines = 1)
+                        }
+                        CheckDot(on)
+                    }
+                }
+            }
         }
-        PrimaryButton(tr(R.string.create_topic)) {
-            val extra = vm.topicSuggest.value.outlets.filter { it.domain in pickedOutlets }
-            if (vm.addTopic(name, keywords, chosen.toList(), extra)) onDone()
+        PrimaryButton(tr(if (editing != null) R.string.save_changes else R.string.create_topic)) {
+            val outlets = shownOutlets.filter { it.domain in pickedOutlets }
+            val ok = if (editing != null) vm.updateTopic(editing.id, name, keywords, chosen.toList(), outlets, pickedFound.toList())
+            else vm.addTopic(name, keywords, chosen.toList(), outlets, pickedFound.toList())
+            if (ok) onDone()
+        }
+    }
+}
+
+/** An action revealed by swiping a row. */
+private class SwipeAction(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val color: Color, val onClick: () -> Unit)
+
+/**
+ * A row that slides to reveal actions: swipe right for [start] actions, left for [end] ones.
+ * It snaps open past halfway, and closes again after an action or a tap on the row.
+ */
+@Composable
+private fun SwipeActions(start: List<SwipeAction>, end: List<SwipeAction>, content: @Composable () -> Unit) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+    val actionPx = with(density) { 76.dp.toPx() }
+    val startW = actionPx * start.size
+    val endW = actionPx * end.size
+    val offset = remember { androidx.compose.animation.core.Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    fun close() = scope.launch { offset.animateTo(0f, androidx.compose.animation.core.spring(stiffness = 600f)) }
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))) {
+        // Actions behind the row.
+        Row(Modifier.matchParentSize(), verticalAlignment = Alignment.CenterVertically) {
+            start.forEach { a -> SwipeButton(a, Modifier.width(76.dp).fillMaxHeight()) { a.onClick(); close() } }
+            Spacer(Modifier.weight(1f))
+            end.forEach { a -> SwipeButton(a, Modifier.width(76.dp).fillMaxHeight()) { a.onClick(); close() } }
+        }
+        Box(
+            Modifier.fillMaxWidth()
+                .graphicsLayer { translationX = offset.value }
+                .background(Glass.deviceBg.copy(alpha = 1f).compositeOver(if (Glass.isDark) Color.Black else Color.White))
+                .pointerInput(start.size, end.size, rtl) {
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { change, dx ->
+                            change.consume()
+                            // Right (start) is positive in left-to-right; flipped for Arabic.
+                            val maxRight = if (rtl) endW else startW
+                            val maxLeft = if (rtl) startW else endW
+                            scope.launch { offset.snapTo((offset.value + dx).coerceIn(-maxLeft, maxRight)) }
+                        },
+                        onDragEnd = {
+                            val maxRight = if (rtl) endW else startW
+                            val maxLeft = if (rtl) startW else endW
+                            val target = when {
+                                offset.value > maxRight / 2 && maxRight > 0 -> maxRight
+                                offset.value < -maxLeft / 2 && maxLeft > 0 -> -maxLeft
+                                else -> 0f
+                            }
+                            scope.launch { offset.animateTo(target, androidx.compose.animation.core.spring(stiffness = 600f)) }
+                        },
+                    )
+                },
+        ) { content() }
+    }
+}
+
+@Composable
+private fun SwipeButton(a: SwipeAction, modifier: Modifier, onClick: () -> Unit) {
+    Column(
+        modifier.background(a.color).clickable(onClick = onClick).padding(horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(a.icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(a.label, style = sans(11.sp, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Rename a topic in place. */
+@Composable
+private fun RenameDialog(current: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var text by remember { mutableStateOf(current) }
+    GlassDialog(icon = Icons.Outlined.Edit, kicker = tr(R.string.rename_topic_title), onDismiss = onDismiss) {
+        Field(tr(R.string.topic_name), text, { text = it })
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.weight(1f)) { DialogButton(tr(R.string.action_cancel), primary = false, onClick = onDismiss) }
+            Box(Modifier.weight(1f)) { DialogButton(tr(R.string.action_save), primary = true) { onSave(text) } }
         }
     }
 }
@@ -800,6 +959,8 @@ private fun AddSourcePage(vm: SettingsViewModel, onDone: () -> Unit) {
     var quota by rememberSaveable { mutableStateOf(8) }
     var busy by remember { mutableStateOf(false) }
     val chosen = remember { mutableStateListOf<String>() }
+    // Outlets picked from "Add sources by country" (no feed address needed).
+    val picked = remember { mutableStateListOf<news.openwire.data.remote.SourceDirectory.Outlet>() }
     val topics by vm.allTopics.collectAsState()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Hint(tr(R.string.add_source_hint))
@@ -808,7 +969,7 @@ private fun AddSourcePage(vm: SettingsViewModel, onDone: () -> Unit) {
             Spacer(Modifier.height(10.dp))
             Field(tr(R.string.feed_url), url, { url = it }, placeholder = "https://www.polygon.com/rss/index.xml", keyboard = KeyboardType.Uri)
         }
-        SourcesByCountry(vm)
+        SourcesByCountry(vm, picked) { vm.addDirectoryOutlets(picked.toList(), chosen.toList()); picked.clear() }
         Section {
             Label(tr(R.string.weave_into))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -818,8 +979,11 @@ private fun AddSourcePage(vm: SettingsViewModel, onDone: () -> Unit) {
             Label(tr(R.string.fair_share, quota))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { (7..10).forEach { q -> Chip("$q", selected = quota == q) { quota = q } } }
         }
-        PrimaryButton(tr(if (busy) R.string.checking_feed else R.string.verify_add)) {
+        val byCountry = url.isBlank() && picked.isNotEmpty()
+        PrimaryButton(if (byCountry) tr(R.string.add_selected, picked.size) else tr(if (busy) R.string.checking_feed else R.string.verify_add)) {
             if (busy) return@PrimaryButton
+            // Outlets picked by country go straight in (into the chosen topics, if any).
+            if (byCountry) { vm.addDirectoryOutlets(picked.toList(), chosen.toList()); picked.clear(); onDone(); return@PrimaryButton }
             busy = true
             vm.addSource(name, url, chosen.toList(), quota) { ok -> busy = false; if (ok) onDone() }
         }
@@ -832,7 +996,11 @@ private fun AddSourcePage(vm: SettingsViewModel, onDone: () -> Unit) {
  * inside the card, so the page stays as it was.
  */
 @Composable
-private fun SourcesByCountry(vm: SettingsViewModel) {
+private fun SourcesByCountry(
+    vm: SettingsViewModel,
+    picked: androidx.compose.runtime.snapshots.SnapshotStateList<news.openwire.data.remote.SourceDirectory.Outlet>,
+    onAdd: () -> Unit,
+) {
     val g = Glass
     var on by rememberSaveable { mutableStateOf(false) }
     var country by rememberSaveable { mutableStateOf<String?>(null) }
@@ -840,7 +1008,6 @@ private fun SourcesByCountry(vm: SettingsViewModel) {
     val section = sectionName?.let { n -> news.openwire.data.remote.SourceDirectory.Section.entries.firstOrNull { it.name == n } }
     val state by vm.directoryState.collectAsState()
     val s by vm.settings.collectAsState()
-    val picked = remember { mutableStateListOf<news.openwire.data.remote.SourceDirectory.Outlet>() }
     val app = news.openwire.domain.engine.Languages.effective(s.language)
     LaunchedEffect(on, country, sectionName) { if (on) { picked.clear(); vm.loadDirectory(country, section) } }
     Section {
@@ -903,9 +1070,9 @@ private fun SourcesByCountry(vm: SettingsViewModel) {
                             }
                         }
                         Spacer(Modifier.height(12.dp))
-                        PrimaryButton(tr(R.string.add_selected, picked.size)) {
-                            if (picked.isNotEmpty()) { vm.addDirectoryOutlets(picked.toList()); picked.clear() }
-                        }
+                        Text(tr(R.string.by_country_weave_hint), style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary)
+                        Spacer(Modifier.height(8.dp))
+                        PrimaryButton(tr(R.string.add_selected, picked.size)) { if (picked.isNotEmpty()) onAdd() }
                     }
                 }
             }

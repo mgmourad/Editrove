@@ -530,8 +530,18 @@ private fun TabFeed(
             NavTab.SAVED -> saved
             NavTab.LIVE, NavTab.OPINION -> emptyList()
             NavTab.DISCOVER -> {
-                val byTopic = remember(feeds) {
-                    feeds.mapNotNull { (id, r) -> (r as? FeedResult.Success)?.let { id to it.articles } }.toMap()
+                // Only the topics you show, from the sources you keep: stories under two days old,
+                // no deals or sponsored pieces (feeds from hidden topics or an earlier edition are left out).
+                val byTopic = remember(feeds, topicsList) {
+                    val shown = topicsList.filter { it.isVisible }.map { it.id }.toSet()
+                    val cutoff = System.currentTimeMillis() - 48 * 3_600_000L
+                    feeds.filterKeys { it in shown }.mapNotNull { (id, r) ->
+                        (r as? FeedResult.Success)?.let { res ->
+                            id to res.articles.filter { a ->
+                                (a.publishedAt ?: Long.MAX_VALUE) >= cutoff && !news.openwire.domain.engine.Promotional.isPromotionalTitle(a.title)
+                            }
+                        }
+                    }.toMap()
                 }
                 // Front page across every edition: ranked by placement, coverage, freshness and authority.
                 // Computed off the main thread, and only once feeds stop arriving for a moment
@@ -600,6 +610,10 @@ private fun TabFeed(
             fullRow("masthead") {
                 Masthead(userSettings.edition.city, onEdition = { vm.openSettings() }, onSettings = { vm.openSettings() })
             }
+            // The live bar: the latest from every topic shown, live coverage and breaking stories first.
+            val tickerItems = news.openwire.ui.home.TickerFeed.build(topicsList.filter { it.isVisible }.map { tp ->
+                tp to ((feeds[tp.id] as? FeedResult.Success)?.articles.orEmpty())
+            })
             fun feed(articles: List<Article>, category: String, ticker: Boolean, title: String) = feedItems(
                 archive = archive,
                 articles = articles, category = category, compact = compact,
@@ -607,6 +621,7 @@ private fun TabFeed(
                 onOpen = onOpen, onToggleSaved = { vm.toggleSaved(it) }, onToggleLiked = { vm.toggleLiked(it) },
                 showTicker = ticker, sectionTitle = title, magazine = magazine,
                 marketWatch = ticker && topic.id == "BUSINESS",
+                ticker = tickerItems,
             )
             when (t) {
                 NavTab.TODAY, NavTab.AUDIO -> {

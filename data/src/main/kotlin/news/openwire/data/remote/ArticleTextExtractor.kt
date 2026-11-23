@@ -142,7 +142,8 @@ class ArticleTextExtractor(
             "consumer, you have the right", "using this toggle", "we and our partners", "store and/or access information",
             "personalised ads", "personalized ads", "legitimate interest",
             // Reprint and licensing notices.
-            "non-commercial use only", "subscriber agreement", "djreprints", "order multiple copies", "order presentation-ready copies",
+            "non-commercial use only", "follow this section", "follow this tag", "follow this author", "personalize your feed",
+            "update your preferences in account settings", "open follow modal", "subscriber agreement", "djreprints", "order multiple copies", "order presentation-ready copies",
         )
         val PAYWALL_HINTS = listOf(
             "subscribe to continue", "to continue reading", "already a subscriber", "subscribers only",
@@ -563,7 +564,11 @@ class ArticleTextExtractor(
             val root = if (stories.size >= 2) stories.first() else scope
             val out = ArrayList<org.jsoup.nodes.Element>()
             for (e in root.select("p, h1")) {
-                if (e.tagName() == "h1") { if (out.any { it.text().length > 40 }) break else continue }
+                // A second headline ends the story — but only once the story itself has begun
+                // (menus and follow prompts above the headline don't count as the story).
+                if (e.tagName() == "h1") {
+                    if (out.count { it.text().length > 80 && !isBoilerplate(it.text()) } >= 2) break else continue
+                }
                 out += e
             }
             return out

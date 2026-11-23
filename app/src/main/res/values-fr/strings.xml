@@ -603,4 +603,16 @@
     <string name="op_discover_sub">Chroniqueurs, commentateurs et sujets dont on parle.</string>
     <string name="op_discover_cta">Trouver des plumes, chroniques et voix à suivre</string>
     <string name="dir_story_one">1 article aujourd’hui</string>
+    <string name="by_country_weave_hint">Astuce : choisissez des thèmes dans « Intégrer aux sujets » ci-dessous pour y ajouter ces médias.</string>
+    <string name="msg_saved_topic">%1$s enregistré</string>
+    <string name="edit_topic">Modifier le sujet</string>
+    <string name="save_changes">Enregistrer</string>
+    <string name="rename_topic">Renommer</string>
+    <string name="edit_topic_action">Modifier</string>
+    <string name="delete_topic_action">Supprimer</string>
+    <string name="hide_topic_action">Masquer</string>
+    <string name="show_topic_action">Afficher</string>
+    <string name="rename_topic_title">Renommer le sujet</string>
+    <string name="action_save">Enregistrer</string>
+    <string name="swipe_hint_topics">Balayez un sujet pour plus d’options : renommer, modifier mots-clés et sources, supprimer.</string>
 </resources>

@@ -603,4 +603,16 @@
     <string name="op_discover_sub">كتّاب أعمدة ومعلّقون والمواضيع التي يكتب عنها الناس.</string>
     <string name="op_discover_cta">ابحث عن كتّاب وأعمدة وأصوات لمتابعتها</string>
     <string name="dir_story_one">خبر واحد اليوم</string>
+    <string name="by_country_weave_hint">نصيحة: اختر مواضيع من «نسجها في المواضيع» أدناه لإضافة هذه الوسائل إليها.</string>
+    <string name="msg_saved_topic">تم حفظ %1$s</string>
+    <string name="edit_topic">تعديل الموضوع</string>
+    <string name="save_changes">حفظ التغييرات</string>
+    <string name="rename_topic">إعادة تسمية</string>
+    <string name="edit_topic_action">تعديل</string>
+    <string name="delete_topic_action">حذف</string>
+    <string name="hide_topic_action">إخفاء</string>
+    <string name="show_topic_action">إظهار</string>
+    <string name="rename_topic_title">إعادة تسمية الموضوع</string>
+    <string name="action_save">حفظ</string>
+    <string name="swipe_hint_topics">اسحب الموضوع لخيارات أكثر: إعادة التسمية، تعديل الكلمات والمصادر، الحذف.</string>
 </resources>

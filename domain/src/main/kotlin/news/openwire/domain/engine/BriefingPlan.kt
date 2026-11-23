@@ -16,7 +16,7 @@ object BriefingPlan {
     /**
      * @param breaking a story labelled breaking leads the briefing (the presenter opens with it).
      */
-    fun arrange(articles: List<Article>, count: Int, normalizeDomain: (String) -> String, breaking: (Article) -> Boolean = { false }): List<Item> {
+    fun arrange(articles: List<Article>, count: Int, normalizeDomain: (String) -> String, breaking: (Article) -> Boolean = { false }, reserve: Int = 0): List<Item> {
         if (count <= 0) return emptyList()
         class Cluster(val lead: Article) { val others = LinkedHashSet<String>() }
         val clusters = ArrayList<Cluster>()
@@ -27,9 +27,16 @@ object BriefingPlan {
                 if (name != null && !name.equals(home.lead.source, ignoreCase = true) &&
                     normalizeDomain(a.domain ?: "") != normalizeDomain(home.lead.domain ?: "-")
                 ) home.others += name
-            } else if (clusters.size < count) clusters += Cluster(a)
+            } else if (clusters.size < count + reserve) clusters += Cluster(a)
         }
         if (clusters.isEmpty()) return emptyList()
+        // Listening order: the most widely covered story leads (the feed's own lead is picked
+        // for its photo, and its near-duplicates are spread apart: neither matters by ear).
+        val position = clusters.withIndex().associate { it.value to it.index }
+        clusters.sortByDescending { c ->
+            val outlets = 1 + c.others.size + maxOf(c.lead.alsoCoveredBy.size, (c.lead.coverage ?: 1) - 1, 0)
+            2.0 * kotlin.math.ln(outlets.toDouble()) - 0.12 * (position[c] ?: 0)
+        }
         clusters.indexOfFirst { breaking(it.lead) }.takeIf { it > 0 }?.let { clusters.add(0, clusters.removeAt(it)) }
         // The lead story stays first; each next slot prefers a story on the same subject.
         val out = ArrayList<Item>(clusters.size)

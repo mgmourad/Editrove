@@ -174,25 +174,92 @@ class SettingsViewModel(
 
     fun clearKeywordIdeas() { _keywordIdeas.value = KeywordIdeas.Idle }
 
-    fun addTopic(label: String, keywords: String, sources: List<String>, outlets: List<news.openwire.domain.engine.TopicGraph.Outlet> = emptyList()): Boolean = try {
-        val words = TopicRegistry.parseCommaKeywords(keywords)
-        val topic = TopicRegistry.newCustomTopic(label, words, sources, settings.value.edition, clock())
-        // Suggested outlets not among the installed sources: their stories on these keywords.
+    /** Feeds a topic carries of its own: suggested outlets and found sources added for it. */
+    fun topicOwnFeeds(topicId: String): List<FeedSource> = settings.value.customFeeds.filter { it.topics == listOf(topicId) && (it.id.startsWith("topic_") || it.id.startsWith("tfound_")) }
+
+    private fun topicFeeds(
+        topicId: String, label: String, words: List<String>,
+        outlets: List<news.openwire.domain.engine.TopicGraph.Outlet>, found: List<news.openwire.data.remote.SourceFinder.Found>,
+    ): List<FeedSource> {
         val country = TopicRegistry.country(settings.value.edition.country)
         val query = (words.ifEmpty { listOf(label) }).take(6).joinToString(" OR ") { if (' ' in it) "\"$it\"" else it }
-        val feeds = outlets.map { o ->
+        val stamp = clock().toString().takeLast(4)
+        return outlets.map { o ->
             FeedSource(
-                id = "topic_${o.domain.replace(Regex("[^a-z0-9]"), "_")}_${clock().toString().takeLast(4)}",
+                id = "topic_${o.domain.replace(Regex("[^a-z0-9]"), "_")}_$stamp",
                 name = o.name, url = TopicRegistry.googleNewsSearchUrl("site:${o.domain} ($query) when:7d", country),
-                domain = o.domain, topics = listOf(topic.id), maxArticles = 8, category = "Custom", isCustom = true,
+                domain = o.domain, topics = listOf(topicId), maxArticles = 8, category = "Custom", isCustom = true,
+            )
+        } + found.map { f ->
+            FeedSource(
+                id = "tfound_${f.domain.replace(Regex("[^a-z0-9]"), "_")}_$stamp",
+                name = f.name, url = f.url, domain = f.domain, topics = listOf(topicId), maxArticles = 8, category = "Custom", isCustom = true,
             )
         }
+    }
+
+    fun addTopic(
+        label: String, keywords: String, sources: List<String>,
+        outlets: List<news.openwire.domain.engine.TopicGraph.Outlet> = emptyList(),
+        found: List<news.openwire.data.remote.SourceFinder.Found> = emptyList(),
+    ): Boolean = try {
+        val words = TopicRegistry.parseCommaKeywords(keywords)
+        val topic = TopicRegistry.newCustomTopic(label, words, sources, settings.value.edition, clock())
+        val feeds = topicFeeds(topic.id, label, words, outlets, found)
         settingsRepo.update { s -> s.copy(customTopics = s.customTopics + topic, topicOrder = s.topicOrder?.plus(topic.id), customFeeds = s.customFeeds + feeds) }
         _message.value = tr(R.string.msg_added_topic, topic.label)
         true
     } catch (e: IllegalArgumentException) {
         _message.value = e.message
         false
+    }
+
+    /** Saves an edited topic in place (same id, so its position, alerts and widgets stay). */
+    fun updateTopic(
+        id: String, label: String, keywords: String, sources: List<String>,
+        outlets: List<news.openwire.domain.engine.TopicGraph.Outlet>, found: List<news.openwire.data.remote.SourceFinder.Found>,
+    ): Boolean = try {
+        val words = TopicRegistry.parseCommaKeywords(keywords)
+        val fresh = TopicRegistry.newCustomTopic(label, words, sources, settings.value.edition, clock()).copy(id = id)
+        val keep = topicOwnFeeds(id)
+        val keepDomains = (outlets.map { it.domain } + found.map { it.domain }).toSet()
+        val stay = keep.filter { it.domain in keepDomains }
+        val add = topicFeeds(id, label, words, outlets.filter { o -> stay.none { it.domain == o.domain } }, found.filter { f -> stay.none { it.domain == f.domain } })
+        settingsRepo.update { s ->
+            s.copy(
+                customTopics = s.customTopics.map { if (it.id == id) fresh else it },
+                customFeeds = s.customFeeds.filterNot { f -> keep.any { it.id == f.id } && f !in stay } + add,
+            )
+        }
+        _message.value = tr(R.string.msg_saved_topic, fresh.label)
+        true
+    } catch (e: IllegalArgumentException) {
+        _message.value = e.message
+        false
+    }
+
+    fun renameTopic(id: String, label: String) {
+        val clean = label.trim()
+        if (clean.isEmpty()) return
+        settingsRepo.update { s -> s.copy(customTopics = s.customTopics.map { if (it.id == id) it.copy(label = clean) else it }) }
+    }
+
+    /** The topic being edited (Settings › Topics › Edit). */
+    val editingTopic = MutableStateFlow<news.openwire.domain.model.Topic?>(null)
+
+    private val _popularNow = MutableStateFlow<List<String>>(emptyList())
+    /** Names in today's top headlines for the edition, refreshed each time New topic opens. */
+    val popularNow: StateFlow<List<String>> = _popularNow
+
+    fun loadPopular() {
+        viewModelScope.launch {
+            val c = TopicRegistry.country(settings.value.edition.country)
+            val names = runCatching {
+                val feed = news.openwire.data.remote.GoogleNewsRssSource().fetchFeed("https://news.google.com/rss?${c.query}")
+                news.openwire.domain.engine.KeywordMiner.fromHeadlines("", feed.items.map { it.title }, limit = 10)
+            }.getOrNull()
+            if (!names.isNullOrEmpty()) _popularNow.value = names
+        }
     }
 
     fun deleteTopic(id: String) = settingsRepo.update { s ->
@@ -303,14 +370,15 @@ class SettingsViewModel(
     }
 
     /** Adds the chosen outlets, each to the tab for its section (general news: the national tab, or International). */
-    fun addDirectoryOutlets(outlets: List<news.openwire.data.remote.SourceDirectory.Outlet>) {
+    fun addDirectoryOutlets(outlets: List<news.openwire.data.remote.SourceDirectory.Outlet>, into: List<String> = emptyList()) {
         if (outlets.isEmpty()) return
         val s0 = settings.value
         val app = news.openwire.domain.engine.Languages.effective(s0.language)
         settingsRepo.update { s ->
             val add = outlets.filter { o -> s.customFeeds.none { it.url == directory.feedUrl(o) } }.map { o ->
                 val lang = TopicRegistry.country(o.country).hl.substringBefore('-')
-                val topics = when (o.section) {
+                // Topics picked under "Weave into topics" win; otherwise the outlet's own section.
+                val topics = if (into.isNotEmpty()) into else when (o.section) {
                     news.openwire.data.remote.SourceDirectory.Section.GENERAL ->
                         if (o.country == s.edition.country) news.openwire.domain.engine.FeedDiscovery.topicsFor(lang, app, o.country)
                         else listOfNotNull("INTERNATIONAL", "TOP".takeIf { lang == app })

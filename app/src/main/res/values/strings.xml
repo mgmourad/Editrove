@@ -605,4 +605,16 @@
     <string name="op_discover_sub">Columnists, commentators and the topics people are writing about.</string>
     <string name="op_discover_cta">Find writers, columns and voices to follow</string>
     <string name="dir_story_one">1 story today</string>
+    <string name="by_country_weave_hint">Tip: pick topics under \'Weave into topics\' below to add these outlets there.</string>
+    <string name="msg_saved_topic">Saved %1$s</string>
+    <string name="edit_topic">Edit topic</string>
+    <string name="save_changes">Save changes</string>
+    <string name="rename_topic">Rename</string>
+    <string name="edit_topic_action">Edit</string>
+    <string name="delete_topic_action">Delete</string>
+    <string name="hide_topic_action">Hide</string>
+    <string name="show_topic_action">Show</string>
+    <string name="rename_topic_title">Rename topic</string>
+    <string name="action_save">Save</string>
+    <string name="swipe_hint_topics">Swipe a topic for more: rename, edit keywords and sources, delete.</string>
 </resources>

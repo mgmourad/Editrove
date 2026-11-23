@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -290,7 +291,9 @@ internal fun ArticleBody(
     androidx.compose.runtime.CompositionLocalProvider(
         androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(baseDensity.density, baseDensity.fontScale * LocalTextScale.current),
     ) {
-    Column(Modifier.widthIn(max = 672.dp).fillMaxWidth()) {
+    var columnWidthDp by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val densityNow = androidx.compose.ui.platform.LocalDensity.current
+    Column(Modifier.widthIn(max = 672.dp).fillMaxWidth().onSizeChanged { columnWidthDp = with(densityNow) { it.width.toDp().value.toInt() } }) {
         if (showMetaBar) {
             Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -348,7 +351,7 @@ internal fun ArticleBody(
         }
 
         // Editorial serif headline
-        Text(article.title.ifBlank { content?.title?.takeIf { it.isNotBlank() } ?: article.source ?: article.domain ?: tr(R.string.reader_article) }, style = serif(28.sp, FontWeight.Bold, lineHeight = 32.sp, tracking = (-0.01).em), color = g.textPrimary)
+        Text(article.title.ifBlank { content?.title?.takeIf { it.isNotBlank() } ?: article.source ?: article.domain ?: tr(R.string.reader_article) }, style = serif(28.sp, FontWeight.Bold, lineHeight = 32.sp, tracking = (-0.01).em), color = g.textPrimary, modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(12.dp))
 
         // Story grouping: who else is running this story
@@ -364,7 +367,8 @@ internal fun ArticleBody(
         }
 
         // Byline (on a narrow screen, the other-outlets pill sits just under the source instead).
-        val narrowByline = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 520
+        // Narrow column (the cover screen, or the reader beside the feed): the pill goes under the source.
+        val narrowByline = columnWidthDp in 1..559
         Row(Modifier.fillMaxWidth().padding(bottom = if (narrowByline) 10.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(36.dp).clip(CircleShape)
@@ -536,7 +540,7 @@ private val bodyStyle = sans(14.5.sp, lineHeight = 25.sp)
 
 @Composable
 private fun BodyParagraph(text: String) {
-    Text(text, style = bodyStyle, color = Glass.textPrimary.copy(alpha = 0.9f))
+    Text(text, style = bodyStyle.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Content), color = Glass.textPrimary.copy(alpha = 0.9f), modifier = Modifier.fillMaxWidth())
 }
 
 /**
@@ -938,7 +942,7 @@ private fun OutletReport(c: news.openwire.data.remote.ArticleContent, loadPost: 
     val context = LocalContext.current
     Column(Modifier.fillMaxWidth()) {
         if (c.title.isNotBlank()) {
-            Text(c.title, style = serif(21.sp, FontWeight.Bold, lineHeight = 27.sp), color = g.textPrimary)
+            Text(c.title, style = serif(21.sp, FontWeight.Bold, lineHeight = 27.sp), color = g.textPrimary, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
         }
         c.description?.let { Text(it, style = sans(14.sp, lineHeight = 22.sp), color = g.textPrimary.copy(alpha = 0.75f)); Spacer(Modifier.height(10.dp)) }

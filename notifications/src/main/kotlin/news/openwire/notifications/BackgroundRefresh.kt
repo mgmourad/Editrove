@@ -226,7 +226,9 @@ object Notifier {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
             .setGroup(GROUP)
-            .setOnlyAlertOnce(true)
+            // New headlines replace the topic's earlier alert, and must sound again: "alert only
+            // once" made every update silent while an older alert sat unread in the shade.
+            .setWhen(System.currentTimeMillis()).setShowWhen(true)
             .also { if (quiet) it.setSilent(true) }
         if (more > 0) b.addAction(0, context.getString(R.string.n_see_all, update.headlines.size), all)
         val n = b.build()
@@ -253,11 +255,20 @@ object Notifier {
             .setAutoCancel(true)
             .build()
         try {
-            NotificationManagerCompat.from(context).notify("breaking", alert.key.hashCode(), n)
+            val nm = NotificationManagerCompat.from(context)
+            nm.notify("breaking", alert.key.hashCode(), n)
+            // Keep the shade tidy: the five newest breaking alerts stay, older ones go.
+            runCatching {
+                context.getSystemService(NotificationManager::class.java)?.activeNotifications
+                    ?.filter { it.tag == "breaking" }?.sortedByDescending { it.postTime }?.drop(MAX_BREAKING_SHOWN)
+                    ?.forEach { nm.cancel("breaking", it.id) }
+            }
         } catch (e: SecurityException) {
             // Permission revoked between the check and the post.
         }
     }
+
+    private const val MAX_BREAKING_SHOWN = 5
 }
 
 /**

@@ -124,15 +124,17 @@ class BriefingPlayer(
     private var storyStartedAt = 0L
     private var pos = 0
     private var session = 0
-    private var stories: List<news.openwire.domain.model.Article> = emptyList()
+    private var stories: MutableList<news.openwire.domain.model.Article> = mutableListOf()
+    /** Stories held back to stand in for one that can't be read (or turns out to be a sales piece). */
+    private var reserve: MutableList<news.openwire.domain.engine.BriefingPlan.Item> = mutableListOf()
     private var topic = ""
     private var detail = news.openwire.domain.model.BriefingDetail.HEADLINES
     private val content = HashMap<Int, kotlinx.coroutines.Deferred<news.openwire.data.remote.ArticleContent?>>()
     /** Reads stories one after another, ahead of the narrator (one fetch at a time). */
     private var pipeline: kotlinx.coroutines.Job? = null
-    private var plan: List<news.openwire.domain.engine.BriefingPlan.Item> = emptyList()
-    private var breakingFlags: List<Boolean> = emptyList()
-    private var developingFlags: List<Boolean> = emptyList()
+    private var plan: MutableList<news.openwire.domain.engine.BriefingPlan.Item> = mutableListOf()
+    private var breakingFlags: MutableList<Boolean> = mutableListOf()
+    private var developingFlags: MutableList<Boolean> = mutableListOf()
     private var meta: Map<String, Pair<news.openwire.domain.engine.BriefingScript.Scope?, news.openwire.domain.engine.BriefingScript.Category?>> = emptyMap()
     private var metaJob: kotlinx.coroutines.Job? = null
     private var presenter = news.openwire.domain.model.Presenter.ANCHOR
@@ -220,10 +222,14 @@ class BriefingPlayer(
         // Every story in a briefing is a different story: other outlets' takes are named, not read
         // again; stories on one subject sit together; a story labelled breaking leads.
         val nowMs = System.currentTimeMillis()
-        plan = news.openwire.domain.engine.BriefingPlan.arrange(articles, p.count, normalizeDomain) { news.openwire.domain.engine.BriefingPlan.isBreaking(it, nowMs) }
-        stories = plan.map { it.article }
-        breakingFlags = stories.map { news.openwire.domain.engine.BriefingPlan.isBreaking(it, nowMs) }
-        developingFlags = stories.map { news.openwire.domain.engine.BriefingPlan.isDeveloping(it) }
+        // Deals, shopping guides and sponsored pieces are never read.
+        val news0 = articles.filterNot { news.openwire.domain.engine.Promotional.isPromotionalTitle(it.title) }
+        val all = news.openwire.domain.engine.BriefingPlan.arrange(news0, p.count, normalizeDomain, breaking = { news.openwire.domain.engine.BriefingPlan.isBreaking(it, nowMs) }, reserve = RESERVE)
+        plan = all.take(p.count).toMutableList()
+        reserve = all.drop(p.count).toMutableList()
+        stories = plan.map { it.article }.toMutableList()
+        breakingFlags = stories.map { news.openwire.domain.engine.BriefingPlan.isBreaking(it, nowMs) }.toMutableList()
+        developingFlags = stories.map { news.openwire.domain.engine.BriefingPlan.isDeveloping(it) }.toMutableList()
         presenter = p.presenter
         seed = (nowMs / 60_000).toInt()
         meta = emptyMap()
@@ -429,11 +435,26 @@ class BriefingPlayer(
             Seg.Sting -> playSting(s)
             is Seg.Story -> {
                 stepJob = scope.launch {
-                    val a = stories[seg.index]
                     val pending = fetch(seg.index)
                     if (pending?.isCompleted == false) loading = true
-                    val c = pending?.let { kotlinx.coroutines.withTimeoutOrNull(STORY_WAIT_MS) { it.await() } }
+                    var c = pending?.let { kotlinx.coroutines.withTimeoutOrNull(STORY_WAIT_MS) { it.await() } }
                     if (s != session) return@launch
+                    // Summaries and Full articles need the story itself: one that can't be read here
+                    // or at another outlet (or turns out to be a sales pitch) gives way to the next.
+                    if (detail != news.openwire.domain.model.BriefingDetail.HEADLINES) {
+                        while (!readable(c) && reserve.isNotEmpty()) {
+                            android.util.Log.i("EditroveBriefing", "story ${seg.index + 1} unreadable (${stories[seg.index].title.take(50)}): replaced")
+                            replaceStory(seg.index, reserve.removeAt(0))
+                            loading = true
+                            c = fetch(seg.index)?.let { kotlinx.coroutines.withTimeoutOrNull(STORY_WAIT_MS) { it.await() } }
+                            if (s != session) return@launch
+                        }
+                        if (!readable(c)) {
+                            android.util.Log.i("EditroveBriefing", "story ${seg.index + 1} skipped: nothing readable")
+                            advance(); return@launch
+                        }
+                    }
+                    val a = stories[seg.index]
                     val other = c?.via == news.openwire.data.remote.TextSource.OTHER_OUTLETS
                     val story = scriptStory(seg.index, c).copy(
                         // Read from another outlet: credit that outlet, and read its text, not the original's deck.
@@ -455,6 +476,21 @@ class BriefingPlayer(
                 }
             }
         }
+    }
+
+    /** Full text worth reading aloud: not a teaser, not a sales piece. */
+    private fun readable(c: news.openwire.data.remote.ArticleContent?): Boolean =
+        c != null && !c.partial && c.text.length >= 500 && !news.openwire.domain.engine.Promotional.isPromotionalText(c.text)
+
+    /** Puts [item] in story [i]'s place (its text fetched afresh). */
+    private fun replaceStory(i: Int, item: news.openwire.domain.engine.BriefingPlan.Item) {
+        val nowMs = System.currentTimeMillis()
+        stories[i] = item.article
+        plan[i] = item.copy(relatedToPrevious = false)
+        breakingFlags[i] = news.openwire.domain.engine.BriefingPlan.isBreaking(item.article, nowMs)
+        developingFlags[i] = news.openwire.domain.engine.BriefingPlan.isDeveloping(item.article)
+        content.remove(i)?.cancel()
+        markStory(pos)
     }
 
     /** What the presenter knows about story [i]: its place in the edition, labels, related and merged coverage. */
@@ -726,6 +762,8 @@ class BriefingPlayer(
         private const val STING_LEAD_MS = 1600L
         /** How long a story may take to arrive (it was usually fetched while the one before was read). */
         private const val STORY_WAIT_MS = 12_000L
+        /** Stand-ins kept for stories that can't be read. */
+        private const val RESERVE = 6
         /** Outro: level under the sign-off, fade in, the breath after the last word, the swell, the tail. */
         private const val OUTRO_UNDER_VOICE = 0.18f
         private const val OUTRO_FADE_IN_MS = 3_000L

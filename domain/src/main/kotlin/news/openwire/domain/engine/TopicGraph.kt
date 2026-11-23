@@ -66,6 +66,8 @@ object TopicGraph {
                     // A short single word ("Pro") or a contraction ("Here's") says nothing on its own; acronyms (RAM, NBA) do.
                     !(' ' !in k && k.length <= 3 && termLabel[k]?.all { it.isUpperCase() || it.isDigit() } != true) &&
                     !(' ' !in k && (k.endsWith("'s") || k.endsWith("’s"))) &&
+                    // Shopping words aren't what a topic is about.
+                    k !in SALES && !Promotional.isPromotionalTitle(k) &&
                     countOf(k, seeds) >= minDf
             }
             .sortedByDescending { (k, v) -> v * (1 + 0.6 * ((termSpread[k] ?: 1) - 1)) + if (k.contains(' ')) 0.05 else 0.0 }
@@ -84,4 +86,5 @@ object TopicGraph {
         seeds.values.sumOf { heads -> heads.count { h -> h.title.lowercase().contains(k) } }
 
     private val WORD = Regex("[^\\p{L}\\p{N}]+")
+    private val SALES = setOf("black friday", "cyber monday", "prime day", "save", "saving", "savings", "deal", "deals", "sale", "sales", "discount", "discounts", "coupon", "price cut", "lowest price")
 }

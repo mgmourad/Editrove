@@ -142,18 +142,22 @@ class MainActivity : ComponentActivity() {
                 intent.getStringExtra(EXTRA_URL)?.let { vm.openLink(it, title = intent.getStringExtra(EXTRA_TITLE)) }
                 if (intent.getBooleanExtra(EXTRA_AUTOPLAY, false)) {
                     intent.removeExtra(EXTRA_AUTOPLAY)
-                    vm.selectTopicId("TOP")
-                    vm.selectTab(news.openwire.ui.home.NavTab.AUDIO)
-                    val player = (application as OpenWireApp).container.briefingPlayer
-                    lifecycleScope.launch {
-                        // Refresh first, then play right away.
-                        val top = vm.topics.firstOrNull { it.id == "TOP" } ?: return@launch
-                        val stories = vm.freshStories(top)
-                        player.awaitReady()
-                        if (stories.isNotEmpty()) player.play(top.label, stories)
-                    }
+                    playTopBriefing()
                 }
             }
+        }
+    }
+
+    /** Top Stories' briefing: refreshed first, then played (scheduled briefings, setup's notice). */
+    private fun playTopBriefing() {
+        vm.selectTopicId("TOP")
+        vm.selectTab(news.openwire.ui.home.NavTab.AUDIO)
+        val player = container.briefingPlayer
+        lifecycleScope.launch {
+            val top = vm.topics.firstOrNull { it.id == "TOP" } ?: return@launch
+            val stories = vm.freshStories(top)
+            player.awaitReady()
+            if (stories.isNotEmpty()) player.play(top.label, stories)
         }
     }
 

@@ -270,6 +270,29 @@ class BriefingPlayer(
         } else run()
     }
 
+    /**
+     * Speaks one line outside a briefing (the presenter sample in setup), with the briefing's own
+     * engine, voice and speed. Does nothing while a briefing is loaded.
+     */
+    fun sayLine(text: String, language: String = news.openwire.domain.engine.Languages.effective(null)) {
+        if (active || text.isBlank()) return
+        lang = language
+        useEngineFor(language)
+        scope.launch {
+            awaitReady()
+            if (active) return@launch
+            val p = prefs()
+            tts.setSpeechRate(p.speed)
+            val all = runCatching { tts.voices }.getOrNull().orEmpty()
+            (p.voice?.let { name -> all.firstOrNull { it.name == name && it.locale.language == lang } } ?: BriefingVoices.preferred(all, lang))
+                ?.let { tts.voice = it } ?: run { tts.language = Locale(lang) }
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "line")
+        }
+    }
+
+    /** Stops a line started with [sayLine]. */
+    fun stopLine() { if (!active) runCatching { tts.stop() } }
+
     /** Waits (up to [ms]) for the text-to-speech engine after a cold start. */
     suspend fun awaitReady(ms: Long = 6_000) {
         kotlinx.coroutines.withTimeoutOrNull(ms) { androidx.compose.runtime.snapshotFlow { ready }.first { it } }

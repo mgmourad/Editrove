@@ -663,7 +663,38 @@ private fun AddTopicPage(vm: SettingsViewModel, editing: news.openwire.domain.mo
         kotlinx.coroutines.delay(650)
         vm.updateTopicSeeds(name, TopicRegistry.parseCommaKeywords(keywords))
     }
-    LaunchedEffect(sug.keywords) { sug.keywords.forEach { k -> if (shownIdeas.none { it.equals(k, true) }) shownIdeas.add(k) } }
+    var nameChosen by rememberSaveable(key) { mutableStateOf(editing != null) }
+    var keywordsTouched by rememberSaveable(key) { mutableStateOf(editing != null) }
+    /** The name the keywords were filled in for (null: you wrote or kept your own). */
+    var autoFor by rememberSaveable(key) { mutableStateOf<String?>(null) }
+    /** Where the latest batch of ideas starts (they're outlined until the next batch). */
+    var newFrom by remember(key) { androidx.compose.runtime.mutableIntStateOf(0) }
+    LaunchedEffect(sug.keywords) {
+        val start = shownIdeas.size
+        sug.keywords.forEach { k -> if (shownIdeas.none { it.equals(k, true) }) shownIdeas.add(k) }
+        if (shownIdeas.size > start && start > 0) newFrom = start
+    }
+    // A name settles (picked, or typing pauses): its 3–5 strongest keywords fill the field,
+    // unless you've written your own.
+    val nameIdeasNow by vm.nameIdeas.collectAsState()
+    LaunchedEffect(name, nameIdeasNow, popular) {
+        if (nameChosen || name.trim().length < 3) return@LaunchedEffect
+        // Still a fragment of a suggested name ("Nvid" → "Nvidia")? Wait for a pick instead.
+        val t = name.trim().lowercase()
+        val extends = (popular + nameIdeasNow).any { it.lowercase().startsWith(t) && it.length > t.length } ||
+            news.openwire.domain.engine.TopicPresets.suggest(name).any { it.name.lowercase().startsWith(t) && it.name.length > t.length }
+        if (extends) return@LaunchedEffect
+        kotlinx.coroutines.delay(2_000)
+        nameChosen = true
+    }
+    LaunchedEffect(nameChosen, name, sug.keywords) {
+        if (!nameChosen || keywordsTouched || sug.keywords.isEmpty()) return@LaunchedEffect
+        // Only fill an empty field, or replace what was filled for an earlier name.
+        if (keywords.isNotBlank() && autoFor == null) return@LaunchedEffect
+        if (autoFor != null && autoFor.equals(name.trim(), true) && keywords.isNotBlank()) return@LaunchedEffect
+        keywords = (listOf(name.trim()) + sug.keywords.filter { !it.equals(name.trim(), true) }.take(4)).joinToString(", ")
+        autoFor = name.trim()
+    }
     LaunchedEffect(sug.outlets) { sug.outlets.forEach { o -> if (shownOutlets.none { it.domain == o.domain }) shownOutlets.add(o) } }
     val current = TopicRegistry.parseCommaKeywords(keywords).map { it.lowercase() }.toSet()
     fun toggleKeyword(k: String) {
@@ -679,27 +710,44 @@ private fun AddTopicPage(vm: SettingsViewModel, editing: news.openwire.domain.mo
             Label(tr(R.string.popular_topics))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 // In today's headlines first (refreshed on each visit), then the classics.
-                popular.take(6).forEach { t -> Chip("↗ $t", selected = name == t) { name = t; keywords = t } }
-                news.openwire.domain.engine.TopicPresets.POPULAR.forEach { p -> Chip(p.name, selected = name == p.name) { name = p.name; keywords = p.keywordText } }
+                popular.take(6).forEach { t -> Chip("↗ $t", selected = name == t) { name = t; nameChosen = true; if (!keywordsTouched) keywords = "" } }
+                news.openwire.domain.engine.TopicPresets.POPULAR.forEach { p -> Chip(p.name, selected = name == p.name) { name = p.name; nameChosen = true; if (!keywordsTouched) keywords = p.keywords.take(5).joinToString(", ") } }
             }
         }
         Section {
-            Field(tr(R.string.topic_name), name, { name = it }, placeholder = tr(R.string.topic_name_eg))
-            if (matches.isNotEmpty() && exact?.keywordText != keywords) {
+            Field(tr(R.string.topic_name), name, { name = it; nameChosen = false }, placeholder = tr(R.string.topic_name_eg))
+            // Suggestions while typing: ready-made topics, today's headline names, live completions.
+            LaunchedEffect(name) { if (!nameChosen) vm.suggestNames(name) }
+            val nameIdeas by vm.nameIdeas.collectAsState()
+            val typed = name.trim().lowercase()
+            val live = (popular + nameIdeas).filter { typed.length >= 2 && it.lowercase().contains(typed) && !it.equals(name.trim(), true) }.distinctBy { it.lowercase() }.take(4)
+            if (!nameChosen && typed.length >= 2 && (matches.isNotEmpty() || live.isNotEmpty())) {
                 Spacer(Modifier.height(6.dp))
-                matches.forEach { p ->
-                    Column(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                            .clickable { name = p.name; keywords = p.keywordText }
-                            .padding(horizontal = 6.dp, vertical = 8.dp),
-                    ) {
-                        Text(p.name, style = sans(14.sp, FontWeight.SemiBold), color = g.textPrimary)
-                        Text(p.keywordText, style = sans(11.sp, lineHeight = 15.sp), color = g.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(g.chipFill).border(1.dp, g.hairline, RoundedCornerShape(14.dp)).padding(4.dp)) {
+                    matches.take(4).forEach { p ->
+                        Column(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                .clickable { name = p.name; nameChosen = true; if (!keywordsTouched) keywords = p.keywords.take(5).joinToString(", ") }
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                        ) {
+                            Text(p.name, style = sans(14.sp, FontWeight.SemiBold), color = g.textPrimary)
+                            Text(p.keywordText, style = sans(11.sp, lineHeight = 15.sp), color = g.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    live.forEach { n ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { name = n; nameChosen = true; if (!keywordsTouched) { keywords = ""; autoFor = null } }.padding(horizontal = 10.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("↗", style = sans(13.sp, FontWeight.SemiBold), color = g.accentSoft)
+                            Spacer(Modifier.width(8.dp))
+                            Text(n, style = sans(14.sp, FontWeight.Medium), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Field(tr(R.string.keywords_field), keywords, { keywords = it }, placeholder = tr(R.string.keywords_eg))
+            Field(tr(R.string.keywords_field), keywords, { keywords = it; keywordsTouched = true }, placeholder = tr(R.string.keywords_eg))
             if (name.isNotBlank() || keywords.isNotBlank()) {
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -708,12 +756,17 @@ private fun AddTopicPage(vm: SettingsViewModel, editing: news.openwire.domain.mo
                 }
                 Spacer(Modifier.height(6.dp))
                 if (shownIdeas.isEmpty() && !sug.loading) Text(tr(R.string.related_keywords_hint), style = sans(11.sp, lineHeight = 16.sp), color = g.textSecondary)
-                // Grows as you pick; scrolls inside itself instead of stretching the page.
-                Box(Modifier.fillMaxWidth().heightIn(max = 196.dp).clip(RoundedCornerShape(14.dp)).verticalScroll(rememberScrollState())) {
+                // Grows as you pick: new ideas join at the end, which scrolls into view.
+                val ideaScroll = rememberScrollState()
+                LaunchedEffect(shownIdeas.size) { if (newFrom > 0) ideaScroll.animateScrollTo(ideaScroll.maxValue) }
+                Box(Modifier.fillMaxWidth().heightIn(max = 196.dp).clip(RoundedCornerShape(14.dp)).verticalScroll(ideaScroll)) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        shownIdeas.forEach { k ->
+                        shownIdeas.forEachIndexed { i, k ->
                             val on = k.lowercase() in current
-                            Chip(if (on) "✓ $k" else "+ $k", selected = on) { toggleKeyword(k) }
+                            val fresh = i >= newFrom && newFrom > 0 && !on
+                            Box(
+                                if (fresh) Modifier.border(1.dp, g.accent.copy(alpha = 0.55f), CircleShape) else Modifier,
+                            ) { Chip(if (on) "✓ $k" else "+ $k", selected = on) { toggleKeyword(k) } }
                         }
                     }
                 }

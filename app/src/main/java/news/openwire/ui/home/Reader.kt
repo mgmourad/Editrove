@@ -362,7 +362,7 @@ internal fun ArticleBody(
 
         // Deck / standfirst — the publisher's own description, when we have it
         content?.description?.let {
-            Text(it, style = sans(15.sp, lineHeight = 24.sp), color = g.textPrimary.copy(alpha = 0.75f))
+            Text(it, style = sans(15.sp, lineHeight = 24.sp).reading(), color = g.textPrimary.copy(alpha = 0.75f), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(20.dp))
         }
 
@@ -428,7 +428,7 @@ internal fun ArticleBody(
                     Row(Modifier.padding(top = 10.dp)) {
                         Box(Modifier.padding(top = 7.dp).size(5.dp).clip(CircleShape).background(g.accent))
                         Spacer(Modifier.width(10.dp))
-                        Text(point, style = sans(13.5.sp, lineHeight = 21.sp), color = g.textPrimary.copy(alpha = 0.92f))
+                        Text(point, style = sans(13.5.sp, lineHeight = 21.sp).reading(), color = g.textPrimary.copy(alpha = 0.92f), modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -436,7 +436,8 @@ internal fun ArticleBody(
         Spacer(Modifier.height(16.dp))
 
         // Feature image (16:9, 24dp radius) with caption
-        article.imageUrl?.takeIf { showFeatureImage }?.let { img ->
+        // The page's own photo (full size) once the article has loaded; the feed's until then.
+        (content?.imageUrl?.takeIf { it.startsWith("http") } ?: article.imageUrl)?.takeIf { showFeatureImage }?.let { img ->
             Box(
                 Modifier.fillMaxWidth().aspectRatio(16f / 9f)
                     .sharedArticleImage(article.id, hasImage = true, cornerRadius = 24.dp)
@@ -945,7 +946,7 @@ private fun OutletReport(c: news.openwire.data.remote.ArticleContent, loadPost: 
             Text(c.title, style = serif(21.sp, FontWeight.Bold, lineHeight = 27.sp), color = g.textPrimary, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
         }
-        c.description?.let { Text(it, style = sans(14.sp, lineHeight = 22.sp), color = g.textPrimary.copy(alpha = 0.75f)); Spacer(Modifier.height(10.dp)) }
+        c.description?.let { Text(it, style = sans(14.sp, lineHeight = 22.sp).reading(), color = g.textPrimary.copy(alpha = 0.75f), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp)) }
         Text(
             listOfNotNull(c.author, c.viaName).joinToString(" · "),
             style = mono(10.sp, tracking = 0.06.em), color = g.textSecondary, modifier = Modifier.padding(bottom = 14.dp),
@@ -961,7 +962,7 @@ private fun OutletReport(c: news.openwire.data.remote.ArticleContent, loadPost: 
                     Row(Modifier.padding(top = 10.dp)) {
                         Box(Modifier.padding(top = 7.dp).size(5.dp).clip(CircleShape).background(g.accent))
                         Spacer(Modifier.width(10.dp))
-                        Text(point, style = sans(13.5.sp, lineHeight = 21.sp), color = g.textPrimary.copy(alpha = 0.92f))
+                        Text(point, style = sans(13.5.sp, lineHeight = 21.sp).reading(), color = g.textPrimary.copy(alpha = 0.92f), modifier = Modifier.weight(1f))
                     }
                 }
             }

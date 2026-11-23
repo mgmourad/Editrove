@@ -24,6 +24,28 @@ object ImageExtractor {
     )
 
     /** True when the URL (and dimensions, if known) look like an editorial photo. */
+    /**
+     * The large version of a feed thumbnail, where the image service says how to ask for one:
+     * BBC ("/ace/standard/240/" → 1024), NYT ("-thumbStandard" → "-superJumbo"), Google
+     * ("=w200-h150" → "=w1200"), WordPress ("-150x150.jpg" → the original), Cloudinary
+     * ("/w_300/" → "/w_1200/") and plain width parameters. Signed addresses are left alone.
+     */
+    fun highRes(url: String?, width: Int = 1200): String? {
+        val u = url?.trim()?.takeIf { it.startsWith("http") } ?: return url
+        if (SIGNED.containsMatchIn(u)) return u
+        var out = u
+        out = BBC.replace(out) { m -> "${m.groupValues[1]}/${maxOf(m.groupValues[2].toInt(), 1024).coerceAtMost(1536)}/" }
+        out = NYT.replace(out, "-superJumbo.")
+        out = GOOGLE.replace(out, "=w$width")
+        out = WP_SIZE.replace(out) { m -> m.groupValues[2] }
+        out = CLOUDINARY.replace(out) { m -> if (m.groupValues[1].toInt() < width) "/w_$width" else m.value }
+        out = WIDTH_PARAM.replace(out) { m ->
+            val n = m.groupValues[3].toIntOrNull() ?: return@replace m.value
+            if (n in 1 until 800) "${m.groupValues[1]}${m.groupValues[2]}=$width" else m.value
+        }
+        return out
+    }
+
     fun isEditorialImage(url: String?, width: Int? = null, height: Int? = null): Boolean {
         val u = url?.trim() ?: return false
         if (!u.startsWith("http://") && !u.startsWith("https://")) return false
@@ -121,3 +143,11 @@ private val META_IMAGE: List<Regex> = listOf("(?:og:image|og:image:url|og:image:
         Regex("<meta[^>]+content=[\"']([^\"']+)[\"'][^>]+(?:property|name)=[\"']$key[\"']", RegexOption.IGNORE_CASE),
     )
 }
+
+private val SIGNED = Regex("[?&](s|sig|signature|token|hash)=", RegexOption.IGNORE_CASE)
+private val BBC = Regex("(ichef\\.bbci\\.co\\.uk/(?:ace/(?:standard|ws)|news))/(\\d{2,4})/")
+private val NYT = Regex("-(?:thumbStandard|thumbLarge|thumbWide|articleInline|mediumThreeByTwo\\d+|mediumSquare\\d+|threeByTwoSmallAt2X|blog\\d+|videoSixteenByNine\\d+)\\.(?=jpg|jpeg|png|webp)")
+private val GOOGLE = Regex("=(?:w\\d+-h\\d+|s\\d+)(?:-[a-z0-9-]+)?$")
+private val WP_SIZE = Regex("(-\\d{2,4}x\\d{2,4})(\\.(?:jpg|jpeg|png|webp))(?=$|\\?)")
+private val CLOUDINARY = Regex("/w_(\\d{2,4})(?=[,/])")
+private val WIDTH_PARAM = Regex("([?&])(w|width|resize_w|imwidth)=(\\d{2,4})(?=&|$)")

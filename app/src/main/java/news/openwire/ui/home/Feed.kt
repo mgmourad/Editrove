@@ -105,8 +105,10 @@ fun mono(size: TextUnit, weight: FontWeight = FontWeight.Normal, tracking: TextU
     TextStyle(fontFamily = JetBrainsMonoFamily, fontSize = size, fontWeight = weight, letterSpacing = tracking)
 
 fun sans(size: TextUnit, weight: FontWeight = FontWeight.Normal, lineHeight: TextUnit = TextUnit.Unspecified) =
-    // Content direction: Arabic (or Hebrew) text reads right to left and sits on the right, whatever the app's language.
-    TextStyle(fontFamily = InterFamily, fontSize = size, fontWeight = weight, lineHeight = lineHeight, textDirection = androidx.compose.ui.text.style.TextDirection.Content)
+    TextStyle(fontFamily = InterFamily, fontSize = size, fontWeight = weight, lineHeight = lineHeight)
+
+/** Reading text (excerpts, decks, key points): Arabic sits on the right, whatever the app's language. */
+fun TextStyle.reading(): TextStyle = copy(textDirection = androidx.compose.ui.text.style.TextDirection.Content)
 
 fun serif(size: TextUnit, weight: FontWeight = FontWeight.Bold, lineHeight: TextUnit = TextUnit.Unspecified, tracking: TextUnit = 0.sp) =
     TextStyle(fontFamily = NewsreaderFamily, fontSize = size, fontWeight = weight, lineHeight = lineHeight, letterSpacing = tracking, textDirection = androidx.compose.ui.text.style.TextDirection.Content)
@@ -691,7 +693,7 @@ fun LeadStoryCard(
                     androidx.compose.animation.AnimatedVisibility(opening != null, enter = androidx.compose.animation.fadeIn()) {
                         Column {
                             Spacer(Modifier.height(10.dp))
-                            Text(opening.orEmpty(), style = sans(14.sp, lineHeight = 21.sp), color = g.textSecondary, maxLines = 6, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
+                            Text(opening.orEmpty(), style = sans(14.sp, lineHeight = 21.sp).reading(), color = g.textSecondary, maxLines = 6, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
                         }
                     }
                     article.coverageLine(3)?.let {
@@ -813,13 +815,16 @@ fun ArticleImage(article: Article, modifier: Modifier, logoSize: Dp, grayscale: 
         value = if (article.imageUrl == null && resolver != null) resolver.resolve(article.originalUrl) else null
     }
     val url = article.imageUrl ?: found
-    // A photo that won't load (blocked or gone) gets the publisher canvas, not a blank frame.
+    // The large version of a feed thumbnail when the image service offers one; the original
+    // address if the large one won't load; the publisher canvas if neither does.
+    val large = remember(url) { news.openwire.domain.engine.ImageExtractor.highRes(url) }
+    var useOriginal by remember(url) { mutableStateOf(false) }
     var broken by remember(url) { mutableStateOf(false) }
     if (url != null && !broken) {
         AsyncImage(
-            model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier,
+            model = if (useOriginal) url else large, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier,
             colorFilter = if (grayscale) GrayscaleFilter else null,
-            onError = { broken = true },
+            onError = { if (!useOriginal && large != url) useOriginal = true else broken = true },
         )
     } else {
         PublisherCanvas(article, modifier, logoSize, grayscale)

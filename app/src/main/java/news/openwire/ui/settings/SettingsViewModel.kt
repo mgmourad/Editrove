@@ -251,6 +251,30 @@ class SettingsViewModel(
     /** Names in today's top headlines for the edition, refreshed each time New topic opens. */
     val popularNow: StateFlow<List<String>> = _popularNow
 
+    private val _nameIdeas = MutableStateFlow<List<String>>(emptyList())
+    /** Topic names in today's news that complete what's being typed ("Gal" → "Galaxy S27", "Galatasaray"). */
+    val nameIdeas: StateFlow<List<String>> = _nameIdeas
+    private var nameJob: kotlinx.coroutines.Job? = null
+
+    fun suggestNames(typed: String) {
+        nameJob?.cancel()
+        val q = typed.trim()
+        if (q.length < 2) { _nameIdeas.value = emptyList(); return }
+        nameJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(350)
+            val c = TopicRegistry.country(settings.value.edition.country)
+            val titles = runCatching {
+                news.openwire.data.remote.GoogleNewsRssSource().fetchFeed(TopicRegistry.googleNewsSearchUrl("$q when:7d", c)).items.map { it.title.substringBeforeLast(" - ") }
+            }.getOrDefault(emptyList())
+            val ql = q.lowercase()
+            val counts = HashMap<String, Int>()
+            titles.forEach { t -> news.openwire.domain.engine.KeywordMiner.terms(t, emptySet()).forEach { n ->
+                if (n.lowercase().split(' ').any { w -> w.startsWith(ql) } || n.lowercase().startsWith(ql)) counts[n] = (counts[n] ?: 0) + 1
+            } }
+            _nameIdeas.value = counts.entries.sortedByDescending { it.value }.map { it.key }.distinctBy { it.lowercase() }.take(5)
+        }
+    }
+
     fun loadPopular() {
         viewModelScope.launch {
             val c = TopicRegistry.country(settings.value.edition.country)

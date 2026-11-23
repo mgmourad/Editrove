@@ -162,7 +162,8 @@ object KeywordMiner {
                 if (isName(words[i], i == 0)) {
                     var j = i
                     while (j + 1 < words.size && isName(words[j + 1], false) && j - i < 2) j++
-                    val phrase = words.subList(i, j + 1).joinToString(" ")
+                    // "Jensen Huang's" is "Jensen Huang".
+                val phrase = words.subList(i, j + 1).joinToString(" ").replace(POSSESSIVE, "")
                     val key = phrase.lowercase()
                     if (key !in STOP && key.split(' ').none { it in own } && phrase.length > 2 && seen.add(key)) bump(phrase)
                     i = j + 1
@@ -178,7 +179,7 @@ object KeywordMiner {
     }
 
     /** The names and terms in one headline (proper names; for Arabic, its content words), minus [own] words. */
-    internal fun terms(title: String, own: Set<String>): Set<String> {
+    fun terms(title: String, own: Set<String>): Set<String> {
         val clean = title.substringBeforeLast(" - ").trim()
         val words = clean.split(TOKEN_SPLIT).map { it.trim('\'', '’', '.', '-') }.filter { it.isNotEmpty() }
         val out = LinkedHashSet<String>()
@@ -194,7 +195,7 @@ object KeywordMiner {
             if (isName(words[i], i == 0)) {
                 var j = i
                 while (j + 1 < words.size && isName(words[j + 1], false) && j - i < 2) j++
-                val phrase = words.subList(i, j + 1).joinToString(" ")
+                val phrase = words.subList(i, j + 1).joinToString(" ").replace(POSSESSIVE, "")
                 val key = phrase.lowercase()
                 if (key !in STOP && key.split(' ').none { it in own } && phrase.length > 2) out += phrase
                 i = j + 1
@@ -214,6 +215,7 @@ object KeywordMiner {
 }
 
 private val MARKS = Regex("\\p{M}+")
+private val POSSESSIVE = Regex("['’ʼ`´]s$")
 private val WORD_SPLIT = Regex("[^\\p{L}\\p{N}]+")
 private val TOKEN_SPLIT = Regex("[^\\p{L}\\p{N}'’.&-]+")
 private val NON_ALNUM = Regex("[^a-z0-9]+")

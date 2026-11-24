@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.draw.drawWithCache
@@ -391,7 +392,7 @@ fun LazyGridScope.feedItems(
     val fresh = if (newIds.isEmpty()) emptyList() else articles.filter { it.id in newIds }
     if (fresh.isNotEmpty()) {
         fullRow("new-divider-$newSince") { NewDivider(fresh.size, newSince) }
-        fresh.forEachIndexed { i, a -> fullRow("new-${a.id}") { NewStoryRow(a, i, onOpen) } }
+        fullRow("new-grid-$newSince") { NewSinceGrid(fresh, onOpen) }
     }
     fun state(a: Article) = a.originalUrl?.let { archive[it] }
     if (showTicker) fullRow("ticker") { LiveTicker(ticker ?: articles.drop(1).take(12).map { TickerItem(it, category, category) }, onOpen) }
@@ -1015,27 +1016,47 @@ private fun NewDivider(count: Int, since: Long) {
 
 private val Glass_accentFade = news.openwire.ui.theme.Rose.copy(alpha = .55f)
 
-/** A new story: fades in and slides down 8 dp, 70 ms after the one above it. */
+/**
+ * New stories as a compact 2 × 2 grid of headlines (text only): the first four, with a cue to
+ * show the rest. Each fades in and slides down 8 dp, 70 ms after the one before it.
+ */
 @Composable
-private fun NewStoryRow(a: Article, index: Int, onOpen: (Article) -> Unit) {
+private fun NewSinceGrid(stories: List<Article>, onOpen: (Article) -> Unit) {
+    var open by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val shown = if (open) stories else stories.take(4)
+    Column(Modifier.fillMaxWidth().animateContentSize(tween(320, easing = FastOutSlowInEasing)), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        shown.chunked(2).forEachIndexed { r, pair ->
+            Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEachIndexed { c, a -> NewStoryCell(a, r * 2 + c, onOpen, Modifier.weight(1f).fillMaxHeight()) }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+        if (stories.size > 4) {
+            Text(
+                if (open) tr(R.string.refresh_show_less) else tr(R.string.refresh_show_more, stories.size - 4),
+                style = mono(11.sp, FontWeight.SemiBold, 0.08.em), color = Glass.accent,
+                modifier = Modifier.clip(CircleShape).clickable { open = !open }.padding(horizontal = 6.dp, vertical = 10.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun NewStoryCell(a: Article, index: Int, onOpen: (Article) -> Unit, modifier: Modifier) {
     val g = Glass
     val reduce = news.openwire.ui.theme.rememberReduceMotion()
     val k = remember(a.id) { androidx.compose.animation.core.Animatable(if (reduce) 1f else 0f) }
-    LaunchedEffect(a.id) { if (!reduce) { kotlinx.coroutines.delay(70L * index); k.animateTo(1f, tween(320, easing = FastOutSlowInEasing)) } }
-    Row(
-        Modifier.fillMaxWidth().graphicsLayer { alpha = k.value; translationY = -8.dp.toPx() * (1f - k.value) }
-            .clip(RoundedCornerShape(16.dp)).background(g.chipFill).clickable { onOpen(a) }.padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    LaunchedEffect(a.id) { if (!reduce) { kotlinx.coroutines.delay(70L * (index % 4)); k.animateTo(1f, tween(320, easing = FastOutSlowInEasing)) } }
+    Column(
+        modifier.graphicsLayer { alpha = k.value; translationY = -8.dp.toPx() * (1f - k.value) }
+            .clip(RoundedCornerShape(14.dp)).background(g.chipFill).clickable { onOpen(a) }.padding(horizontal = 11.dp, vertical = 9.dp),
     ) {
-        Box(Modifier.size(7.dp).clip(CircleShape).background(g.accent).semantics { contentDescription = tr(R.string.refresh_new_dot) })
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(a.publication(), style = mono(10.sp, FontWeight.SemiBold, 0.12.em), color = g.accent, maxLines = 1)
-            Text(a.title, style = serif(16.sp, FontWeight.SemiBold, lineHeight = 21.sp), color = g.textPrimary, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(6.dp).clip(CircleShape).background(g.accent).semantics { contentDescription = tr(R.string.refresh_new_dot) })
+            Spacer(Modifier.width(6.dp))
+            Text(a.publication(), style = mono(9.5.sp, FontWeight.SemiBold, 0.1.em), color = g.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (!a.imageUrl.isNullOrBlank()) {
-            Spacer(Modifier.width(10.dp))
-            ArticleImage(a, Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)), logoSize = 28.dp)
-        }
+        Spacer(Modifier.height(3.dp))
+        Text(a.title, style = serif(14.sp, FontWeight.SemiBold, lineHeight = 18.sp), color = g.textPrimary, maxLines = 3, overflow = TextOverflow.Ellipsis)
     }
 }

@@ -61,5 +61,6 @@ class PullRefreshTest {
         assertEquals(emptyList<String>(), NewSince.newIds(listOf("a"), listOf("a")))
         // A different topic entirely: nothing is called "new".
         assertEquals(emptyList<String>(), NewSince.newIds(listOf("a"), listOf("p", "q")))
+        assertEquals(NewSince.key("Fed holds rates — again"), NewSince.key("Fed Holds Rates, Again"))
     }
 }

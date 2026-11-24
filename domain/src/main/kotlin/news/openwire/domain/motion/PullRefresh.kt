@@ -70,6 +70,11 @@ object PullMachine {
 
 /** Stories that arrived since the previous refresh. */
 object NewSince {
+    private val NON_WORD = Regex("[^\\p{L}\\p{N}]+")
+
+    /** A story's identity across refreshes (ids are positional; links get rewritten): its headline. */
+    fun key(title: String): String = title.lowercase().replace(NON_WORD, " ").trim()
+
     /**
      * The ids in [fresh] that weren't in [previous]. Nothing is "new" on a first load
      * (no previous copy) or when every story changed (a different topic or edition).

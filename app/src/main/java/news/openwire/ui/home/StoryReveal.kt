@@ -157,7 +157,7 @@ private val PreviewFilter = ColorFilter.colorMatrix(
  * beneath. A full image that came from memory shows at once.
  */
 @Composable
-fun DevelopingImage(preview: String?, full: String, modifier: Modifier, onFailed: () -> Unit) {
+fun DevelopingImage(preview: String?, full: String?, modifier: Modifier, onFailed: () -> Unit) {
     val reduce = rememberReduceMotion()
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val reveal = remember(full) { Animatable(0f) }
@@ -173,12 +173,12 @@ fun DevelopingImage(preview: String?, full: String, modifier: Modifier, onFailed
                 model = preview, contentDescription = null, contentScale = ContentScale.Crop, colorFilter = PreviewFilter,
                 modifier = Modifier.fillMaxSize().graphicsLayer {
                     alpha = 1f - reveal.value * reveal.value
-                    renderEffect = BlurSteps.of(14.dp.toPx())
+                    renderEffect = if (alpha > 0f) BlurSteps.of(14.dp.toPx()) else null
                     scaleX = 1.04f; scaleY = 1.04f
                 },
             )
         }
-        AsyncImage(
+        if (full != null) AsyncImage(
             model = full, contentDescription = null, contentScale = ContentScale.Crop,
             onState = { s ->
                 if (s is AsyncImagePainter.State.Success && !ready) {
@@ -245,54 +245,88 @@ fun CountUp(target: Int?, render: @Composable (Int?) -> Unit) {
 private val RX_RTL_HEAD = Regex("[\\u0590-\\u08FF]")
 
 /**
- * The headline setting itself, word by word (55 ms apart, 900 ms each): from wght 220 / opsz 8,
- * blurred 9 dp, 0.35 em low and loosely spaced, to wght 640 / opsz 72, sharp, in place and tight.
- * Every word keeps its final size from the start, so nothing reflows. TalkBack reads it once.
+ * The headline setting itself, word by word (55 ms apart, 900 ms each): each word crossfades from a
+ * thin, small-optical-size cut (wght 220 / opsz 8), blurred, 0.35 em low and loosely set, to the
+ * display cut (wght 640 / opsz 72), sharp and in place.
+ *
+ * Smoothness: both cuts are laid out once; every frame only moves layers (alpha, offset, scale,
+ * blur). The clock is read inside `graphicsLayer`, so nothing recomposes or re-measures while it
+ * plays. TalkBack reads the headline once.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingHeadline(text: String, start: Boolean, size: androidx.compose.ui.unit.TextUnit, lineHeight: androidx.compose.ui.unit.TextUnit, color: Color, modifier: Modifier = Modifier) {
     val reduce = rememberReduceMotion()
     val words = remember(text) { text.split(' ').filter { it.isNotEmpty() } }
-    val finalStyle = remember(size, lineHeight) {
+    val boldStyle = remember(size, lineHeight) {
         TextStyle(fontFamily = VariableType.newsreader(640, 72), fontWeight = FontWeight(640), fontSize = size, lineHeight = lineHeight, letterSpacing = (-0.01).em)
     }
-    val measurer = rememberTextMeasurer(cacheSize = 96)
-    val density = LocalDensity.current
-    // One clock for every word.
-    var elapsed by remember(text) { mutableLongStateOf(if (reduce) Long.MAX_VALUE / 4 else 0L) }
+    val thinStyle = remember(size, lineHeight) {
+        TextStyle(fontFamily = VariableType.newsreader(220, 8), fontWeight = FontWeight(220), fontSize = size, lineHeight = lineHeight, letterSpacing = 0.05.em)
+    }
+    // One clock for every word, read only in the draw phase.
+    val clock = remember(text) { androidx.compose.runtime.mutableLongStateOf(if (reduce) Long.MAX_VALUE / 4 else -1L) }
     val total = words.size * 55L + 900L
     LaunchedEffect(text, start) {
         if (!start || reduce) return@LaunchedEffect
         val t0 = withFrameMillis { it }
-        while (isActive && elapsed < total) withFrameMillis { elapsed = it - t0 }
+        while (isActive && clock.longValue < total) withFrameMillis { clock.longValue = it - t0 }
+        clock.longValue = total
     }
     val rtl = RX_RTL_HEAD.containsMatchIn(text.take(60))
     CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
         FlowRow(modifier.clearAndSetSemantics { contentDescription = text; heading() }) {
             words.forEachIndexed { i, w ->
                 val token = if (i < words.size - 1) "$w " else w
-                val box = remember(token, finalStyle, density) { measurer.measure(token, finalStyle, softWrap = false).size }
-                val p = if (!start && !reduce) 0f else EmphasizedDecelerate.transform(((elapsed - i * 55L) / 900f).coerceIn(0f, 1f))
-                // Axes step in twelfths of the way, so the whole headline uses about a dozen typefaces.
-                val wght = VariableType.step(p, 220, 640, 12)
-                val opsz = VariableType.step(p, 8, 72, 12)
-                val style = if (p >= 1f) finalStyle else finalStyle.copy(
-                    fontFamily = VariableType.newsreader(wght, opsz), fontWeight = FontWeight(wght),
-                    letterSpacing = (0.06f - 0.07f * p).em,
-                )
-                Box(Modifier.size(with(density) { box.width.toDp() }, with(density) { box.height.toDp() })) {
+                fun p(): Float {
+                    val t = clock.longValue
+                    if (t < 0) return 0f
+                    return EmphasizedDecelerate.transform(((t - i * 55L) / 900f).coerceIn(0f, 1f))
+                }
+                Box {
+                    // The display cut decides the word's box; the thin cut sits over it and fades away.
                     Text(
-                        token, style = style, color = color, softWrap = false, maxLines = 1,
-                        modifier = Modifier.wrapContentSize(unbounded = true, align = Alignment.BottomStart).graphicsLayer {
-                            alpha = (p * 1.6f).coerceAtMost(1f)
-                            translationY = (1f - p) * .35f * size.toPx()
-                            renderEffect = if (p < 1f) BlurSteps.of(9.dp.toPx() * (1f - p)) else null
+                        token, style = boldStyle, color = color, softWrap = false, maxLines = 1,
+                        modifier = Modifier.graphicsLayer {
+                            // Sharp from the start (no blur layer): it fades in as the thin cut fades out.
+                            val k = p()
+                            alpha = k * k
+                            translationY = (1f - k) * .35f * size.toPx()
+                        },
+                    )
+                    Text(
+                        token, style = thinStyle, color = color, softWrap = false, maxLines = 1,
+                        modifier = Modifier.matchParentSize().wrapContentSize(Alignment.BottomStart, unbounded = true).graphicsLayer {
+                            val k = p()
+                            alpha = if (k >= 1f) 0f else (1f - k) * (k * 4f).coerceAtMost(1f) * .9f
+                            translationY = (1f - k) * .35f * size.toPx()
+                            // The only blur per word, and only while it's still soft (cheap on the GPU).
+                            renderEffect = if (k > 0f && k < .6f) BlurSteps.of(9.dp.toPx() * (1f - k / .6f)) else null
                         },
                     )
                 }
             }
         }
+    }
+}
+
+/**
+ * A section of the article sliding up into place, [index] × 70 ms after [start]
+ * (a cascade down the page). Only the layer moves: nothing re-measures.
+ */
+@Composable
+fun Modifier.cascadeIn(index: Int, start: Boolean): Modifier {
+    val reduce = rememberReduceMotion()
+    val k = remember { Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(start) {
+        if (!start || reduce || k.value >= 1f) return@LaunchedEffect
+        delay(70L * index.coerceAtMost(12))
+        k.animateTo(1f, tween(560, easing = EmphasizedDecelerate))
+    }
+    return graphicsLayer {
+        val v = k.value
+        alpha = v
+        translationY = (1f - v) * 18.dp.toPx()
     }
 }
 

@@ -18,4 +18,7 @@
     <string name="refresh_new_dot">Nueva</string>
     <string name="reader_points_done">Hecho en este teléfono en %s s</string>
     <string name="reader_points_working">Resumiendo en este teléfono</string>
+    <string name="reader_points_done_ms">Hecho en este teléfono en %d ms</string>
+    <string name="refresh_show_more">Mostrar %d más</string>
+    <string name="refresh_show_less">Mostrar menos</string>
 </resources>

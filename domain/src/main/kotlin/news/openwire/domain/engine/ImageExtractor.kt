@@ -34,7 +34,10 @@ object ImageExtractor {
         val u = url?.trim()?.takeIf { it.startsWith("http") } ?: return url
         if (SIGNED.containsMatchIn(u)) return u
         var out = u
-        out = BBC.replace(out) { m -> "${m.groupValues[1]}/${maxOf(m.groupValues[2].toInt(), 1024).coerceAtMost(1536)}/" }
+        // BBC: 1536 px for its photo library (sharp across an unfolded screen); "branded_news"
+        // social cards only come in 1024.
+        val bbcMax = if ("/branded_news/" in out) 1024 else 1536
+        out = BBC.replace(out) { m -> "${m.groupValues[1]}/${maxOf(m.groupValues[2].toInt(), bbcMax).coerceAtMost(bbcMax)}/" }
         out = NYT.replace(out, "-superJumbo.")
         out = GOOGLE.replace(out, "=w$width")
         out = WP_SIZE.replace(out) { m -> m.groupValues[2] }

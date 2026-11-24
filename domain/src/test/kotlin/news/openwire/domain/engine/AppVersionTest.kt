@@ -53,4 +53,10 @@ class AppVersionTest {
         assertTrue(dec < jan)
         assertEquals("0.9-build.112026", nov.toString())
     }
+
+    @Test fun aFourPartPatchFollowsTheDatedBuild() {
+        assertTrue(AppVersion.parse("0.9.2.1")!! > AppVersion.parse("0.9.2-build.112326")!!)
+        assertTrue(AppVersion.parse("v0.9.2.1")!! < AppVersion.parse("0.9.3")!!)
+        assertEquals(false, AppVersion.parse("0.9.2.1")!!.isPrerelease)
+    }
 }

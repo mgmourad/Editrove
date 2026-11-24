@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (0.9.2.1)
+
+- Article photos are sharp: the full-page reader no longer stretches the feed's small
+  thumbnail; it uses the publisher's large photo or the page's own (BBC at 1536 px).
+- Every article leads with its main photo at the top, including stories that had no
+  photo in the feed.
+- The headline sets smoothly and the article cascades in, section by section.
+- "New since" stories show as a compact 2 × 2 grid of headlines with a "Show more" cue.
+
 ### Added
 
 - Loading motion, the Editrove way (ADR-0007):

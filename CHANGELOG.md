@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- First-run setup: pick your edition (your location or a typed city), topics
+  (including up to three of your own), the sources you trust, and who reads your
+  audio briefing and when. Each choice is drawn live as a network graph. It saves
+  everything in one go, Skip keeps today's defaults, and it can be run again from
+  Settings › Backup. Works folded and unfolded, in book and table-top posture,
+  with TalkBack, with animations off, and in all five languages. Existing users
+  and imported settings never see it (ADR-0006).
+
 - Project documentation set: `SPEC.md`, `CLAUDE.md`, `ARCHITECTURE.md`,
   `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, ADRs, and the design
   document.

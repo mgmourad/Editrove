@@ -143,24 +143,19 @@ private fun FullReaderPage(
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Wide header photo (the card's photo flies into it).
-            article.imageUrl?.let { img ->
-                Box(
-                    Modifier.widthIn(max = 1040.dp).fillMaxWidth().padding(horizontal = 32.dp).aspectRatio(2.1f)
-                        .sharedArticleImage(article.id, hasImage = true, cornerRadius = 28.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(28.dp)),
-                ) { AsyncImage(img, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-                Text(
-                    "PHOTOGRAPHY // ${article.publication()}",
-                    style = mono(10.sp, tracking = 0.05.em), color = g.textPrimary.copy(alpha = 0.5f), textAlign = TextAlign.End,
-                    modifier = Modifier.widthIn(max = 1040.dp).fillMaxWidth().padding(horizontal = 32.dp, vertical = 8.dp),
-                )
-                Spacer(Modifier.height(20.dp))
-            }
+            // Wide header photo (the card's photo flies into it), at the sharpest size available.
+            var content by remember(article.id) { mutableStateOf<news.openwire.data.remote.ArticleContent?>(null) }
+            var loading by remember(article.id) { mutableStateOf(true) }
+            HeroPhoto(
+                article, content, loading, aspect = 2.1f, radius = 28.dp, captionGap = 20.dp,
+                modifier = Modifier.widthIn(max = 1040.dp).padding(horizontal = 32.dp),
+            )
             // Comfortable reading measure.
             Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(horizontal = 32.dp)) {
-                ArticleBody(article, category, showMetaBar = true, saved = saved, liked = liked, actions = actions, showFeatureImage = false)
+                ArticleBody(
+                    article, category, showMetaBar = true, saved = saved, liked = liked, actions = actions, showFeatureImage = false,
+                    onLoading = { loading = it }, onContent = { content = it },
+                )
             }
         }
         StatusBarGlass(haze, extra = barHeight + 22.dp)

@@ -260,6 +260,8 @@ internal fun ArticleBody(
     showFeatureImage: Boolean = true,
     /** Told whether the article text is still loading (the sheet's top-edge comet). */
     onLoading: ((Boolean) -> Unit)? = null,
+    /** Told the page's content once it loads (Full view draws the photo header itself). */
+    onContent: ((news.openwire.data.remote.ArticleContent?) -> Unit)? = null,
 ) {
     val g = Glass
     val url = article.originalUrl ?: article.targetUrl ?: ""
@@ -291,7 +293,7 @@ internal fun ArticleBody(
     val images = LocalImageResolver.current
     LaunchedEffect(state) { (state as? BodyState.Loaded)?.content?.imageUrl?.let { images?.remember(article.originalUrl, it) } }
     val content = (state as? BodyState.Loaded)?.content
-    LaunchedEffect(state) { onLoading?.invoke(state is BodyState.Loading) }
+    LaunchedEffect(state) { onLoading?.invoke(state is BodyState.Loading); onContent?.invoke(content) }
     // The page is in place (the sheet finished opening): the headline and kicker set now.
     val settled = rememberReaderSettled()
     val reduce = news.openwire.ui.theme.rememberReduceMotion()
@@ -304,8 +306,10 @@ internal fun ArticleBody(
     var columnWidthDp by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val densityNow = androidx.compose.ui.platform.LocalDensity.current
     Column(Modifier.widthIn(max = 672.dp).fillMaxWidth().onSizeChanged { columnWidthDp = with(densityNow) { it.width.toDp().value.toInt() } }) {
+        // The story's main photo leads the page (the card's photo grows into it).
+        if (showFeatureImage) HeroPhoto(article, content, loading = state is BodyState.Loading, aspect = 16f / 9f, radius = 24.dp, captionGap = 20.dp)
         if (showMetaBar) {
-            Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(bottom = 12.dp).cascadeIn(0, settled), verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier.clip(CircleShape).background(g.accent.copy(alpha = 0.15f))
                         .border(1.dp, g.accent.copy(alpha = 0.30f), CircleShape)
@@ -328,14 +332,14 @@ internal fun ArticleBody(
                 Spacer(Modifier.width(8.dp))
                 SpringToggle(saved, ToggleKind.BOOKMARK, { actions.onToggleSaved(article) }, background = g.chipFill, border = g.hairline, padding = 8.dp)
             }
-            Box(Modifier.fillMaxWidth().height(1.dp).background(g.hairline))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(g.hairline).cascadeIn(0, settled))
             Spacer(Modifier.height(20.dp))
         }
 
         // Reader-service pill: tells you how this story is unlocked and opens that page.
         val context = LocalContext.current
         val service = remember(article.id) { actions.router.serviceFor(article) }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().cascadeIn(1, settled), verticalAlignment = Alignment.CenterVertically) {
         androidx.compose.foundation.layout.FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.weight(1f).padding(bottom = 12.dp),
@@ -363,26 +367,26 @@ internal fun ArticleBody(
         // Editorial serif headline
         SettingHeadline(
             article.title.ifBlank { content?.title?.takeIf { it.isNotBlank() } ?: article.source ?: article.domain ?: tr(R.string.reader_article) },
-            start = settled, size = 28.sp, lineHeight = 32.sp, color = g.textPrimary, modifier = Modifier.fillMaxWidth(),
+            start = settled, size = 28.sp, lineHeight = 32.sp, color = g.textPrimary, modifier = Modifier.fillMaxWidth().cascadeIn(2, settled),
         )
         Spacer(Modifier.height(12.dp))
 
         // Story grouping: who else is running this story
         article.coverageLine(4)?.let {
-            Text(it, style = sans(12.sp, FontWeight.Medium), color = g.accentSoft)
+            Text(it, style = sans(12.sp, FontWeight.Medium), color = g.accentSoft, modifier = Modifier.cascadeIn(3, settled))
             Spacer(Modifier.height(12.dp))
         }
 
         // Deck / standfirst — the publisher's own description, when we have it
         content?.description?.let {
-            Text(it, style = sans(15.sp, lineHeight = 24.sp).reading(), color = g.textPrimary.copy(alpha = 0.75f), modifier = Modifier.fillMaxWidth())
+            Text(it, style = sans(15.sp, lineHeight = 24.sp).reading(), color = g.textPrimary.copy(alpha = 0.75f), modifier = Modifier.fillMaxWidth().cascadeIn(4, settled))
             Spacer(Modifier.height(20.dp))
         }
 
         // Byline (on a narrow screen, the other-outlets pill sits just under the source instead).
         // Narrow column (the cover screen, or the reader beside the feed): the pill goes under the source.
         val narrowByline = columnWidthDp in 1..559
-        Row(Modifier.fillMaxWidth().padding(bottom = if (narrowByline) 10.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().padding(bottom = if (narrowByline) 10.dp else 20.dp).cascadeIn(5, settled), verticalAlignment = Alignment.CenterVertically) {
             SourceRing(start = settled, size = 36.dp) { SourceLogo(article.domain, article.source, size = 22.dp) }
             Spacer(Modifier.width(12.dp))
             val nameIn by androidx.compose.animation.core.animateFloatAsState(
@@ -417,45 +421,18 @@ internal fun ArticleBody(
         }
 
         if (narrowByline) {
-            Box(Modifier.padding(bottom = 18.dp)) {
+            Box(Modifier.padding(bottom = 18.dp).cascadeIn(6, settled)) {
                 OtherOutletsPill(showing = useOthers, original = article.source ?: article.domain ?: "") { if (useOthers) useOthers = false else openOthers() }
             }
         }
 
         // Liquid Glass narrated-briefing player
-        AudioBriefingCard(article, content)
+        Box(Modifier.cascadeIn(6, settled)) { AudioBriefingCard(article, content) }
         Spacer(Modifier.height(16.dp))
 
         // On-device summary: the article's own key sentences, written in front of you.
-        if (!useOthers) KeyPointsCard(state, content)
+        if (!useOthers) Box(Modifier.cascadeIn(7, settled)) { KeyPointsCard(state, content) }
         Spacer(Modifier.height(16.dp))
-
-        // Feature image (16:9, 24dp radius) with caption
-        // The page's own photo (full size) once the article has loaded; the feed's until then.
-        (content?.imageUrl?.takeIf { it.startsWith("http") } ?: article.imageUrl)?.takeIf { showFeatureImage }?.let { img ->
-            Box(
-                Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                    .sharedArticleImage(article.id, hasImage = true, cornerRadius = 24.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
-            ) {
-                // Develops from the cached thumbnail; falls back to the usual image (or publisher canvas) if it won't load.
-                var failed by remember(img) { mutableStateOf(false) }
-                if (failed || !img.startsWith("http")) ArticleImage(article.copy(imageUrl = img), Modifier.fillMaxSize(), logoSize = 72.dp)
-                else DevelopingImage(
-                    preview = article.imageUrl, full = remember(img) { news.openwire.domain.engine.ImageExtractor.highRes(img) ?: img },
-                    modifier = Modifier.fillMaxSize(), onFailed = { failed = true },
-                )
-            }
-            Text(
-                tr(R.string.reader_photo, article.publication()),
-                style = mono(10.sp, tracking = 0.05.em),
-                color = g.textPrimary.copy(alpha = 0.5f),
-                textAlign = TextAlign.End,
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            )
-            Spacer(Modifier.height(24.dp))
-        }
 
         if (noOthers) Text(tr(R.string.reader_other_none), style = sans(13.sp, lineHeight = 20.sp), color = g.indigo, modifier = Modifier.padding(bottom = 16.dp))
         if (useOthers) OtherOutletsView(others, original = article.source ?: article.domain ?: "", onBack = { useOthers = false }, loadPost = actions.loadPost)
@@ -488,7 +465,7 @@ internal fun ArticleBody(
                 val mediaAfter = remember(s.content) { s.content.media.groupBy { it.after } }
                 s.content.paragraphs.forEachIndexed { i, para ->
                     // Drop caps are a Latin-type tradition; Arabic (and Hebrew) text opens plainly.
-                    Box(Modifier.revealDown(i, reduce)) {
+                    Box(Modifier.cascadeIn(8 + i, true)) {
                         if (i == 0 && !RX_RTL.containsMatchIn(para.take(40))) DropCapParagraph(para) else BodyParagraph(para)
                     }
                     Spacer(Modifier.height(16.dp))
@@ -1033,8 +1010,12 @@ private fun KeyPointsCard(body: BodyState, content: news.openwire.data.remote.Ar
                 Spacer(Modifier.width(6.dp))
                 Text(tr(R.string.reader_points_working), style = sans(10.sp), color = g.textSecondary)
             } else {
-                val secs = (p as Points.Done).ms / 1000.0
-                Text(tr(R.string.reader_points_done, String.format(androidx.compose.ui.platform.LocalConfiguration.current.locales[0], "%.2f", secs)), style = sans(10.sp), color = g.textSecondary)
+                val ms = (p as Points.Done).ms
+                val loc = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+                Text(
+                    if (ms < 1000) tr(R.string.reader_points_done_ms, ms.coerceAtLeast(1)) else tr(R.string.reader_points_done, String.format(loc, "%.1f", ms / 1000.0)),
+                    style = sans(10.sp), color = g.textSecondary,
+                )
             }
         }
         when (p) {
@@ -1055,4 +1036,50 @@ private fun KeyPointsCard(body: BodyState, content: news.openwire.data.remote.Ar
             }
         }
     }
+}
+
+/**
+ * The story's main photo, as sharp as can be had: the feed image at the publisher's large size when
+ * its address says how (BBC, NYT, Guardian…), otherwise the article page's own photo once it loads,
+ * the feed image only as a last resort. The small feed image stands in, blurred, until then.
+ */
+@Composable
+internal fun HeroPhoto(
+    article: Article,
+    content: news.openwire.data.remote.ArticleContent?,
+    loading: Boolean,
+    aspect: Float,
+    radius: androidx.compose.ui.unit.Dp,
+    captionGap: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+) {
+    val g = Glass
+    val feed = article.imageUrl?.takeIf { it.startsWith("http") }
+    val page = content?.imageUrl?.takeIf { it.startsWith("http") }
+    val upgraded = remember(feed) { feed?.let { news.openwire.domain.engine.ImageExtractor.highRes(it) } }
+    val full = when {
+        upgraded != null && upgraded != feed -> upgraded // a known large size of the same photo
+        page != null -> news.openwire.domain.engine.ImageExtractor.highRes(page) ?: page
+        loading && feed != null -> null // wait for the page's photo; the thumbnail develops meanwhile
+        else -> feed
+    }
+    if (full == null && feed == null) return
+    Box(
+        modifier.fillMaxWidth().aspectRatio(aspect)
+            .sharedArticleImage(article.id, hasImage = feed != null, cornerRadius = radius)
+            .clip(RoundedCornerShape(radius))
+            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(radius)),
+    ) {
+        var failed by remember(full) { mutableStateOf(false) }
+        if (failed) ArticleImage(article.copy(imageUrl = feed ?: full), Modifier.fillMaxSize(), logoSize = 72.dp)
+        else DevelopingImage(preview = feed, full = full, modifier = Modifier.fillMaxSize(), onFailed = { failed = true })
+    }
+    Text(
+        tr(R.string.reader_photo, article.publication()),
+        style = mono(10.sp, tracking = 0.05.em),
+        color = g.textPrimary.copy(alpha = 0.5f),
+        textAlign = TextAlign.End,
+        modifier = modifier.fillMaxWidth().padding(top = 8.dp),
+    )
+    Spacer(Modifier.height(captionGap))
 }

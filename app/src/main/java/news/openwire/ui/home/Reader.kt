@@ -465,12 +465,12 @@ internal fun ArticleBody(
                 val mediaAfter = remember(s.content) { s.content.media.groupBy { it.after } }
                 s.content.paragraphs.forEachIndexed { i, para ->
                     // Drop caps are a Latin-type tradition; Arabic (and Hebrew) text opens plainly.
-                    Box(Modifier.cascadeIn(8 + i, true)) {
+                    Box(Modifier.revealOnScroll()) {
                         if (i == 0 && !RX_RTL.containsMatchIn(para.take(40))) DropCapParagraph(para) else BodyParagraph(para)
                     }
                     Spacer(Modifier.height(16.dp))
                     // The story's own photos and videos, where the publisher placed them.
-                    mediaAfter[i]?.forEach { m -> StoryMedia(m); Spacer(Modifier.height(16.dp)) }
+                    mediaAfter[i]?.forEach { m -> Box(Modifier.revealOnScroll()) { StoryMedia(m) }; Spacer(Modifier.height(16.dp)) }
                 }
                 if (s.content.embeds.isNotEmpty()) {
                     EmbeddedPosts(s.content.embeds, actions.loadPost)
@@ -1072,7 +1072,7 @@ internal fun HeroPhoto(
     ) {
         var failed by remember(full) { mutableStateOf(false) }
         if (failed) ArticleImage(article.copy(imageUrl = feed ?: full), Modifier.fillMaxSize(), logoSize = 72.dp)
-        else DevelopingImage(preview = feed, full = full, modifier = Modifier.fillMaxSize(), onFailed = { failed = true })
+        else DevelopingImage(preview = feed, full = full, modifier = Modifier.fillMaxSize(), start = rememberReaderSettled(), onFailed = { failed = true })
     }
     Text(
         tr(R.string.reader_photo, article.publication()),

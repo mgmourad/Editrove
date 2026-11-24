@@ -57,6 +57,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -288,30 +293,73 @@ private fun ChannelTile(c: LivePalette, ch: Channel, selected: Boolean, onClick:
             .border(BorderStroke(if (selected) 2.dp else 1.dp, if (selected) c.red else c.line), RoundedCornerShape(18.dp))
             .clickable(onClick = onClick),
     ) {
-        Box(
-            Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                .background(Brush.verticalGradient(listOf(c.surfaceHi, c.surface))),
-            contentAlignment = Alignment.Center,
-        ) {
-            SourceLogo(ch.domain, ch.name, size = 46.dp)
-            Box(Modifier.align(Alignment.TopStart).padding(10.dp)) {
-                if (ch.playsInApp) LiveBadge(c)
-                else Row(
-                    Modifier.clip(RoundedCornerShape(4.dp)).background(c.bg.copy(alpha = 0.7f)).padding(horizontal = 6.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("YouTube", style = mono(9.sp, FontWeight.SemiBold), color = c.text)
-                    Spacer(Modifier.width(3.dp))
-                    Icon(Icons.AutoMirrored.Filled.OpenInNew, null, tint = c.text, modifier = Modifier.size(10.dp))
-                }
-            }
-            if (selected) Box(Modifier.align(Alignment.Center).size(46.dp).clip(CircleShape).background(c.red.copy(alpha = 0.85f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.PlayArrow, null, tint = c.onRed)
-            }
-        }
+        ChannelThumbnail(c, ch, selected)
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
             Text(ch.name, style = sans(14.sp, FontWeight.SemiBold, lineHeight = 18.sp), color = c.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(Languages.of(ch.language)?.nativeName ?: ch.language, style = sans(11.sp), color = c.dim)
+        }
+    }
+}
+
+/**
+ * A channel's thumbnail: its high-resolution logo filling the frame (over a soft, enlarged copy
+ * of itself, so any shape fills 16:9), a half-dark veil for depth that still lets the logo read,
+ * the LIVE STREAM sticker top right, and the play mark in the middle on a soft shadow.
+ */
+@Composable
+private fun ChannelThumbnail(c: LivePalette, ch: Channel, selected: Boolean) {
+    val logos = news.openwire.ui.home.LocalLogoResolver.current
+    val fallback = news.openwire.ui.home.faviconUrl(ch.domain, 256)
+    val logo by produceState<String?>(null, ch.domain) { value = logos?.logo(ch.domain) ?: fallback }
+    var src by remember(logo) { mutableStateOf(logo) }
+    BoxWithConstraints(
+        Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Brush.verticalGradient(listOf(c.surfaceHi, c.surface))),
+        contentAlignment = Alignment.Center,
+    ) {
+        val w = maxWidth
+        val l = src
+        if (l == null) {
+            news.openwire.ui.home.SourceLogo(ch.domain, ch.name, size = 46.dp)
+        } else {
+            val onError: (coil.compose.AsyncImagePainter.State.Error) -> Unit = { if (src != fallback) src = fallback else src = null }
+            // Brand-coloured backdrop: the logo, enlarged and softened.
+            coil.compose.AsyncImage(
+                model = l, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, onError = onError,
+                modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = 1.5f; scaleY = 1.5f; alpha = .85f }
+                    .blur(36.dp, androidx.compose.ui.draw.BlurredEdgeTreatment.Rectangle),
+            )
+            // The logo itself, as large as the frame allows.
+            coil.compose.AsyncImage(
+                model = l, contentDescription = ch.name, contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().padding(vertical = w * .07f, horizontal = w * .12f),
+            )
+        }
+        // Half-dark veil: depth without hiding the logo.
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .38f), Color.Black.copy(alpha = .52f)))))
+        // LIVE STREAM, top right.
+        Image(
+            painterResource(R.drawable.live_sticker), contentDescription = tr(R.string.live),
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = w * .05f, end = w * .04f).width(w * .3f),
+        )
+        // External channels say where they open.
+        if (!ch.playsInApp) Row(
+            Modifier.align(Alignment.TopStart).padding(10.dp).clip(RoundedCornerShape(4.dp)).background(c.bg.copy(alpha = 0.7f)).padding(horizontal = 6.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("YouTube", style = mono(9.sp, FontWeight.SemiBold), color = c.text)
+            Spacer(Modifier.width(3.dp))
+            Icon(Icons.AutoMirrored.Filled.OpenInNew, null, tint = c.text, modifier = Modifier.size(10.dp))
+        }
+        // The play mark on a soft drop shadow (blurred on Android 12+, a faint offset copy below).
+        val play = w * (if (selected) .2f else .17f)
+        Box(Modifier.size(play * 1.6f), contentAlignment = Alignment.Center) {
+            Image(
+                painterResource(R.drawable.live_play), contentDescription = null,
+                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black),
+                modifier = Modifier.height(play).graphicsLayer { translationY = 2.dp.toPx(); alpha = if (android.os.Build.VERSION.SDK_INT >= 31) .6f else .3f }
+                    .blur(7.dp, androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded),
+            )
+            Image(painterResource(R.drawable.live_play), contentDescription = tr(R.string.live_play_channel, ch.name), modifier = Modifier.height(play))
         }
     }
 }

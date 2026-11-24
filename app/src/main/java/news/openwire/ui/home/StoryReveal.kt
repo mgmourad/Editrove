@@ -66,6 +66,8 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -157,20 +159,22 @@ private val PreviewFilter = ColorFilter.colorMatrix(
  * beneath. A full image that came from memory shows at once.
  */
 @Composable
-fun DevelopingImage(preview: String?, full: String?, modifier: Modifier, onFailed: () -> Unit) {
+fun DevelopingImage(preview: String?, full: String?, modifier: Modifier, start: Boolean = true, onFailed: () -> Unit) {
     val reduce = rememberReduceMotion()
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val reveal = remember(full) { Animatable(0f) }
-    var instant by remember(full) { mutableStateOf(false) }
+    val reveal = remember(full) { Animatable(if (reduce) 1f else 0f) }
     var ready by remember(full) { mutableStateOf(false) }
-    LaunchedEffect(ready) {
-        if (!ready) return@LaunchedEffect
-        if (instant || reduce) reveal.snapTo(1f) else reveal.animateTo(1f, tween(1150, easing = FastOutSlowInEasing))
+    // Every story develops the same way, cached or not, once the page is in place to be seen.
+    LaunchedEffect(ready, start) {
+        if (!ready || !start || reveal.value >= 1f) return@LaunchedEffect
+        if (reduce) reveal.snapTo(1f) else reveal.animateTo(1f, tween(1150, easing = FastOutSlowInEasing))
     }
+    // Without a thumbnail, the photo itself (soft and dim) is its own preview.
+    val soft = preview ?: full
     Box(modifier) {
-        if (preview != null && reveal.value < 1f) {
+        if (soft != null && reveal.value < 1f) {
             AsyncImage(
-                model = preview, contentDescription = null, contentScale = ContentScale.Crop, colorFilter = PreviewFilter,
+                model = soft, contentDescription = null, contentScale = ContentScale.Crop, colorFilter = PreviewFilter,
                 modifier = Modifier.fillMaxSize().graphicsLayer {
                     alpha = 1f - reveal.value * reveal.value
                     renderEffect = if (alpha > 0f) BlurSteps.of(14.dp.toPx()) else null
@@ -181,10 +185,8 @@ fun DevelopingImage(preview: String?, full: String?, modifier: Modifier, onFaile
         if (full != null) AsyncImage(
             model = full, contentDescription = null, contentScale = ContentScale.Crop,
             onState = { s ->
-                if (s is AsyncImagePainter.State.Success && !ready) {
-                    instant = s.result.dataSource == DataSource.MEMORY_CACHE || s.result.dataSource == DataSource.MEMORY
-                    ready = true
-                } else if (s is AsyncImagePainter.State.Error) onFailed()
+                if (s is AsyncImagePainter.State.Success && !ready) ready = true
+                else if (s is AsyncImagePainter.State.Error) onFailed()
             },
             modifier = Modifier.fillMaxSize().drawWithCache {
                 val h = size.height; val w = size.width
@@ -487,4 +489,56 @@ fun CometLine(loading: Boolean, progress: () -> Float, modifier: Modifier = Modi
             }
         },
     )
+}
+
+/**
+ * A paragraph that settles onto the page when the reader scrolls it into view: a soft ink wipe
+ * from its top to its bottom (a feathered mask, not a hard edge) while it rises a few dp, over
+ * about a second. Paragraphs already on screen settle top-down, a little after one another.
+ * Each plays once; with animations off, text is simply there.
+ */
+@Composable
+fun Modifier.revealOnScroll(): Modifier {
+    val reduce = rememberReduceMotion()
+    if (reduce) return this
+    val view = androidx.compose.ui.platform.LocalView.current
+    val k = remember { Animatable(0f) }
+    var seenAt by remember { mutableStateOf(-1f) }
+    LaunchedEffect(seenAt >= 0f) {
+        if (seenAt < 0f) return@LaunchedEffect
+        // Lower on the screen → a touch later: the page settles from the top down.
+        delay((seenAt * 260f).toLong())
+        k.animateTo(1f, tween(1050, easing = EmphasizedDecelerate))
+    }
+    return this
+        .then(
+            Modifier.onGloballyPositioned { c ->
+                if (seenAt >= 0f) return@onGloballyPositioned
+                val h = view.height.toFloat().takeIf { it > 0f } ?: return@onGloballyPositioned
+                val top = c.boundsInWindow().top
+                if (top < h * .9f) seenAt = (top / h).coerceIn(0f, 1f)
+            },
+        )
+        .graphicsLayer {
+            val v = k.value
+            translationY = (1f - v) * 16.dp.toPx()
+            alpha = if (v <= 0f) 0f else 1f
+            // Offscreen only while the mask is moving.
+            compositingStrategy = if (v in 0.001f..0.999f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+        }
+        .drawWithCache {
+            val feather = size.height * .45f + 24.dp.toPx()
+            onDrawWithContent {
+                val v = k.value
+                drawContent()
+                if (v >= 1f || v <= 0f) return@onDrawWithContent
+                // The edge travels from above the paragraph to below it, feathered.
+                val edge = -feather + (size.height + feather) * v
+                val mask = Brush.verticalGradient(
+                    0f to Color.Black, 1f to Color.Transparent,
+                    startY = edge, endY = edge + feather,
+                )
+                drawRect(mask, blendMode = BlendMode.DstIn)
+            }
+        }
 }

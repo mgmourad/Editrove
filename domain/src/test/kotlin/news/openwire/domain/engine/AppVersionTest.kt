@@ -58,5 +58,7 @@ class AppVersionTest {
         assertTrue(AppVersion.parse("0.9.2.1")!! > AppVersion.parse("0.9.2-build.112326")!!)
         assertTrue(AppVersion.parse("v0.9.2.1")!! < AppVersion.parse("0.9.3")!!)
         assertEquals(false, AppVersion.parse("0.9.2.1")!!.isPrerelease)
+        // The next beta is offered over the patch.
+        assertTrue(AppVersion.parse("0.9.3-beta.112426")!! > AppVersion.parse("0.9.2.1")!!)
     }
 }

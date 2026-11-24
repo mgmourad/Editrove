@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import kotlin.math.roundToInt
 import news.openwire.i18n.tr
 import news.openwire.i18n.text
 import news.openwire.R
@@ -174,9 +180,15 @@ fun Masthead(edition: String, onEdition: () -> Unit, onSettings: () -> Unit, mod
                 )
             }
         }
+        // The pull's one "ink" detail: the wordmark gets very slightly heavier (wght 700 → 800) and
+        // tighter (−0.5 sp) as the rule grows. Stepped, so it reuses five typefaces.
+        val inkState = LocalPullInk.current
+        val ink: Int by remember(inkState) { androidx.compose.runtime.derivedStateOf { (inkState.value * 5f).roundToInt() } }
         Text(
             "Editrove",
-            style = serif(40.sp, FontWeight.Bold, lineHeight = 40.sp, tracking = (-0.02).em),
+            style = if (ink == 0) serif(40.sp, FontWeight.Bold, lineHeight = 40.sp, tracking = (-0.02).em)
+            else serif(40.sp, FontWeight(700 + ink * 20), lineHeight = 40.sp, tracking = (40 * -0.02f - 0.1f * ink).sp)
+                .copy(fontFamily = news.openwire.ui.theme.VariableType.newsreader(700 + ink * 20)),
             color = g.textPrimary,
             maxLines = 1,
             softWrap = false,
@@ -210,24 +222,67 @@ fun FeedControls(
             }
         }
         Spacer(Modifier.weight(1f))
-        val label = when {
-            refreshing -> tr(R.string.status_refreshing)
-            updatedAt > 0 -> tr(R.string.status_updated, NewsProcessor.formatRelativeTime(updatedAt))
-            else -> tr(R.string.status_saved_copy)
-        } + if (failed.isNotEmpty() && !refreshing) " · " + tr(if (failed.size > 1) R.string.status_offline_many else R.string.status_offline_one, failed.size) else ""
+        // While refreshing, the last time stays up (the dot pulses); when it lands, the time rolls
+        // over like an odometer and the offline count updates.
+        var shownAt by remember { mutableStateOf(updatedAt) }
+        var shownFailed by remember { mutableStateOf(failed) }
+        if (!refreshing) { shownAt = updatedAt; shownFailed = failed }
+        // Keep the relative time current while the screen is open.
+        var minute by remember { mutableStateOf(0L) }
+        LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(30_000); minute++ } }
+        val label = remember(shownAt, shownFailed, minute) {
+            when {
+                shownAt > 0 -> tr(R.string.status_updated, NewsProcessor.formatRelativeTime(shownAt))
+                else -> tr(R.string.status_saved_copy)
+            } + if (shownFailed.isNotEmpty()) " · " + tr(if (shownFailed.size > 1) R.string.status_offline_many else R.string.status_offline_one, shownFailed.size) else ""
+        }
         Row(
-            Modifier.clip(CircleShape).clickable(enabled = !refreshing, onClick = onRefresh).padding(horizontal = 8.dp, vertical = 6.dp),
+            Modifier.clip(CircleShape).clickable(enabled = !refreshing, onClickLabel = tr(R.string.action_refresh), onClick = onRefresh).padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(label, style = mono(10.sp, tracking = 0.sp), color = g.textSecondary, maxLines = 1)
-            Spacer(Modifier.width(6.dp))
-            val spin = rememberInfiniteTransition(label = "spin")
-            val angle by spin.animateFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "a")
-            androidx.compose.material3.Icon(
-                androidx.compose.material.icons.Icons.Filled.Refresh, contentDescription = tr(R.string.action_refresh),
-                tint = g.accentSoft, modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = if (refreshing) angle else 0f },
-            )
+            PulseDot(refreshing)
+            Spacer(Modifier.width(7.dp))
+            Odometer(label, style = mono(10.sp, tracking = 0.sp), color = g.textSecondary)
         }
+    }
+}
+
+/** The status line's rose dot: still when idle, a slow breath while refreshing. */
+@Composable
+private fun PulseDot(refreshing: Boolean) {
+    val reduce = news.openwire.ui.theme.rememberReduceMotion()
+    val k = if (refreshing && !reduce) rememberInfiniteTransition(label = "dot")
+        .animateFloat(0f, 1f, infiniteRepeatable(tween(1100, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "k") else null
+    Box(
+        Modifier.size(6.dp).graphicsLayer {
+            val v = k?.value ?: 0f
+            alpha = 1f - .55f * v; scaleX = 1f + .35f * v; scaleY = scaleX
+        }.clip(CircleShape).background(Glass.accent),
+    )
+}
+
+/** Emphasized decelerate (M3): the odometer's roll. */
+private val EmphasizedDecelerate = androidx.compose.animation.core.CubicBezierEasing(.05f, .7f, .1f, 1f)
+
+/**
+ * Text that rolls over like an odometer when it changes: the part that stays put doesn't move,
+ * the rest rolls up (420 ms, emphasized decelerate). "18 min ago" → "just now".
+ */
+@Composable
+internal fun Odometer(text: String, style: androidx.compose.ui.text.TextStyle, color: Color) {
+    var previous by remember { mutableStateOf(text) }
+    val keep = remember(text) { previous.commonPrefixWith(text).let { p -> p.substring(0, p.lastIndexOf(' ').let { if (it < 0) 0 else it + 1 }) } }
+    LaunchedEffect(text) { previous = text }
+    Row {
+        if (keep.isNotEmpty()) Text(keep, style = style, color = color, maxLines = 1)
+        androidx.compose.animation.AnimatedContent(
+            targetState = text.removePrefix(keep),
+            transitionSpec = {
+                (androidx.compose.animation.slideInVertically(tween(420, easing = EmphasizedDecelerate)) { it } + androidx.compose.animation.fadeIn(tween(300))) togetherWith
+                    (androidx.compose.animation.slideOutVertically(tween(420, easing = EmphasizedDecelerate)) { -it } + androidx.compose.animation.fadeOut(tween(200)))
+            },
+            label = "odometer",
+        ) { Text(it, style = style, color = color, maxLines = 1) }
     }
 }
 
@@ -329,8 +384,17 @@ fun LazyGridScope.feedItems(
     marketWatch: Boolean = false,
     /** The live bar's stories across topics (null: this feed's own). */
     ticker: List<TickerItem>? = null,
+    /** Stories that arrived with the last refresh, and when the one before it was. */
+    newIds: Set<String> = emptySet(),
+    newSince: Long = 0L,
 ) {
     if (articles.isEmpty()) return
+    // New since the last refresh: under a divider at the top, each with the rose "new" dot.
+    val fresh = if (newIds.isEmpty()) emptyList() else articles.filter { it.id in newIds }
+    if (fresh.isNotEmpty()) {
+        fullRow("new-divider-$newSince") { NewDivider(fresh.size, newSince) }
+        fresh.forEachIndexed { i, a -> fullRow("new-${a.id}") { NewStoryRow(a, i, onOpen) } }
+    }
     fun state(a: Article) = a.originalUrl?.let { archive[it] }
     if (showTicker) fullRow("ticker") { LiveTicker(ticker ?: articles.drop(1).take(12).map { TickerItem(it, category, category) }, onOpen) }
     if (showTicker && marketWatch) fullRow("markets") { MarketBar() }
@@ -924,4 +988,56 @@ private fun SkeletonBlock(height: Dp) {
             .graphicsLayer { alpha = a }
             .glassSurface(elevation = 0.dp),
     )
+}
+
+/** "3 new since 9:12": rose mono, with a hairline fading away in the reading direction. */
+@Composable
+private fun NewDivider(count: Int, since: Long) {
+    val time = remember(since) {
+        if (since <= 0L) "" else java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
+            .format(java.time.Instant.ofEpochMilli(since).atZone(java.time.ZoneId.systemDefault()))
+    }
+    val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            (if (time.isEmpty()) tr(R.string.refresh_new, count) else tr(R.string.refresh_new_since, count, time)).uppercase(),
+            style = mono(11.sp, FontWeight.SemiBold, 0.14.em), color = Glass.accent, maxLines = 1,
+        )
+        Spacer(Modifier.width(10.dp))
+        Box(
+            Modifier.weight(1f).height(1.dp).drawWithCache {
+                val b = Brush.horizontalGradient(
+                    if (rtl) listOf(Color.Transparent, Glass_accentFade) else listOf(Glass_accentFade, Color.Transparent),
+                )
+                onDrawBehind { drawRect(b) }
+            },
+        )
+    }
+}
+
+private val Glass_accentFade = news.openwire.ui.theme.Rose.copy(alpha = .55f)
+
+/** A new story: fades in and slides down 8 dp, 70 ms after the one above it. */
+@Composable
+private fun NewStoryRow(a: Article, index: Int, onOpen: (Article) -> Unit) {
+    val g = Glass
+    val reduce = news.openwire.ui.theme.rememberReduceMotion()
+    val k = remember(a.id) { androidx.compose.animation.core.Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(a.id) { if (!reduce) { kotlinx.coroutines.delay(70L * index); k.animateTo(1f, tween(320, easing = FastOutSlowInEasing)) } }
+    Row(
+        Modifier.fillMaxWidth().graphicsLayer { alpha = k.value; translationY = -8.dp.toPx() * (1f - k.value) }
+            .clip(RoundedCornerShape(16.dp)).background(g.chipFill).clickable { onOpen(a) }.padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(g.accent).semantics { contentDescription = tr(R.string.refresh_new_dot) })
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(a.publication(), style = mono(10.sp, FontWeight.SemiBold, 0.12.em), color = g.accent, maxLines = 1)
+            Text(a.title, style = serif(16.sp, FontWeight.SemiBold, lineHeight = 21.sp), color = g.textPrimary, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
+        if (!a.imageUrl.isNullOrBlank()) {
+            Spacer(Modifier.width(10.dp))
+            ArticleImage(a, Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)), logoSize = 28.dp)
+        }
+    }
 }

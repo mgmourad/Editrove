@@ -92,6 +92,18 @@ class HomeViewModel(
     private val _refreshing = MutableStateFlow<Set<String>>(emptySet())
     val refreshing: StateFlow<Set<String>> = _refreshing.asStateFlow()
 
+    /** The wire under the pull band: each source of the current pull-refresh as it answers. */
+    private val _ticker = MutableStateFlow(news.openwire.data.repository.RefreshTicker())
+    val ticker: StateFlow<news.openwire.data.repository.RefreshTicker> = _ticker.asStateFlow()
+    /** Topics whose refresh the reader asked for (only those drive the wire). */
+    private val pulled = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /** Stories that arrived with the last refresh the reader asked for, per topic. */
+    data class NewStories(val ids: List<String>, val since: Long)
+    private val _newStories = MutableStateFlow<Map<String, NewStories>>(emptyMap())
+    val newStories: StateFlow<Map<String, NewStories>> = _newStories.asStateFlow()
+    private val beforeRefresh = HashMap<String, Pair<List<String>, Long>>()
+
     private val _archive = MutableStateFlow<Map<String, ArchiveState>>(emptyMap())
     /** Keyed by the story's original URL. */
     val archive: StateFlow<Map<String, ArchiveState>> = _archive.asStateFlow()
@@ -129,6 +141,13 @@ class HomeViewModel(
     private val archiveGate = Semaphore(3)
 
     init {
+        viewModelScope.launch {
+            repository.refreshEvents.collect { e ->
+                _ticker.update { t ->
+                    if (e is news.openwire.data.repository.RefreshEvent.Started) { if (e.topicId in pulled) t.reduce(e) else t } else t.reduce(e)
+                }
+            }
+        }
         load(currentTopic)
         viewModelScope.launch {
             settings.collect { s ->
@@ -177,6 +196,16 @@ class HomeViewModel(
 
     /** Pull-to-refresh / Refresh action: always goes back to the network. */
     fun refresh() {
+        // What was on screen, to tell which stories are new when this refresh lands.
+        fun mark(t: Topic) {
+            pulled += t.id
+            (_feeds.value[t.id] as? FeedResult.Success)?.let { r -> beforeRefresh[t.id] = r.articles.map { news.openwire.domain.motion.NewSince.key(it.title) } to r.updatedAt }
+        }
+        when (_tab.value) {
+            NavTab.DISCOVER -> topics.forEach(::mark)
+            NavTab.SAVED, NavTab.LIVE, NavTab.OPINION -> Unit
+            else -> mark(currentTopic)
+        }
         when (_tab.value) {
             NavTab.DISCOVER -> topics.forEach { load(it, force = true) }
             NavTab.SAVED, NavTab.LIVE, NavTab.OPINION -> Unit
@@ -364,8 +393,20 @@ class HomeViewModel(
                 (_feeds.value[topic.id] as? FeedResult.Success)?.let { if (it.fromCache) checkArchives(it.articles) }
             } finally {
                 _refreshing.update { it - topic.id }
+                if (pulled.remove(topic.id)) settleNew(topic.id)
             }
         }
+    }
+
+    /** After a refresh the reader asked for: which stories weren't there before it. */
+    private fun settleNew(topicId: String) {
+        val (before, at) = beforeRefresh.remove(topicId) ?: return
+        val now = _feeds.value[topicId] as? FeedResult.Success ?: return
+        if (now.fromCache) return
+        val keys = now.articles.map { news.openwire.domain.motion.NewSince.key(it.title) }
+        val fresh = news.openwire.domain.motion.NewSince.newIds(before, keys).toHashSet()
+        val ids = now.articles.filter { news.openwire.domain.motion.NewSince.key(it.title) in fresh }.map { it.id }
+        _newStories.update { if (ids.isEmpty()) it - topicId else it + (topicId to NewStories(ids, at)) }
     }
 
     /** Non-blocking archive checks for hard-paywall stories; missing snapshots grey the story out. */

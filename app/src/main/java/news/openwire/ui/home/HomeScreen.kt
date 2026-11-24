@@ -510,6 +510,7 @@ private fun TabFeed(
     val userSettings by vm.settings.collectAsState()
     val archive by vm.archive.collectAsState()
     val refreshingIds by vm.refreshing.collectAsState()
+    val newStoriesMap by vm.newStories.collectAsState()
 
     val padding = PaddingValues(
         start = horizontalPadding, end = horizontalPadding,
@@ -601,11 +602,15 @@ private fun TabFeed(
             NavTab.SAVED, NavTab.LIVE, NavTab.OPINION -> false
             else -> topic.id in refreshingIds
         }
-        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
-            isRefreshing = isRefreshing,
+        RuleRefreshBox(
+            refreshing = isRefreshing,
+            ticker = vm.ticker,
+            newCount = { vm.newStories.value[topic.id]?.ids?.size ?: 0 },
             onRefresh = { vm.refresh() },
+            topInset = padding.calculateTopPadding() - 6.dp,
             modifier = Modifier.fillMaxSize(),
         ) {
+        val newHere = if (t == NavTab.TODAY) newStoriesMap[topic.id] else null
         EditorialGrid(stateFor(t), padding, Modifier.fillMaxSize(), columns = columns) {
             fullRow("masthead") {
                 Masthead(userSettings.edition.city, onEdition = { vm.openSettings() }, onSettings = { vm.openSettings() })
@@ -622,6 +627,8 @@ private fun TabFeed(
                 showTicker = ticker, sectionTitle = title, magazine = magazine,
                 marketWatch = ticker && topic.id == "BUSINESS",
                 ticker = tickerItems,
+                newIds = newHere?.ids?.toSet().orEmpty(),
+                newSince = newHere?.since ?: 0L,
             )
             when (t) {
                 NavTab.TODAY, NavTab.AUDIO -> {

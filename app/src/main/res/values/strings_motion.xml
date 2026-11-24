@@ -21,4 +21,7 @@
     <string name="reader_points_done_ms">Done on this phone in %d ms</string>
     <string name="refresh_show_more">Show %d more</string>
     <string name="refresh_show_less">Show less</string>
+    <string name="live_play_channel">Play %s live</string>
+    <string name="reader_auto_other">%1$s wouldn\'t open here, so this is %2$s\'s report of the same story.</string>
+    <string name="reader_other_outlet">another outlet</string>
 </resources>

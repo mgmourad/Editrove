@@ -297,6 +297,15 @@ internal fun ArticleBody(
     // The page is in place (the sheet finished opening): the headline and kicker set now.
     val settled = rememberReaderSettled()
     val reduce = news.openwire.ui.theme.rememberReduceMotion()
+    // Time + action: the body may reveal once the summary has finished writing and a beat has
+    // passed; each paragraph then waits to be scrolled into view.
+    var summaryDone by remember(article.id) { mutableStateOf(false) }
+    val bodyGate = remember(article.id) { mutableStateOf(false) }
+    LaunchedEffect(summaryDone, state is BodyState.Loaded) {
+        if (state !is BodyState.Loaded) return@LaunchedEffect
+        if (summaryDone) { kotlinx.coroutines.delay(BODY_PAUSE_MS); bodyGate.value = true }
+        else { kotlinx.coroutines.delay(SUMMARY_TIMEOUT_MS); bodyGate.value = true } // never hold the text back for long
+    }
 
     // The whole article (headline, standfirst, summary, body) follows the chosen text size.
     val baseDensity = androidx.compose.ui.platform.LocalDensity.current
@@ -431,7 +440,8 @@ internal fun ArticleBody(
         Spacer(Modifier.height(16.dp))
 
         // On-device summary: the article's own key sentences, written in front of you.
-        if (!useOthers) Box(Modifier.cascadeIn(7, settled)) { KeyPointsCard(state, content) }
+        if (!useOthers) Box(Modifier.cascadeIn(7, settled)) { KeyPointsCard(state, content, onDone = { summaryDone = true }) }
+        else LaunchedEffect(Unit) { summaryDone = true }
         Spacer(Modifier.height(16.dp))
 
         if (noOthers) Text(tr(R.string.reader_other_none), style = sans(13.sp, lineHeight = 20.sp), color = g.indigo, modifier = Modifier.padding(bottom = 16.dp))
@@ -451,6 +461,15 @@ internal fun ArticleBody(
                 SlowArticleCard(failed = true, onRetry = { attempt++ }, onOthers = openOthers, smryUrl = if (service == null) url else "")
             }
             is BodyState.Loaded -> {
+                // The original turned the reader away: say whose report this is, up front.
+                if (s.content.via == news.openwire.data.remote.TextSource.OTHER_OUTLETS) {
+                    Text(
+                        tr(R.string.reader_auto_other, article.source ?: article.domain ?: "", s.content.viaName ?: tr(R.string.reader_other_outlet)),
+                        style = sans(13.sp, FontWeight.Medium, lineHeight = 19.sp), color = g.indigo,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 18.dp).clip(RoundedCornerShape(14.dp))
+                            .background(g.indigo.copy(alpha = .10f)).padding(horizontal = 14.dp, vertical = 10.dp),
+                    )
+                }
                 s.content.pullQuote?.let { quote ->
                     Row(Modifier.fillMaxWidth().padding(bottom = 24.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
                         Box(Modifier.width(2.dp).fillMaxHeight().background(g.accent))
@@ -463,14 +482,16 @@ internal fun ArticleBody(
                     }
                 }
                 val mediaAfter = remember(s.content) { s.content.media.groupBy { it.after } }
+                androidx.compose.runtime.CompositionLocalProvider(LocalBodyGate provides bodyGate) {
                 s.content.paragraphs.forEachIndexed { i, para ->
                     // Drop caps are a Latin-type tradition; Arabic (and Hebrew) text opens plainly.
-                    Box(Modifier.cascadeIn(8 + i, true)) {
+                    Box(Modifier.revealOnScroll()) {
                         if (i == 0 && !RX_RTL.containsMatchIn(para.take(40))) DropCapParagraph(para) else BodyParagraph(para)
                     }
                     Spacer(Modifier.height(16.dp))
                     // The story's own photos and videos, where the publisher placed them.
-                    mediaAfter[i]?.forEach { m -> StoryMedia(m); Spacer(Modifier.height(16.dp)) }
+                    mediaAfter[i]?.forEach { m -> Box(Modifier.revealOnScroll()) { StoryMedia(m) }; Spacer(Modifier.height(16.dp)) }
+                }
                 }
                 if (s.content.embeds.isNotEmpty()) {
                     EmbeddedPosts(s.content.embeds, actions.loadPost)
@@ -488,7 +509,7 @@ internal fun ArticleBody(
                 if (s.content.via != news.openwire.data.remote.TextSource.PUBLISHER) {
                     val viaUrl = s.content.viaUrl
                     Text(
-                        tr(R.string.reader_text_via, s.content.via.label),
+                        tr(R.string.reader_text_via, if (s.content.via == news.openwire.data.remote.TextSource.OTHER_OUTLETS) s.content.viaName ?: s.content.via.label else s.content.via.label),
                         style = mono(10.sp, tracking = 0.06.em), color = g.textPrimary.copy(alpha = 0.55f),
                         modifier = Modifier.clip(CircleShape).clickable(enabled = viaUrl != null) {
                             viaUrl?.let { androidx.browser.customtabs.CustomTabsIntent.Builder().build().launchUrl(context, android.net.Uri.parse(it)) }
@@ -560,6 +581,11 @@ private fun DropCapParagraph(text: String) {
         }
     }
 }
+
+/** The beat between the summary finishing and the body being allowed to reveal. */
+private const val BODY_PAUSE_MS = 120L
+/** The body never waits on the summary longer than this after the text arrives. */
+private const val SUMMARY_TIMEOUT_MS = 2_000L
 
 /** How long an article loads before the reader is offered Retry or other outlets. */
 private const val SLOW_ARTICLE_MS = 12_000L
@@ -987,7 +1013,7 @@ private sealed interface Points {
  * they arrive; then the real time it took on this phone. No card when there's nothing to summarise.
  */
 @Composable
-private fun KeyPointsCard(body: BodyState, content: news.openwire.data.remote.ArticleContent?) {
+private fun KeyPointsCard(body: BodyState, content: news.openwire.data.remote.ArticleContent?, onDone: () -> Unit) {
     val g = Glass
     val points by produceState<Points>(Points.Waiting, content) {
         val c = content ?: return@produceState
@@ -999,9 +1025,10 @@ private fun KeyPointsCard(body: BodyState, content: news.openwire.data.remote.Ar
         value = Points.Done(list, (System.nanoTime() - t0) / 1_000_000)
     }
     val p = points
-    if (body is BodyState.Failed || (p is Points.Done && p.points.isEmpty())) return
+    if (body is BodyState.Failed || (p is Points.Done && p.points.isEmpty())) { LaunchedEffect(Unit) { onDone() }; return }
     var written by remember(content) { mutableIntStateOf(0) }
     val done = p is Points.Done && written >= p.points.size
+    LaunchedEffect(done) { if (done) onDone() }
     GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), contentPadding = PaddingValues(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(tr(R.string.reader_summary), style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = g.accentSoft, modifier = Modifier.weight(1f))
@@ -1063,7 +1090,6 @@ internal fun HeroPhoto(
         loading && feed != null -> null // wait for the page's photo; the thumbnail develops meanwhile
         else -> feed
     }
-    if (full == null && feed == null) return
     Box(
         modifier.fillMaxWidth().aspectRatio(aspect)
             .sharedArticleImage(article.id, hasImage = feed != null, cornerRadius = radius)
@@ -1071,11 +1097,28 @@ internal fun HeroPhoto(
             .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(radius)),
     ) {
         var failed by remember(full) { mutableStateOf(false) }
-        if (failed) ArticleImage(article.copy(imageUrl = feed ?: full), Modifier.fillMaxSize(), logoSize = 72.dp)
-        else DevelopingImage(preview = feed, full = full, modifier = Modifier.fillMaxSize(), onFailed = { failed = true })
+        val settled = rememberReaderSettled()
+        if (failed || full == null) {
+            // No photo to be had (or it won't load): the publisher's canvas develops the same way,
+            // once the page has finished looking for one.
+            DevelopReveal(ready = !loading || failed, start = settled, modifier = Modifier.fillMaxSize()) {
+                ArticleImage(article.copy(imageUrl = if (failed) null else feed), Modifier.fillMaxSize(), logoSize = 72.dp)
+            }
+        } else {
+            // No thumbnail to soften: the publisher canvas stays soft underneath until the photo arrives.
+            if (feed == null) DevelopReveal(ready = false, start = false, modifier = Modifier.fillMaxSize()) {
+                ArticleImage(article.copy(imageUrl = null), Modifier.fillMaxSize(), logoSize = 72.dp)
+            }
+            DevelopingImage(preview = feed, full = full, modifier = Modifier.fillMaxSize(), start = settled, onFailed = { failed = true })
+        }
     }
     Text(
-        tr(R.string.reader_photo, article.publication()),
+        // A photo from another newsroom's report is credited to it.
+        tr(
+            R.string.reader_photo,
+            if (full != null && full != upgraded && content?.via == news.openwire.data.remote.TextSource.OTHER_OUTLETS) (content.viaName ?: article.publication()).uppercase()
+            else article.publication(),
+        ),
         style = mono(10.sp, tracking = 0.05.em),
         color = g.textPrimary.copy(alpha = 0.5f),
         textAlign = TextAlign.End,

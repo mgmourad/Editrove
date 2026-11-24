@@ -175,7 +175,8 @@ class ArticleTextExtractor(
                 return@coroutineScope null
             }
         } else link
-        val paywalled = runCatching { archiveFirst(url) }.getOrDefault(false)
+        val refused = news.openwire.domain.engine.FeedDiscovery.domainOf(url)?.let { it in refusing } == true
+        val paywalled = refused || runCatching { archiveFirst(url) }.getOrDefault(false)
         val results = kotlinx.coroutines.channels.Channel<ArticleContent?>(capacity = 8)
         val jobs = mutableListOf<kotlinx.coroutines.Job>()
         fun race(delayMs: Long = 0, block: suspend () -> ArticleContent?) {
@@ -228,8 +229,13 @@ class ArticleTextExtractor(
         val meta = got.firstOrNull { it.via == TextSource.PUBLISHER }
         val out = winner?.let { if (it.via == TextSource.PUBLISHER) it else it.mergeMeta(meta) }
             ?: got.maxByOrNull { it.text.length }?.let { (if (it.via == TextSource.PUBLISHER) it else it.mergeMeta(meta))?.copy(partial = true) }
-        if (diagnostics) android.util.Log.i("EditroveReader", "${System.currentTimeMillis() - started}ms ${out?.via ?: "NONE"} ${out?.text?.length ?: 0}ch partial=${out?.partial} paywalled=$paywalled ${url.take(90)}")
-        out
+        // Nothing readable (the site turned the reader away and no archive has it yet): the same
+        // story from other newsrooms, credited in the reader. Works for any outlet, not a list.
+        val final = if ((out == null || (out.partial && out.text.length < 1_200)) && !title.isNullOrBlank()) {
+            runCatching { fromOtherOutlets(title, url) }.getOrNull()?.let { o -> if (out != null && out.text.length > o.text.length) out else o.mergeMeta(meta) ?: o } ?: out
+        } else out
+        if (diagnostics) android.util.Log.i("EditroveReader", "${System.currentTimeMillis() - started}ms ${final?.via ?: "NONE"} ${final?.text?.length ?: 0}ch partial=${final?.partial} paywalled=$paywalled refused=$refused ${url.take(90)}")
+        final
     }
 
     /**
@@ -627,10 +633,16 @@ class ArticleTextExtractor(
             .header("Accept-Language", "en-US,en;q=0.9")
             .build()
         client.newCall(request).execute().use { response ->
+            // A site that turns readers away (401/403, or a 429 bot wall) is remembered for this run.
+            if (response.code in REFUSED) news.openwire.domain.engine.FeedDiscovery.domainOf(url)?.let { refusing += it }
             if (!response.isSuccessful) return null
             return response.body?.string()
         }
     }
+
+    /** Sites that refused the reader this session: their stories go straight to archives and other outlets. */
+    private val refusing = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val REFUSED = setOf(401, 403, 429, 451)
 }
 
 // Compiled once: Android compiles regexes natively (ICU), so building them per call is costly.

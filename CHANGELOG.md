@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (0.9.3 beta 112426)
+
+- Every story's photo develops in, cached or not, and so does the publisher's logo when a
+  story has no photo.
+- Stories from sites that turn the reader away (Reuters and others) open anyway: the reader
+  finds the same story at other newsrooms and says whose report it is.
+- Closing a story lets the page free-fall back into the feed; its card takes the landing.
+- Article text settles in as you scroll down to it, with a soft ink wipe.
+- Live: channel thumbnails show the broadcaster's own large brand art under a half-dark
+  veil, with a LIVE STREAM sticker and the play mark in a dark rounded box.
+
 ### Fixed (0.9.2.1)
 
 - Article photos are sharp: the full-page reader no longer stretches the feed's small

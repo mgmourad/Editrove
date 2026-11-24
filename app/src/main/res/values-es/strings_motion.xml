@@ -21,4 +21,7 @@
     <string name="reader_points_done_ms">Hecho en este teléfono en %d ms</string>
     <string name="refresh_show_more">Mostrar %d más</string>
     <string name="refresh_show_less">Mostrar menos</string>
+    <string name="live_play_channel">Ver %s en directo</string>
+    <string name="reader_auto_other">%1$s no se abre aquí, así que esta es la crónica de %2$s sobre la misma noticia.</string>
+    <string name="reader_other_outlet">otro medio</string>
 </resources>

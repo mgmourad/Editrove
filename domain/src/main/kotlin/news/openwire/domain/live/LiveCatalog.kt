@@ -139,3 +139,42 @@ object RadioBrowser {
         }.distinctBy { it.name.lowercase() }
     }
 }
+
+/**
+ * Large brand art for each channel's thumbnail: the broadcaster's own share card (1200 × 630)
+ * where its site publishes one, else its official channel avatar (900 px). Checked by eye; a
+ * missing or broken one falls back to the publisher-logo lookup.
+ */
+object ChannelArt {
+    private val ART = mapOf(
+        "abc" to "https://s.abcnews.com/images/US/abc_news_default_2000x2000_update_16x9_992.jpg",
+        "aja" to "https://www.aljazeera.net/images/aljazeera-arabic-social-preview-v2.jpg",
+        "aje" to "https://www.aljazeera.com/images/logo_aje_social.png",
+        "alarabiya" to "https://yt3.googleusercontent.com/GoZXY6BOD_V0vV3ok3fAzIbNMx3og4z2Jd2Up0BnocvBn35rMB4NG3vMOdzOpQ4-HFBUfDQ-JQ=s900-c-k-c0x00ffffff-no-rj",
+        "alqahera" to "https://alqaheranews.net/assets/imgs/post-default.jpg",
+        "asharq" to "https://yt3.googleusercontent.com/ytc/AIdro_kZQjNcecj0_Z8VHxjNt6zKzLtCPpnNRF0rSjyNXm4AZg=s900-c-k-c0x00ffffff-no-rj",
+        "bloomberg" to "https://yt3.googleusercontent.com/4-w44catDebzaDSUWgereql0G5_z5o7VpJXuIYL_eZ3H1vXy0lTmrole9V500jTUXCnQPZ5CuKQ=s900-c-k-c0x00ffffff-no-rj",
+        "cbs" to "https://assets1.cbsnewsstatic.com/hub/i/2022/01/22/4fc70efe-a2d7-4eb3-8f23-05db514ef3bb/news-slate-stream.jpg",
+        "cna" to "https://yt3.googleusercontent.com/-rE0W1GTFDHNy9pd2pkbItVQM6Jcp_hWwD4pUURoArQ2TvZ1TFernWqXFGJXKIYTN5IQtnxkUA=s900-c-k-c0x00ffffff-no-rj",
+        "dwar" to "https://yt3.googleusercontent.com/1diREnd5d5mj0zM8AmZYfuccwIppbzSBz0ERjzRl9kydXSPKREif3GyigSpYq2P_d8GH0RMKj5I=s900-c-k-c0x00ffffff-no-rj",
+        "dwen" to "https://yt3.googleusercontent.com/NSOdTQTWlqMy8O_j32dx-ftfTCHMOt04Hm7KZ4pfAK6-eQzQSZMWvvss90kG8KQfJ7iNP3phyA=s900-c-k-c0x00ffffff-no-rj",
+        "dwes" to "https://yt3.googleusercontent.com/TOHGshxAMW2Meq-N9EWB3T71en-ziaWoiFYWcjrhxQpOW4Wog3HwrAjDZIeCvj1q9VLPt_YsCA=s900-c-k-c0x00ffffff-no-rj",
+        "euronews" to "https://yt3.googleusercontent.com/8MyE7rxMBfLZOpYkJVJFm1C8I9jxbceBbOJS9OhrepZMVGxGV-OEJU-UdLOew_qR_l-knETWeu4=s900-c-k-c0x00ffffff-no-rj",
+        "euronewsfr" to "https://yt3.googleusercontent.com/U0I3pGqWPE2d3E7LqMnjZ_vsH6qZkCv5606viZpjjK7CzkvcEmTa94NUnOnYZ-6CZWkDRY6H_w=s900-c-k-c0x00ffffff-no-rj",
+        "f24ar" to "https://yt3.googleusercontent.com/ytc/AIdro_n_QTJ5-GLGnftQFkb7Kp36W2eBH3H-7ZqTQxzFkkqGrIE=s900-c-k-c0x00ffffff-no-rj",
+        "f24en" to "https://yt3.googleusercontent.com/ytc/AIdro_n_QTJ5-GLGnftQFkb7Kp36W2eBH3H-7ZqTQxzFkkqGrIE=s900-c-k-c0x00ffffff-no-rj",
+        "f24es" to "https://yt3.googleusercontent.com/ytc/AIdro_kzqAgL2TukPL1ijpuPdoOgU75Av9cdQVf0mahAZSySyA=s900-c-k-c0x00ffffff-no-rj",
+        "f24fr" to "https://yt3.googleusercontent.com/ytc/AIdro_k9aU_SRhYAWJjQ6AO7uzQDZE5mb7gmv4synLrC7hEWGjE=s900-c-k-c0x00ffffff-no-rj",
+        "livenow" to "https://images.foxtv.com/www.livenowfox.com/img/1200/630/default-image.png?ve=1&tl=1",
+        "nbc" to "https://media-cldnry.s-nbcnews.com/image/upload/t_nbcnews-fp-1200-630,f_auto,q_auto:best/v1696280772/newsgroup-logos/nbcnews/social/primary-color-1680x840.png",
+        "nhk" to "https://yt3.googleusercontent.com/ytc/AIdro_m9YDtPWqgZW91_-QTdsVWLbnR0ZQ1BaHX38ZcSRVGnfd0=s900-c-k-c0x00ffffff-no-rj",
+        "rtve24h" to "https://www.rtve.es/contenidos/imagenes/rtve_facebook.jpg",
+        "sky" to "https://yt3.googleusercontent.com/dGnkztdrLtXRlzkdqReeL-NES2761xxmNVcJhGKqFpR0vQBoP9XaxnXF95FDpwrjyFr2iJvV8Es=s900-c-k-c0x00ffffff-no-rj",
+        "sna" to "https://yt3.googleusercontent.com/C_tTYi9T3TlVewh6A5Yon_NOd3XxSjAduqRCqhaUcHkNGt67zyD0Cb6jJePYZTUMw-0VQt9TCA=s900-c-k-c0x00ffffff-no-rj",
+        "tagesschau24" to "https://images.tagesschau.de/image/89045d82-5cd5-46ad-8f91-73911add30ee/AAABlpITK5s/AAABnSSvrFg/16x9-big/tagesschau-logo-100.jpg?width=1280",
+        "trtarabi" to "https://yt3.googleusercontent.com/gYgMDstQrKquZlKMpynGak3fik58-0UdhvIFvRNk8Z1KAGDzn6Kuz8uULtWRwVM3bJcqBuWfxQ=s900-c-k-c0x00ffffff-no-rj",
+        "trtworld" to "https://yt3.googleusercontent.com/luLQWmGFG4iDC1U_2JlzZ1mquci_sUdfZfFl4eWgBkDpW6tvZT0MEA4c4JebJdi9hCo518q1=s900-c-k-c0x00ffffff-no-rj",
+    )
+
+    fun of(channelId: String): String? = ART[channelId]
+}

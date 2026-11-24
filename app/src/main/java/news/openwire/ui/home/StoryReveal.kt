@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
@@ -66,6 +67,8 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -157,20 +160,22 @@ private val PreviewFilter = ColorFilter.colorMatrix(
  * beneath. A full image that came from memory shows at once.
  */
 @Composable
-fun DevelopingImage(preview: String?, full: String?, modifier: Modifier, onFailed: () -> Unit) {
+fun DevelopingImage(preview: String?, full: String?, modifier: Modifier, start: Boolean = true, onFailed: () -> Unit) {
     val reduce = rememberReduceMotion()
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val reveal = remember(full) { Animatable(0f) }
-    var instant by remember(full) { mutableStateOf(false) }
+    val reveal = remember(full) { Animatable(if (reduce) 1f else 0f) }
     var ready by remember(full) { mutableStateOf(false) }
-    LaunchedEffect(ready) {
-        if (!ready) return@LaunchedEffect
-        if (instant || reduce) reveal.snapTo(1f) else reveal.animateTo(1f, tween(1150, easing = FastOutSlowInEasing))
+    // Every story develops the same way, cached or not, once the page is in place to be seen.
+    LaunchedEffect(ready, start) {
+        if (!ready || !start || reveal.value >= 1f) return@LaunchedEffect
+        if (reduce) reveal.snapTo(1f) else reveal.animateTo(1f, tween(1150, easing = FastOutSlowInEasing))
     }
+    // Without a thumbnail, the photo itself (soft and dim) is its own preview.
+    val soft = preview ?: full
     Box(modifier) {
-        if (preview != null && reveal.value < 1f) {
+        if (soft != null && reveal.value < 1f) {
             AsyncImage(
-                model = preview, contentDescription = null, contentScale = ContentScale.Crop, colorFilter = PreviewFilter,
+                model = soft, contentDescription = null, contentScale = ContentScale.Crop, colorFilter = PreviewFilter,
                 modifier = Modifier.fillMaxSize().graphicsLayer {
                     alpha = 1f - reveal.value * reveal.value
                     renderEffect = if (alpha > 0f) BlurSteps.of(14.dp.toPx()) else null
@@ -181,10 +186,8 @@ fun DevelopingImage(preview: String?, full: String?, modifier: Modifier, onFaile
         if (full != null) AsyncImage(
             model = full, contentDescription = null, contentScale = ContentScale.Crop,
             onState = { s ->
-                if (s is AsyncImagePainter.State.Success && !ready) {
-                    instant = s.result.dataSource == DataSource.MEMORY_CACHE || s.result.dataSource == DataSource.MEMORY
-                    ready = true
-                } else if (s is AsyncImagePainter.State.Error) onFailed()
+                if (s is AsyncImagePainter.State.Success && !ready) ready = true
+                else if (s is AsyncImagePainter.State.Error) onFailed()
             },
             modifier = Modifier.fillMaxSize().drawWithCache {
                 val h = size.height; val w = size.width
@@ -382,9 +385,9 @@ fun WrittenText(text: String, startAt: Int, style: TextStyle, settled: Color, on
     var n by remember(text) { mutableIntStateOf(if (reduce) Int.MAX_VALUE / 2 else 0) }
     LaunchedEffect(text) {
         if (reduce) { onDone(); return@LaunchedEffect }
-        delay(startAt * 16L)
+        delay((startAt * 5.6f).toLong())
         val t0 = withFrameMillis { it }
-        while (isActive && n < text.length + GLOW) withFrameMillis { n = ((it - t0) / 16L).toInt() }
+        while (isActive && n < text.length + GLOW) withFrameMillis { n = ((it - t0) / 5.6f).toInt() }
         onDone()
     }
     // Letters land in the app's own rose accent and cool to the body colour.
@@ -487,4 +490,151 @@ fun CometLine(loading: Boolean, progress: () -> Float, modifier: Modifier = Modi
             }
         },
     )
+}
+
+/**
+ * A paragraph that settles onto the page when the reader scrolls it into view: a soft ink wipe
+ * from its top to its bottom (a feathered mask, not a hard edge) while it rises a few dp, over
+ * about a second. Paragraphs already on screen settle top-down, a little after one another.
+ * Each plays once; with animations off, text is simply there.
+ */
+/**
+ * Whether the article body may start revealing: opened once the key points have finished
+ * writing (plus a pause), so the eye has finished with the summary before the text arrives.
+ */
+val LocalBodyGate = androidx.compose.runtime.compositionLocalOf<androidx.compose.runtime.State<Boolean>> { androidx.compose.runtime.mutableStateOf(true) }
+
+/**
+ * A paragraph that settles onto the page only when both are true: the body gate is open (the
+ * summary is done, and a beat has passed) and the reader has scrolled the paragraph well into
+ * view. A soft ink wipe top to bottom, a small rise and (Android 12+) blur to focus, ~1.4 s.
+ * Paragraphs that come into view together settle one after another, top first.
+ */
+@Composable
+fun Modifier.revealOnScroll(): Modifier {
+    val reduce = rememberReduceMotion()
+    if (reduce) return this
+    val view = androidx.compose.ui.platform.LocalView.current
+    val gate by LocalBodyGate.current
+    val k = remember { Animatable(0f) }
+    // Where the paragraph's top sits on screen (0 top … 1 bottom), or -1 while still below the fold.
+    var inView by remember { mutableStateOf(-1f) }
+    LaunchedEffect(gate, inView >= 0f) {
+        if (!gate || inView < 0f || k.value > 0f) return@LaunchedEffect
+        delay((inView * 112f).toLong()) // a quick staircase down the screen
+        k.animateTo(1f, tween(560, easing = SettleEasing))
+    }
+    return this
+        .then(
+            Modifier.onGloballyPositioned { c ->
+                if (inView >= 0f) return@onGloballyPositioned
+                val h = view.height.toFloat().takeIf { it > 0f } ?: return@onGloballyPositioned
+                // Unclipped position: an off-screen paragraph is really off screen (boundsInWindow
+                // clips it to an empty box at the top, which made everything "visible" at once).
+                val top = c.positionInWindow().y
+                if (c.isAttached && top < h * .92f && top + c.size.height > 0f) inView = (top / h).coerceIn(0f, 1f)
+            },
+        )
+        .graphicsLayer {
+            val v = k.value
+            translationY = (1f - v) * 22.dp.toPx()
+            alpha = if (v <= 0f) 0f else 1f
+            renderEffect = if (v > 0f && v < .85f) BlurSteps.of(5.dp.toPx() * (1f - v / .85f)) else null
+            compositingStrategy = if (v in 0.001f..0.999f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+        }
+        .drawWithCache {
+            val feather = size.height * .6f + 32.dp.toPx()
+            onDrawWithContent {
+                val v = k.value
+                drawContent()
+                if (v >= 1f || v <= 0f) return@onDrawWithContent
+                val edge = -feather + (size.height + feather) * v
+                val mask = Brush.verticalGradient(0f to Color.Black, 1f to Color.Transparent, startY = edge, endY = edge + feather)
+                drawRect(mask, blendMode = BlendMode.DstIn)
+            }
+        }
+}
+
+/** A gentle S-curve: eases in, travels evenly, eases out. */
+private val SettleEasing = CubicBezierEasing(.4f, 0f, .2f, 1f)
+
+/**
+ * The develop effect for anything that isn't a single photo (a publisher's logo canvas): soft,
+ * dim and desaturated until [ready], then the sharp version wipes in top to bottom behind the
+ * same light line as a photo. [content] is drawn twice (the soft layer and the sharp one).
+ */
+@Composable
+fun DevelopReveal(ready: Boolean, start: Boolean, modifier: Modifier, content: @Composable () -> Unit) {
+    val reduce = rememberReduceMotion()
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val reveal = remember { Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(ready, start) {
+        if (!ready || !start || reveal.value >= 1f) return@LaunchedEffect
+        reveal.animateTo(1f, tween(1150, easing = FastOutSlowInEasing))
+    }
+    Box(modifier) {
+        if (reveal.value < 1f) Box(
+            Modifier.fillMaxSize().graphicsLayer {
+                alpha = 1f - reveal.value * reveal.value
+                renderEffect = if (alpha > 0f) BlurSteps.of(14.dp.toPx()) else null
+                scaleX = 1.04f; scaleY = 1.04f
+            }.drawWithContent { drawContent(); drawRect(Color.Black.copy(alpha = .35f)) },
+        ) { content() }
+        Box(
+            Modifier.fillMaxSize().drawWithCache {
+                val line = Brush.horizontalGradient(if (rtl) listOf(Indigo400, Rose400) else listOf(Rose400, Indigo400))
+                val glow = Brush.verticalGradient(listOf(Color.Transparent, Rose.copy(alpha = .22f)), startY = 0f, endY = 18.dp.toPx())
+                val lw = 2.dp.toPx(); val gh = 18.dp.toPx()
+                onDrawWithContent {
+                    val k = reveal.value
+                    if (k <= 0f) return@onDrawWithContent
+                    if (k >= 1f) { drawContent(); return@onDrawWithContent }
+                    val y = size.height * k
+                    clipRect(bottom = y) { this@onDrawWithContent.drawContent() }
+                    translate(top = y - gh) { drawRect(glow, size = Size(size.width, gh)) }
+                    drawLine(line, Offset(0f, y), Offset(size.width, y), lw)
+                }
+            },
+        ) { content() }
+    }
+}
+
+/** Gravity: starts still and keeps accelerating (a page let go). */
+val FreeFall = CubicBezierEasing(.55f, 0f, .9f, .45f)
+
+/** The story the reader just let fall back into the feed: its card takes the landing. */
+object Landing {
+    var id by androidx.compose.runtime.mutableStateOf<String?>(null)
+        private set
+    var at by androidx.compose.runtime.mutableLongStateOf(0L)
+        private set
+
+    fun mark(articleId: String) { id = articleId; at = System.nanoTime() }
+}
+
+/**
+ * The card a closed story falls back into: as the page lands (about 420 ms after closing), it
+ * gives a little under the impact and springs back, once.
+ */
+@Composable
+fun Modifier.landing(articleId: String): Modifier {
+    val reduce = rememberReduceMotion()
+    if (reduce) return this
+    val mine = Landing.id == articleId
+    val k = remember(articleId) { Animatable(0f) }
+    val at = Landing.at
+    LaunchedEffect(mine, at) {
+        if (!mine) return@LaunchedEffect
+        delay(400)
+        k.snapTo(0f)
+        k.animateTo(1f, tween(90, easing = LinearEasing)) // impact
+        k.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = .42f, stiffness = 420f)) // rebound
+    }
+    return graphicsLayer {
+        val v = k.value
+        scaleY = 1f - .045f * v
+        scaleX = 1f + .015f * v
+        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(.5f, 1f)
+        translationY = 4.dp.toPx() * v
+    }
 }

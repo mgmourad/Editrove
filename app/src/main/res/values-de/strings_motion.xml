@@ -21,4 +21,7 @@
     <string name="reader_points_done_ms">Auf diesem Telefon in %d ms erledigt</string>
     <string name="refresh_show_more">%d weitere anzeigen</string>
     <string name="refresh_show_less">Weniger anzeigen</string>
+    <string name="live_play_channel">%s live ansehen</string>
+    <string name="reader_auto_other">%1$s lässt sich hier nicht öffnen, deshalb der Bericht von %2$s zur selben Meldung.</string>
+    <string name="reader_other_outlet">einem anderen Medium</string>
 </resources>

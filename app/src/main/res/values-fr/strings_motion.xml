@@ -21,4 +21,7 @@
     <string name="reader_points_done_ms">Fait sur ce téléphone en %d ms</string>
     <string name="refresh_show_more">Afficher %d de plus</string>
     <string name="refresh_show_less">Afficher moins</string>
+    <string name="live_play_channel">Regarder %s en direct</string>
+    <string name="reader_auto_other">%1$s ne s\'ouvre pas ici : voici le reportage de %2$s sur la même info.</string>
+    <string name="reader_other_outlet">un autre média</string>
 </resources>

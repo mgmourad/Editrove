@@ -1,0 +1,8 @@
+Editrove 0.9.2 (build 112326) — Topics your way, a livelier live bar
+• Alerts keep their sound: a new alert for a topic no longer arrives silent while an earlier one is still unread.
+• Arabic headlines and articles sit on the right, and the live bar runs right to left for Arabic.
+• The live bar is faster, shows the latest from all your topics (live coverage first), colours each topic, and can be swiped both ways.
+• Audio briefings skip stories they can't read and any deals or sponsored pieces, and open with the day's most-covered story.
+• Discover shows only your visible topics, from the last two days.
+• Topics: swipe to rename, edit or delete; edit a topic on its own page; suggestions keep growing as you choose; find sources online as you type.
+• Add sources by country straight into the topics you pick, no feed address needed.

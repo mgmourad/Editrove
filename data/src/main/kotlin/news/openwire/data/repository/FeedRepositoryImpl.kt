@@ -65,6 +65,16 @@ class FeedRepositoryImpl(
 
     private val norm: (String) -> String = { registry.normalizeDomain(it) }
 
+    private val reporter = RefreshReporter()
+    override val refreshEvents get() = reporter.events
+
+    private fun feedRef(cfg: FeedSource) = SourceRef(
+        cfg.url,
+        cfg.name,
+        if (cfg.isPrimary && cfg.url.contains("/rss/search")) SourceRef.Kind.SEARCH else SourceRef.Kind.FEED,
+    )
+    private fun editionRef(file: String) = SourceRef("snapshot:$file", "", SourceRef.Kind.EDITION)
+
     /** Latest copy of every topic loaded this session: the pool used to measure cross-outlet coverage. */
     private val pool = ConcurrentHashMap<String, List<Article>>()
 
@@ -141,12 +151,13 @@ class FeedRepositoryImpl(
         // let a minutes-old sports item displace the day's lead story).
         val cached = NewsProcessor.deduplicate(cached(topic.id)).also { if (it.isNotEmpty()) pool.putIfAbsent(topic.id, it) }
         if (cached.isNotEmpty()) emit(FeedResult.Success(cached, fromCache = true, updatedAt = feedState?.lastUpdated(topic.id) ?: 0L, refreshing = true))
+        val rid = reporter.start(topic.id, listOf(editionRef(file)) + extrasFor(topic).map(::feedRef))
         try {
             // The snapshot arrives in the pipeline's editorial order; that order is a signal, not noise.
-            val published = NewsProcessor.deduplicate(remote.fetchTopic(file).mapIndexed { i, dto -> dto.toArticle(rank = i) })
+            val published = NewsProcessor.deduplicate(reporter.time(rid, editionRef(file)) { remote.fetchTopic(file) }.mapIndexed { i, dto -> dto.toArticle(rank = i) })
             val fresh = rank(topic, published)
             emit(FeedResult.Success(fresh, fromCache = false, updatedAt = clock(), refreshing = extrasFor(topic).isNotEmpty()))
-            val woven = weaveExtras(topic, published)
+            val woven = weaveExtras(topic, published, rid)
             val ranked = if (woven === published) fresh else rank(topic, woven)
             store(topic.id, ranked)
             if (ranked !== fresh) emit(FeedResult.Success(ranked, fromCache = false, updatedAt = clock()))
@@ -155,6 +166,8 @@ class FeedRepositoryImpl(
             Log.w(TAG, "Snapshot ${topic.id} failed", e)
             if (cached.isEmpty()) emit(FeedResult.Error(e.message ?: "Network error"))
             else emit(FeedResult.Success(cached, fromCache = true, updatedAt = feedState?.lastUpdated(topic.id) ?: 0L))
+        } finally {
+            reporter.finish(rid, topic.id)
         }
     }
 
@@ -165,7 +178,7 @@ class FeedRepositoryImpl(
     }
 
     /** Weaves Editrove-added sources into a published snapshot, fairly and deduplicated. */
-    private suspend fun weaveExtras(topic: Topic, snapshot: List<Article>): List<Article> {
+    private suspend fun weaveExtras(topic: Topic, snapshot: List<Article>, rid: Long = 0): List<Article> {
         val extras = extrasFor(topic)
         if (extras.isEmpty()) return snapshot
         val gate = Semaphore(4)
@@ -174,7 +187,7 @@ class FeedRepositoryImpl(
                 async {
                     gate.withPermit {
                         runCatching {
-                            rssSource.fetchFeed(cfg.url).items.take(cfg.maxArticles + 4).mapIndexed { idx, item ->
+                            reporter.time(rid, feedRef(cfg)) { rssSource.fetchFeed(cfg.url) }.items.take(cfg.maxArticles + 4).mapIndexed { idx, item ->
                                 normalizer.normalize(item, topic.id, idx, feedName = cfg.name, feedUrl = cfg.url, idPrefix = "x$i")
                             }
                         }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { FeedWeaver.Group(cfg, it) }
@@ -207,11 +220,20 @@ class FeedRepositoryImpl(
         // A built-in topic whose sources were edited still leads with its published front page,
         // minus stories from the sources the reader switched off.
         val snapshotOk = topic.snapshotFile != null && !topic.isCustom && !foreign
+        val loadsEditionFirst = snapshotOk && (primaryUrl == null || cached.isEmpty())
+        val rid = reporter.start(topic.id, (if (loadsEditionFirst) listOf(editionRef(topic.snapshotFile!!)) else emptyList()) + configs.map(::feedRef))
+        try { observeLiveFetch(topic, s, cached, primaryUrl, feedLang, configs, snapshotOk, loadsEditionFirst, rid) } finally { reporter.finish(rid, topic.id) }
+    }
+
+    private suspend fun FlowCollector<FeedResult>.observeLiveFetch(
+        topic: Topic, s: UserSettings, cached: List<Article>, primaryUrl: String?, feedLang: String?,
+        configs: List<FeedSource>, snapshotOk: Boolean, loadsEditionFirst: Boolean, rid: Long,
+    ) {
         suspend fun loadPublished(): List<Article> =
             // Without the stories of switched-off feeds (the snapshot records each story's feed).
-            runCatching { remote.fetchTopic(topic.snapshotFile!!).mapIndexed { i, d -> d.toArticle(rank = i) } }.getOrDefault(emptyList())
+            runCatching { reporter.time(rid, editionRef(topic.snapshotFile!!)) { remote.fetchTopic(topic.snapshotFile!!) }.mapIndexed { i, d -> d.toArticle(rank = i) } }.getOrDefault(emptyList())
                 .filter { a -> a.feedUrl == null || SourceLibrary.sourceKey(a.feedUrl) !in s.disabledSources }
-        var published = if (snapshotOk && (primaryUrl == null || cached.isEmpty())) loadPublished() else emptyList()
+        var published = if (loadsEditionFirst) loadPublished() else emptyList()
         // First launch: show the published front page at once while the live one is built.
         if (cached.isEmpty() && primaryUrl != null && published.isNotEmpty()) {
             emit(FeedResult.Success(rank(topic, NewsProcessor.deduplicate(published)), fromCache = true, updatedAt = clock(), refreshing = true))
@@ -227,7 +249,7 @@ class FeedRepositoryImpl(
                 async {
                     gate.withPermit {
                         try {
-                            val feed = rssSource.fetchFeed(cfg.url)
+                            val feed = reporter.time(rid, feedRef(cfg)) { rssSource.fetchFeed(cfg.url) }
                             val items = feed.items.mapIndexed { idx, item ->
                                 normalizer.normalize(
                                     item, topic.id, idx,

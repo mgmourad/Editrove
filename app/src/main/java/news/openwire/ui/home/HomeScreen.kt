@@ -290,7 +290,9 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
             } else {
                 val openId = if (sheetOpen) selected?.id else null
                 CompositionLocalProvider(LocalImageTransition provides ImageTransition(this@SharedTransitionLayout, null, openId)) {
-                    CompactLayout(vm, tab, shownTab, pager, stateFor, FeedUi(savedIds, liked, null), onSelectTab)
+                    Box(Modifier.fillMaxSize().sinkBehind(sheetOpen && selected != null)) {
+                        CompactLayout(vm, tab, shownTab, pager, stateFor, FeedUi(savedIds, liked, null), onSelectTab)
+                    }
                 }
                 ReaderSheetHost(
                     visible = sheetOpen && selected != null,
@@ -390,8 +392,9 @@ private fun SharedTransitionScope.ReaderSheetHost(
 
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically(springTween(520)) { it } + fadeIn(tween(200)),
-        exit = slideOutVertically(springTween(420)) { it } + fadeOut(tween(300, delayMillis = 120)),
+        // The photo is what grows into the page (a shared element); the sheet itself only rises a little.
+        enter = slideInVertically(tween(620, easing = EmphasizedDecelerate)) { it / 10 } + fadeIn(tween(240)),
+        exit = slideOutVertically(tween(520, easing = EmphasizedAccelerate)) { it / 10 } + fadeOut(tween(300, delayMillis = 140)),
     ) {
         // Keep showing the last story while the sheet slides away.
         var shown by remember { mutableStateOf(article) }
@@ -510,6 +513,7 @@ private fun TabFeed(
     val userSettings by vm.settings.collectAsState()
     val archive by vm.archive.collectAsState()
     val refreshingIds by vm.refreshing.collectAsState()
+    val newStoriesMap by vm.newStories.collectAsState()
 
     val padding = PaddingValues(
         start = horizontalPadding, end = horizontalPadding,
@@ -530,8 +534,18 @@ private fun TabFeed(
             NavTab.SAVED -> saved
             NavTab.LIVE, NavTab.OPINION -> emptyList()
             NavTab.DISCOVER -> {
-                val byTopic = remember(feeds) {
-                    feeds.mapNotNull { (id, r) -> (r as? FeedResult.Success)?.let { id to it.articles } }.toMap()
+                // Only the topics you show, from the sources you keep: stories under two days old,
+                // no deals or sponsored pieces (feeds from hidden topics or an earlier edition are left out).
+                val byTopic = remember(feeds, topicsList) {
+                    val shown = topicsList.filter { it.isVisible }.map { it.id }.toSet()
+                    val cutoff = System.currentTimeMillis() - 48 * 3_600_000L
+                    feeds.filterKeys { it in shown }.mapNotNull { (id, r) ->
+                        (r as? FeedResult.Success)?.let { res ->
+                            id to res.articles.filter { a ->
+                                (a.publishedAt ?: Long.MAX_VALUE) >= cutoff && !news.openwire.domain.engine.Promotional.isPromotionalTitle(a.title)
+                            }
+                        }
+                    }.toMap()
                 }
                 // Front page across every edition: ranked by placement, coverage, freshness and authority.
                 // Computed off the main thread, and only once feeds stop arriving for a moment
@@ -591,15 +605,23 @@ private fun TabFeed(
             NavTab.SAVED, NavTab.LIVE, NavTab.OPINION -> false
             else -> topic.id in refreshingIds
         }
-        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
-            isRefreshing = isRefreshing,
+        RuleRefreshBox(
+            refreshing = isRefreshing,
+            ticker = vm.ticker,
+            newCount = { vm.newStories.value[topic.id]?.ids?.size ?: 0 },
             onRefresh = { vm.refresh() },
+            topInset = padding.calculateTopPadding() - 6.dp,
             modifier = Modifier.fillMaxSize(),
         ) {
+        val newHere = if (t == NavTab.TODAY) newStoriesMap[topic.id] else null
         EditorialGrid(stateFor(t), padding, Modifier.fillMaxSize(), columns = columns) {
             fullRow("masthead") {
                 Masthead(userSettings.edition.city, onEdition = { vm.openSettings() }, onSettings = { vm.openSettings() })
             }
+            // The live bar: the latest from every topic shown, live coverage and breaking stories first.
+            val tickerItems = news.openwire.ui.home.TickerFeed.build(topicsList.filter { it.isVisible }.map { tp ->
+                tp to ((feeds[tp.id] as? FeedResult.Success)?.articles.orEmpty())
+            })
             fun feed(articles: List<Article>, category: String, ticker: Boolean, title: String) = feedItems(
                 archive = archive,
                 articles = articles, category = category, compact = compact,
@@ -607,6 +629,9 @@ private fun TabFeed(
                 onOpen = onOpen, onToggleSaved = { vm.toggleSaved(it) }, onToggleLiked = { vm.toggleLiked(it) },
                 showTicker = ticker, sectionTitle = title, magazine = magazine,
                 marketWatch = ticker && topic.id == "BUSINESS",
+                ticker = tickerItems,
+                newIds = newHere?.ids?.toSet().orEmpty(),
+                newSince = newHere?.since ?: 0L,
             )
             when (t) {
                 NavTab.TODAY, NavTab.AUDIO -> {

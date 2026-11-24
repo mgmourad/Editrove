@@ -603,4 +603,16 @@
     <string name="op_discover_sub">Columnistas, comentaristas y los temas sobre los que se escribe.</string>
     <string name="op_discover_cta">Encuentra firmas, columnas y voces para seguir</string>
     <string name="dir_story_one">1 noticia hoy</string>
+    <string name="by_country_weave_hint">Consejo: elige temas en «Integrar en temas» abajo para añadir allí estos medios.</string>
+    <string name="msg_saved_topic">%1$s guardado</string>
+    <string name="edit_topic">Editar tema</string>
+    <string name="save_changes">Guardar cambios</string>
+    <string name="rename_topic">Renombrar</string>
+    <string name="edit_topic_action">Editar</string>
+    <string name="delete_topic_action">Eliminar</string>
+    <string name="hide_topic_action">Ocultar</string>
+    <string name="show_topic_action">Mostrar</string>
+    <string name="rename_topic_title">Renombrar tema</string>
+    <string name="action_save">Guardar</string>
+    <string name="swipe_hint_topics">Desliza un tema para más opciones: renombrar, editar palabras clave y fuentes, eliminar.</string>
 </resources>

@@ -13,8 +13,9 @@ android {
         applicationId = "news.editrove"
         minSdk = 26
         targetSdk = 37
-        versionCode = 18
-        versionName = "0.9.1-beta.112026"
+        versionCode = 19
+        versionName = "0.9.2-build.112326"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Editrove's built-in voices (sherpa-onnx) ship native code for ARM phones and tablets.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
 
@@ -92,6 +93,8 @@ dependencies {
 
     implementation(libs.coil.compose)
     implementation(libs.haze)
+    // Fold postures (hinge bounds) for first-run setup.
+    implementation(libs.androidx.window)
     implementation(libs.glance.appwidget)
     implementation(libs.androidx.browser)
     // Live TV (HLS) and radio, with background playback and lock-screen controls.
@@ -107,5 +110,12 @@ dependencies {
     implementation(libs.commons.compress)
 
     testImplementation(libs.junit)
+    // Compose UI tests (first-run setup).
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.espresso)
+    debugImplementation(libs.compose.ui.test.manifest)
     testImplementation(libs.kotlinx.coroutines.test)
 }

@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import kotlin.math.roundToInt
 import news.openwire.i18n.tr
 import news.openwire.i18n.text
 import news.openwire.R
@@ -107,8 +113,11 @@ fun mono(size: TextUnit, weight: FontWeight = FontWeight.Normal, tracking: TextU
 fun sans(size: TextUnit, weight: FontWeight = FontWeight.Normal, lineHeight: TextUnit = TextUnit.Unspecified) =
     TextStyle(fontFamily = InterFamily, fontSize = size, fontWeight = weight, lineHeight = lineHeight)
 
+/** Reading text (excerpts, decks, key points): Arabic sits on the right, whatever the app's language. */
+fun TextStyle.reading(): TextStyle = copy(textDirection = androidx.compose.ui.text.style.TextDirection.Content)
+
 fun serif(size: TextUnit, weight: FontWeight = FontWeight.Bold, lineHeight: TextUnit = TextUnit.Unspecified, tracking: TextUnit = 0.sp) =
-    TextStyle(fontFamily = NewsreaderFamily, fontSize = size, fontWeight = weight, lineHeight = lineHeight, letterSpacing = tracking)
+    TextStyle(fontFamily = NewsreaderFamily, fontSize = size, fontWeight = weight, lineHeight = lineHeight, letterSpacing = tracking, textDirection = androidx.compose.ui.text.style.TextDirection.Content)
 
 fun Article.publication(): String = (source ?: domain ?: "").uppercase()
 
@@ -171,9 +180,15 @@ fun Masthead(edition: String, onEdition: () -> Unit, onSettings: () -> Unit, mod
                 )
             }
         }
+        // The pull's one "ink" detail: the wordmark gets very slightly heavier (wght 700 → 800) and
+        // tighter (−0.5 sp) as the rule grows. Stepped, so it reuses five typefaces.
+        val inkState = LocalPullInk.current
+        val ink: Int by remember(inkState) { androidx.compose.runtime.derivedStateOf { (inkState.value * 5f).roundToInt() } }
         Text(
             "Editrove",
-            style = serif(40.sp, FontWeight.Bold, lineHeight = 40.sp, tracking = (-0.02).em),
+            style = if (ink == 0) serif(40.sp, FontWeight.Bold, lineHeight = 40.sp, tracking = (-0.02).em)
+            else serif(40.sp, FontWeight(700 + ink * 20), lineHeight = 40.sp, tracking = (40 * -0.02f - 0.1f * ink).sp)
+                .copy(fontFamily = news.openwire.ui.theme.VariableType.newsreader(700 + ink * 20)),
             color = g.textPrimary,
             maxLines = 1,
             softWrap = false,
@@ -207,24 +222,65 @@ fun FeedControls(
             }
         }
         Spacer(Modifier.weight(1f))
-        val label = when {
-            refreshing -> tr(R.string.status_refreshing)
-            updatedAt > 0 -> tr(R.string.status_updated, NewsProcessor.formatRelativeTime(updatedAt))
-            else -> tr(R.string.status_saved_copy)
-        } + if (failed.isNotEmpty() && !refreshing) " · " + tr(if (failed.size > 1) R.string.status_offline_many else R.string.status_offline_one, failed.size) else ""
+        // While refreshing, the last time stays up (the dot pulses); when it lands, the time rolls
+        // over like an odometer and the offline count updates.
+        var shownAt by remember { mutableStateOf(updatedAt) }
+        var shownFailed by remember { mutableStateOf(failed) }
+        if (!refreshing) { shownAt = updatedAt; shownFailed = failed }
+        // Keep the relative time current while the screen is open.
+        var minute by remember { mutableStateOf(0L) }
+        LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(30_000); minute++ } }
+        val label = remember(shownAt, shownFailed, minute) {
+            when {
+                shownAt > 0 -> tr(R.string.status_updated, NewsProcessor.formatRelativeTime(shownAt))
+                else -> tr(R.string.status_saved_copy)
+            } + if (shownFailed.isNotEmpty()) " · " + tr(if (shownFailed.size > 1) R.string.status_offline_many else R.string.status_offline_one, shownFailed.size) else ""
+        }
         Row(
-            Modifier.clip(CircleShape).clickable(enabled = !refreshing, onClick = onRefresh).padding(horizontal = 8.dp, vertical = 6.dp),
+            Modifier.clip(CircleShape).clickable(enabled = !refreshing, onClickLabel = tr(R.string.action_refresh), onClick = onRefresh).padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(label, style = mono(10.sp, tracking = 0.sp), color = g.textSecondary, maxLines = 1)
-            Spacer(Modifier.width(6.dp))
-            val spin = rememberInfiniteTransition(label = "spin")
-            val angle by spin.animateFloat(0f, 360f, infiniteRepeatable(tween(900, easing = LinearEasing)), label = "a")
-            androidx.compose.material3.Icon(
-                androidx.compose.material.icons.Icons.Filled.Refresh, contentDescription = tr(R.string.action_refresh),
-                tint = g.accentSoft, modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = if (refreshing) angle else 0f },
-            )
+            PulseDot(refreshing)
+            Spacer(Modifier.width(7.dp))
+            Odometer(label, style = mono(10.sp, tracking = 0.sp), color = g.textSecondary)
         }
+    }
+}
+
+/** The status line's rose dot: still when idle, a slow breath while refreshing. */
+@Composable
+private fun PulseDot(refreshing: Boolean) {
+    val reduce = news.openwire.ui.theme.rememberReduceMotion()
+    val k = if (refreshing && !reduce) rememberInfiniteTransition(label = "dot")
+        .animateFloat(0f, 1f, infiniteRepeatable(tween(1100, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "k") else null
+    Box(
+        Modifier.size(6.dp).graphicsLayer {
+            val v = k?.value ?: 0f
+            alpha = 1f - .55f * v; scaleX = 1f + .35f * v; scaleY = scaleX
+        }.clip(CircleShape).background(Glass.accent),
+    )
+}
+
+
+/**
+ * Text that rolls over like an odometer when it changes: the part that stays put doesn't move,
+ * the rest rolls up (420 ms, emphasized decelerate). "18 min ago" → "just now".
+ */
+@Composable
+internal fun Odometer(text: String, style: androidx.compose.ui.text.TextStyle, color: Color) {
+    var previous by remember { mutableStateOf(text) }
+    val keep = remember(text) { previous.commonPrefixWith(text).let { p -> p.substring(0, p.lastIndexOf(' ').let { if (it < 0) 0 else it + 1 }) } }
+    LaunchedEffect(text) { previous = text }
+    Row {
+        if (keep.isNotEmpty()) Text(keep, style = style, color = color, maxLines = 1)
+        androidx.compose.animation.AnimatedContent(
+            targetState = text.removePrefix(keep),
+            transitionSpec = {
+                (androidx.compose.animation.slideInVertically(tween(420, easing = EmphasizedDecelerate)) { it } + androidx.compose.animation.fadeIn(tween(300))) togetherWith
+                    (androidx.compose.animation.slideOutVertically(tween(420, easing = EmphasizedDecelerate)) { -it } + androidx.compose.animation.fadeOut(tween(200)))
+            },
+            label = "odometer",
+        ) { Text(it, style = style, color = color, maxLines = 1) }
     }
 }
 
@@ -324,10 +380,21 @@ fun LazyGridScope.feedItems(
     magazine: Boolean = false,
     /** Business tab: the market-watch bar under the LIVE ticker. */
     marketWatch: Boolean = false,
+    /** The live bar's stories across topics (null: this feed's own). */
+    ticker: List<TickerItem>? = null,
+    /** Stories that arrived with the last refresh, and when the one before it was. */
+    newIds: Set<String> = emptySet(),
+    newSince: Long = 0L,
 ) {
     if (articles.isEmpty()) return
+    // New since the last refresh: under a divider at the top, each with the rose "new" dot.
+    val fresh = if (newIds.isEmpty()) emptyList() else articles.filter { it.id in newIds }
+    if (fresh.isNotEmpty()) {
+        fullRow("new-divider-$newSince") { NewDivider(fresh.size, newSince) }
+        fresh.forEachIndexed { i, a -> fullRow("new-${a.id}") { NewStoryRow(a, i, onOpen) } }
+    }
     fun state(a: Article) = a.originalUrl?.let { archive[it] }
-    if (showTicker) fullRow("ticker") { LiveTicker(articles, onOpen) }
+    if (showTicker) fullRow("ticker") { LiveTicker(ticker ?: articles.drop(1).take(12).map { TickerItem(it, category, category) }, onOpen) }
     if (showTicker && marketWatch) fullRow("markets") { MarketBar() }
     val hero = articles.first()
     fullRow("hero-${hero.id}") {
@@ -396,62 +463,116 @@ fun LazyGridScope.feedItems(
 
 // ---- Live ticker -----------------------------------------------------------------
 
-private val TickerColors = listOf(Indigo400, Emerald400, Amber400, Fuchsia400, Rose400)
 
-/** Swipeable live strip of real headlines (slow auto-scroll; tap to open). */
+/** One story in the live bar, with the topic it comes from. */
+data class TickerItem(val article: Article, val topicId: String, val topicLabel: String)
+
+object TickerFeed {
+    private val LIVE = Regex("(?i)\\b(live|live updates|breaking|just in|developing)\\b|مباشر|عاجل|en direct|en vivo|liveticker")
+
+    /**
+     * The newest stories from every topic shown: live coverage and breaking stories first, then
+     * by time, one story per headline, topics interleaved so no single one fills the bar.
+     */
+    fun build(topics: List<Pair<news.openwire.domain.model.Topic, List<Article>>>, now: Long = System.currentTimeMillis(), max: Int = 24): List<TickerItem> {
+        val seen = HashSet<String>()
+        val all = topics.flatMap { (t, list) -> list.take(15).map { TickerItem(it, t.id, t.label) } }
+            .filter { (it.article.publishedAt ?: 0L) > now - 36 * 3_600_000L || it.article.publishedAt == null }
+        val live = all.filter { LIVE.containsMatchIn(it.article.title) && (it.article.publishedAt ?: now) > now - 6 * 3_600_000L }
+            .sortedByDescending { it.article.publishedAt ?: 0L }
+        val rest = all.sortedByDescending { it.article.publishedAt ?: 0L }
+        val out = ArrayList<TickerItem>()
+        val perTopic = HashMap<String, Int>()
+        for (it in live + rest) {
+            val key = it.article.title.lowercase().take(60)
+            if (!seen.add(key)) continue
+            val n = perTopic[it.topicId] ?: 0
+            if (n >= 4 && it !in live) continue
+            perTopic[it.topicId] = n + 1
+            out += it
+            if (out.size >= max) break
+        }
+        return out
+    }
+}
+
+/** Topic colours for the live bar, in the app's palette. */
+private val TopicTint = listOf(Rose400, Indigo400, Emerald400, Amber400, Fuchsia400, Color(0xFF38BDF8), Color(0xFFA3E635), Color(0xFFF472B6))
+
+private fun tintFor(topicId: String) = TopicTint[Math.floorMod(topicId.hashCode(), TopicTint.size)]
+
+/**
+ * The live bar: the latest across your topics, drifting continuously (Arabic headlines drift the
+ * other way); swipe it back and forth, and it carries on a moment after you let go.
+ */
 @Composable
-fun LiveTicker(articles: List<Article>, onOpen: (Article) -> Unit) {
+fun LiveTicker(items: List<TickerItem>, onOpen: (Article) -> Unit) {
     val g = Glass
-    val items = remember(articles) { articles.drop(1).take(10) }
-    val listState = rememberLazyListState()
-    // The strip drifts for half a minute, then rests: an endless marquee keeps the whole glass
-    // UI redrawing even when nobody is reading it. New headlines or a swipe start it again.
-    var moving by remember(items) { mutableStateOf(true) }
+    if (items.isEmpty()) return
+    // Repeated, so the drift never runs out and you can swipe back past the start.
+    val loop = remember(items) { List(LOOPS) { r -> items.mapIndexed { i, it -> Triple(r * items.size + i, it, i) } }.flatten() }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = items.size * (LOOPS / 2))
     val dragged by listState.interactionSource.collectIsDraggedAsState()
-    LaunchedEffect(dragged) { if (dragged) moving = true }
-    LaunchedEffect(items, moving) {
-        if (!moving) return@LaunchedEffect
-        val until = System.currentTimeMillis() + 30_000
-        while (isActive && System.currentTimeMillis() < until) {
-            delay(32)
-            try {
-                if (listState.canScrollForward) listState.scrollBy(1.2f) else { delay(1500); listState.scrollToItem(0) }
-            } catch (e: CancellationException) {
-                if (!isActive) throw e // the user grabbed the strip; resume after they let go
-                delay(2500)
+    val arabic = remember(items) { items.count { RX_AR.containsMatchIn(it.article.title) } * 2 > items.size }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val speed = with(density) { TICKER_DP_PER_SEC.dp.toPx() }
+    LaunchedEffect(items, dragged) {
+        if (dragged) return@LaunchedEffect
+        delay(if (listState.firstVisibleItemScrollOffset == 0 && listState.firstVisibleItemIndex == items.size * (LOOPS / 2)) 400 else 1800)
+        var last = 0L
+        while (isActive) {
+            val t = androidx.compose.runtime.withFrameNanos { it }
+            val dt = if (last == 0L) 0f else ((t - last) / 1e9f).coerceAtMost(0.05f)
+            last = t
+            try { listState.scrollBy(speed * dt) } catch (e: CancellationException) { if (!isActive) throw e }
+            // Far along the loop: jump back by whole copies (invisible), so it never ends.
+            if (listState.firstVisibleItemIndex > items.size * (LOOPS - 1)) {
+                listState.scrollToItem(listState.firstVisibleItemIndex - items.size * (LOOPS / 2), listState.firstVisibleItemScrollOffset)
             }
         }
-        moving = false
+    }
+    LaunchedEffect(dragged) {
+        if (!dragged && listState.firstVisibleItemIndex < items.size) {
+            listState.scrollToItem(listState.firstVisibleItemIndex + items.size * (LOOPS / 2), listState.firstVisibleItemScrollOffset)
+        }
     }
     GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            LivePill(pulsing = moving)
+            LivePill(pulsing = true)
             Spacer(Modifier.width(10.dp))
-            LazyRow(state = listState, modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                itemsIndexed(items, key = { _, a -> a.id }) { index, article ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (index > 0) {
-                            Text("•", style = sans(12.sp), color = g.textPrimary.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 8.dp))
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalLayoutDirection provides if (arabic) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr,
+            ) {
+                LazyRow(state = listState, modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    items(loop.size, key = { loop[it].first }) { k ->
+                        val item = loop[k].second
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("•", style = sans(12.sp), color = g.textPrimary.copy(alpha = 0.3f), modifier = Modifier.padding(horizontal = 10.dp))
+                            Text(
+                                buildAnnotatedString {
+                                    withStyle(SpanStyle(fontFamily = JetBrainsMonoFamily, fontWeight = FontWeight.Bold, color = tintFor(item.topicId))) {
+                                        append(item.topicLabel.uppercase())
+                                    }
+                                    append("  ")
+                                    append(item.article.title)
+                                    (item.article.source ?: item.article.domain)?.takeIf { it.isNotBlank() }?.let { src -> withStyle(SpanStyle(color = g.textSecondary)) { append("  · $src") } }
+                                },
+                                style = sans(12.sp),
+                                color = g.textPrimary.copy(alpha = 0.88f),
+                                maxLines = 1,
+                                modifier = Modifier.clickable { onOpen(item.article) },
+                            )
                         }
-                        Text(
-                            buildAnnotatedString {
-                                withStyle(SpanStyle(fontFamily = JetBrainsMonoFamily, fontWeight = FontWeight.Bold, color = TickerColors[index % TickerColors.size])) {
-                                    append(shortSource(article))
-                                }
-                                append("  ")
-                                append(article.title)
-                            },
-                            style = sans(12.sp),
-                            color = g.textPrimary.copy(alpha = 0.85f),
-                            maxLines = 1,
-                            modifier = Modifier.clickable { onOpen(article) },
-                        )
                     }
                 }
             }
         }
     }
 }
+
+private const val LOOPS = 40
+private const val TICKER_DP_PER_SEC = 42f
+private val RX_AR = Regex("[\\u0600-\\u06FF]")
 
 private fun shortSource(a: Article): String {
     val s = a.source ?: a.domain?.substringBefore('.') ?: "WIRE"
@@ -569,6 +690,7 @@ fun HeroCard(
                     color = if (selected) Rose200 else Color.White,
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 article.coverageLine()?.let {
                     Spacer(Modifier.height(6.dp))
@@ -622,7 +744,7 @@ fun LeadStoryCard(
                     Text(
                         article.title,
                         style = serif(30.sp, FontWeight.Bold, lineHeight = 34.sp, tracking = (-0.01).em),
-                        color = g.textPrimary, maxLines = 5, overflow = TextOverflow.Ellipsis,
+                        color = g.textPrimary, maxLines = 5, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth(),
                     )
                     // The feed's excerpt, or (Google items carry none) the story's opening from its page.
                     val excerpt = article.summary?.takeIf { it.isNotBlank() && FeedWeaver.calculateTitleSimilarity(it, article.title) < 0.7 }
@@ -633,7 +755,7 @@ fun LeadStoryCard(
                     androidx.compose.animation.AnimatedVisibility(opening != null, enter = androidx.compose.animation.fadeIn()) {
                         Column {
                             Spacer(Modifier.height(10.dp))
-                            Text(opening.orEmpty(), style = sans(14.sp, lineHeight = 21.sp), color = g.textSecondary, maxLines = 6, overflow = TextOverflow.Ellipsis)
+                            Text(opening.orEmpty(), style = sans(14.sp, lineHeight = 21.sp).reading(), color = g.textSecondary, maxLines = 6, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
                         }
                     }
                     article.coverageLine(3)?.let {
@@ -715,6 +837,7 @@ fun BentoCard(
                 minLines = 3,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -754,13 +877,16 @@ fun ArticleImage(article: Article, modifier: Modifier, logoSize: Dp, grayscale: 
         value = if (article.imageUrl == null && resolver != null) resolver.resolve(article.originalUrl) else null
     }
     val url = article.imageUrl ?: found
-    // A photo that won't load (blocked or gone) gets the publisher canvas, not a blank frame.
+    // The large version of a feed thumbnail when the image service offers one; the original
+    // address if the large one won't load; the publisher canvas if neither does.
+    val large = remember(url) { news.openwire.domain.engine.ImageExtractor.highRes(url) }
+    var useOriginal by remember(url) { mutableStateOf(false) }
     var broken by remember(url) { mutableStateOf(false) }
     if (url != null && !broken) {
         AsyncImage(
-            model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier,
+            model = if (useOriginal) url else large, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier,
             colorFilter = if (grayscale) GrayscaleFilter else null,
-            onError = { broken = true },
+            onError = { if (!useOriginal && large != url) useOriginal = true else broken = true },
         )
     } else {
         PublisherCanvas(article, modifier, logoSize, grayscale)
@@ -860,4 +986,56 @@ private fun SkeletonBlock(height: Dp) {
             .graphicsLayer { alpha = a }
             .glassSurface(elevation = 0.dp),
     )
+}
+
+/** "3 new since 9:12": rose mono, with a hairline fading away in the reading direction. */
+@Composable
+private fun NewDivider(count: Int, since: Long) {
+    val time = remember(since) {
+        if (since <= 0L) "" else java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT)
+            .format(java.time.Instant.ofEpochMilli(since).atZone(java.time.ZoneId.systemDefault()))
+    }
+    val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            (if (time.isEmpty()) tr(R.string.refresh_new, count) else tr(R.string.refresh_new_since, count, time)).uppercase(),
+            style = mono(11.sp, FontWeight.SemiBold, 0.14.em), color = Glass.accent, maxLines = 1,
+        )
+        Spacer(Modifier.width(10.dp))
+        Box(
+            Modifier.weight(1f).height(1.dp).drawWithCache {
+                val b = Brush.horizontalGradient(
+                    if (rtl) listOf(Color.Transparent, Glass_accentFade) else listOf(Glass_accentFade, Color.Transparent),
+                )
+                onDrawBehind { drawRect(b) }
+            },
+        )
+    }
+}
+
+private val Glass_accentFade = news.openwire.ui.theme.Rose.copy(alpha = .55f)
+
+/** A new story: fades in and slides down 8 dp, 70 ms after the one above it. */
+@Composable
+private fun NewStoryRow(a: Article, index: Int, onOpen: (Article) -> Unit) {
+    val g = Glass
+    val reduce = news.openwire.ui.theme.rememberReduceMotion()
+    val k = remember(a.id) { androidx.compose.animation.core.Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(a.id) { if (!reduce) { kotlinx.coroutines.delay(70L * index); k.animateTo(1f, tween(320, easing = FastOutSlowInEasing)) } }
+    Row(
+        Modifier.fillMaxWidth().graphicsLayer { alpha = k.value; translationY = -8.dp.toPx() * (1f - k.value) }
+            .clip(RoundedCornerShape(16.dp)).background(g.chipFill).clickable { onOpen(a) }.padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(g.accent).semantics { contentDescription = tr(R.string.refresh_new_dot) })
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(a.publication(), style = mono(10.sp, FontWeight.SemiBold, 0.12.em), color = g.accent, maxLines = 1)
+            Text(a.title, style = serif(16.sp, FontWeight.SemiBold, lineHeight = 21.sp), color = g.textPrimary, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
+        if (!a.imageUrl.isNullOrBlank()) {
+            Spacer(Modifier.width(10.dp))
+            ArticleImage(a, Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)), logoSize = 28.dp)
+        }
+    }
 }

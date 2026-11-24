@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="refresh_pull">Pull for the latest edition</string>
+    <string name="refresh_release">Release to refresh</string>
+    <string name="refresh_checking">Checking your sources</string>
+    <string name="refresh_news_search">News search</string>
+    <string name="refresh_edition">Editrove edition</string>
+    <string name="refresh_ms">%d ms</string>
+    <string name="refresh_no_answer">didn\'t respond</string>
+    <string name="refresh_count">%1$d of %2$d</string>
+    <string name="refresh_announce_start">Refreshing</string>
+    <string name="refresh_announce_done">Updated</string>
+    <string name="refresh_announce_new_one">Updated, %d new story</string>
+    <string name="refresh_announce_new_many">Updated, %d new stories</string>
+    <string name="refresh_new">%d new</string>
+    <string name="refresh_new_since">%1$d new since %2$s</string>
+    <string name="refresh_new_dot">New</string>
+    <string name="reader_points_done">Done on this phone in %s s</string>
+    <string name="reader_points_working">Summarising on this phone</string>
+</resources>

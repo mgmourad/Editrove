@@ -17,6 +17,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.animation.togetherWith
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import news.openwire.data.local.ThemeMode
@@ -60,6 +63,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val onboardingVm: news.openwire.onboarding.OnboardingViewModel by viewModels {
+        viewModelFactory {
+            initializer {
+                news.openwire.onboarding.OnboardingViewModel(
+                    handle = createSavedStateHandle(),
+                    settingsRepo = container.settingsRepository,
+                    catalog = { container.feedCatalog.catalog },
+                    feeds = container.feedRepository,
+                    rerun = news.openwire.onboarding.OnboardingGate.rerun,
+                )
+            }
+        }
+    }
+
     override fun attachBaseContext(newBase: android.content.Context) = super.attachBaseContext(news.openwire.i18n.AppLocale.wrap(newBase))
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,9 +97,17 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             container.settingsRepository.settings.collect { st -> news.openwire.realtime.RealtimeAlertService.sync(this@MainActivity, st) }
         }
+        settingsVm.onImported = { news.openwire.onboarding.OnboardingGate.markDone(this) }
         if (savedInstanceState == null) handleIntent(intent)
-        // A fresh install opened from the launcher starts with the welcome tour.
-        if (savedInstanceState == null && intent?.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER) &&
+        // First run: setup (which replaces the welcome tour). Kept across recreation (a language switch, a fold).
+        val gate = news.openwire.onboarding.OnboardingGate
+        if (savedInstanceState?.getBoolean(KEY_SETUP) == true) { gate.showing = true; gate.rerun = savedInstanceState.getBoolean(KEY_RERUN) }
+        else if (savedInstanceState == null && gate.shouldShow(this, container.settingsRepository.settings.value)) {
+            gate.showing = true
+            news.openwire.guide.Guide.markWelcomed(this)
+        }
+        // A fresh install opened from the launcher starts with the welcome tour (when setup didn't run).
+        if (!gate.showing && savedInstanceState == null && intent?.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER) &&
             news.openwire.guide.Guide.shouldWelcome(this)
         ) news.openwire.guide.Guide.showing = true
         setContent {
@@ -102,10 +127,59 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 vm.messages.collect { Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show() }
             }
-            OpenWireTheme(darkTheme = dark) {
-                HomeScreen(vm, settingsVm)
+            val setup = news.openwire.onboarding.OnboardingGate.showing
+            var notice by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) }
+            androidx.compose.animation.AnimatedContent(
+                setup,
+                transitionSpec = { androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(500)) togetherWith androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(400)) },
+                label = "setup",
+            ) { onSetup ->
+                if (onSetup) {
+                    // Setup is always Black Glass.
+                    DisposableEffect(Unit) {
+                        enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT), navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT))
+                        onDispose {}
+                    }
+                    LaunchedEffect(Unit) { if (onboardingVm.state.value.step == news.openwire.domain.onboarding.Step.DONE) onboardingVm.restart(news.openwire.onboarding.OnboardingGate.rerun) }
+                    OpenWireTheme(darkTheme = true) {
+                        news.openwire.onboarding.OnboardingScreen(
+                            vm = onboardingVm,
+                            sayLine = { container.briefingPlayer.sayLine(it) },
+                            stopLine = { container.briefingPlayer.stopLine() },
+                            onLanguage = { tag -> settingsVm.setLanguage(tag); news.openwire.i18n.AppLocale.apply(this@MainActivity, tag) },
+                            onFinished = { st -> finishSetup(st)?.let { notice = it } },
+                        )
+                    }
+                } else {
+                    OpenWireTheme(darkTheme = dark) {
+                        androidx.compose.foundation.layout.Box {
+                            HomeScreen(vm, settingsVm)
+                            news.openwire.onboarding.SetupNotice(notice, onPlay = { notice = null; playTopBriefing() }, onDismiss = { notice = null })
+                        }
+                    }
+                }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(KEY_SETUP, news.openwire.onboarding.OnboardingGate.showing)
+        outState.putBoolean(KEY_RERUN, news.openwire.onboarding.OnboardingGate.rerun)
+    }
+
+    /** Setup is done: flags set, and the "briefing is set" line if a time was picked. */
+    private fun finishSetup(st: news.openwire.domain.onboarding.OnboardingState): String? {
+        val gate = news.openwire.onboarding.OnboardingGate
+        gate.markDone(this)
+        news.openwire.guide.Guide.markWelcomed(this)
+        if (!gate.rerun) container.changelog.markSeen()
+        // The delivery check matters only when something will be delivered.
+        if (st.choices.slots.isEmpty() && !gate.rerun) news.openwire.delivery.DeliveryCheck.markChecked(this)
+        vm.openSettings(false)
+        vm.selectTopicId("TOP")
+        gate.showing = false; gate.rerun = false
+        return news.openwire.onboarding.SetupNotice.text(st)
     }
 
     override fun onStart() {
@@ -142,22 +216,28 @@ class MainActivity : ComponentActivity() {
                 intent.getStringExtra(EXTRA_URL)?.let { vm.openLink(it, title = intent.getStringExtra(EXTRA_TITLE)) }
                 if (intent.getBooleanExtra(EXTRA_AUTOPLAY, false)) {
                     intent.removeExtra(EXTRA_AUTOPLAY)
-                    vm.selectTopicId("TOP")
-                    vm.selectTab(news.openwire.ui.home.NavTab.AUDIO)
-                    val player = (application as OpenWireApp).container.briefingPlayer
-                    lifecycleScope.launch {
-                        // Refresh first, then play right away.
-                        val top = vm.topics.firstOrNull { it.id == "TOP" } ?: return@launch
-                        val stories = vm.freshStories(top)
-                        player.awaitReady()
-                        if (stories.isNotEmpty()) player.play(top.label, stories)
-                    }
+                    playTopBriefing()
                 }
             }
         }
     }
 
+    /** Top Stories' briefing: refreshed first, then played (scheduled briefings, setup's notice). */
+    private fun playTopBriefing() {
+        vm.selectTopicId("TOP")
+        vm.selectTab(news.openwire.ui.home.NavTab.AUDIO)
+        val player = container.briefingPlayer
+        lifecycleScope.launch {
+            val top = vm.topics.firstOrNull { it.id == "TOP" } ?: return@launch
+            val stories = vm.freshStories(top)
+            player.awaitReady()
+            if (stories.isNotEmpty()) player.play(top.label, stories)
+        }
+    }
+
     companion object {
+        private const val KEY_SETUP = "setup_showing"
+        private const val KEY_RERUN = "setup_rerun"
         const val EXTRA_TOPIC = "news.openwire.extra.TOPIC"
         const val EXTRA_TAB = "news.openwire.extra.TAB"
         const val EXTRA_SETTINGS = "news.openwire.extra.SETTINGS"

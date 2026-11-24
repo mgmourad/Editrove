@@ -114,4 +114,14 @@ class ArticleTextExtractorTest {
         assertFalse(x.relevant(privacy, "Trump calls Putin and Xi friends. They have other plans."))
         assertTrue(x.relevant(ArticleContent("", ps.joinToString("\n\n"), null), "Bridge reopens after two-year repair"))
     }
+
+    @Test fun followPromptsAboveTheHeadlineAreNotTheStory() {
+        // A saved TIME page: "Follow this section…" prompts, then the headline, then the story.
+        val html = javaClass.getResource("/time_taiwan.html")!!.readText()
+        val x = ArticleTextExtractor(okhttp3.OkHttpClient())
+        val ps = x.articleParagraphs(Jsoup.parse(html))
+        assertTrue(ps.size >= 15)
+        assertTrue(ps.first().startsWith("The southern Taiwanese city of Chiayi"))
+        assertTrue(x.relevant(ArticleContent("", ps.joinToString("\n\n"), null), "How Taiwan Is Turning Tech Supremacy Into a Security Shield"))
+    }
 }

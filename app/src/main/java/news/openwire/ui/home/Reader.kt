@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -201,14 +202,16 @@ fun ReaderSheet(
     val g = Glass
     val haze = rememberHazeState()
     val headerHeight = 61.dp
+    val scroll = rememberScrollState()
+    var loading by remember(article.id) { mutableStateOf(true) }
     Box(Modifier.fillMaxSize().background(g.deviceBg)) {
         // Scrolling body is the blur source; the top bar floats over it as frosted glass.
         Column(
-            Modifier.fillMaxSize().hazeSource(haze).background(g.deviceBg).verticalScroll(rememberScrollState())
+            Modifier.fillMaxSize().hazeSource(haze).background(g.deviceBg).verticalScroll(scroll)
                 .statusBarsPadding()
                 .padding(start = 20.dp, end = 20.dp, top = headerHeight + 20.dp, bottom = 64.dp),
         ) {
-            ArticleBody(article, category, showMetaBar = false, saved = saved, liked = liked, actions = actions)
+            ArticleBody(article, category, showMetaBar = false, saved = saved, liked = liked, actions = actions, onLoading = { loading = it })
         }
         // Faded glass behind the header (no rule), matching the feed's top and bottom fades.
         StatusBarGlass(haze, extra = headerHeight + 18.dp)
@@ -238,6 +241,8 @@ fun ReaderSheet(
                 Spacer(Modifier.width(8.dp))
                 SpringToggle(saved, ToggleKind.BOOKMARK, { actions.onToggleSaved(article) }, background = g.chipFill, padding = 8.dp)
             }
+            // Loading: a comet along the top edge; then how far you've read.
+            CometLine(loading, progress = { if (scroll.maxValue > 0) scroll.value / scroll.maxValue.toFloat() else 0f })
         }
     }
 }
@@ -253,6 +258,8 @@ internal fun ArticleBody(
     actions: ReaderActions,
     /** False when the page already shows the photo as a large header (Full view). */
     showFeatureImage: Boolean = true,
+    /** Told whether the article text is still loading (the sheet's top-edge comet). */
+    onLoading: ((Boolean) -> Unit)? = null,
 ) {
     val g = Glass
     val url = article.originalUrl ?: article.targetUrl ?: ""
@@ -284,13 +291,19 @@ internal fun ArticleBody(
     val images = LocalImageResolver.current
     LaunchedEffect(state) { (state as? BodyState.Loaded)?.content?.imageUrl?.let { images?.remember(article.originalUrl, it) } }
     val content = (state as? BodyState.Loaded)?.content
+    LaunchedEffect(state) { onLoading?.invoke(state is BodyState.Loading) }
+    // The page is in place (the sheet finished opening): the headline and kicker set now.
+    val settled = rememberReaderSettled()
+    val reduce = news.openwire.ui.theme.rememberReduceMotion()
 
     // The whole article (headline, standfirst, summary, body) follows the chosen text size.
     val baseDensity = androidx.compose.ui.platform.LocalDensity.current
     androidx.compose.runtime.CompositionLocalProvider(
         androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(baseDensity.density, baseDensity.fontScale * LocalTextScale.current),
     ) {
-    Column(Modifier.widthIn(max = 672.dp).fillMaxWidth()) {
+    var columnWidthDp by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val densityNow = androidx.compose.ui.platform.LocalDensity.current
+    Column(Modifier.widthIn(max = 672.dp).fillMaxWidth().onSizeChanged { columnWidthDp = with(densityNow) { it.width.toDp().value.toInt() } }) {
         if (showMetaBar) {
             Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -348,7 +361,10 @@ internal fun ArticleBody(
         }
 
         // Editorial serif headline
-        Text(article.title.ifBlank { content?.title?.takeIf { it.isNotBlank() } ?: article.source ?: article.domain ?: tr(R.string.reader_article) }, style = serif(28.sp, FontWeight.Bold, lineHeight = 32.sp, tracking = (-0.01).em), color = g.textPrimary)
+        SettingHeadline(
+            article.title.ifBlank { content?.title?.takeIf { it.isNotBlank() } ?: article.source ?: article.domain ?: tr(R.string.reader_article) },
+            start = settled, size = 28.sp, lineHeight = 32.sp, color = g.textPrimary, modifier = Modifier.fillMaxWidth(),
+        )
         Spacer(Modifier.height(12.dp))
 
         // Story grouping: who else is running this story
@@ -359,21 +375,20 @@ internal fun ArticleBody(
 
         // Deck / standfirst — the publisher's own description, when we have it
         content?.description?.let {
-            Text(it, style = sans(15.sp, lineHeight = 24.sp), color = g.textPrimary.copy(alpha = 0.75f))
+            Text(it, style = sans(15.sp, lineHeight = 24.sp).reading(), color = g.textPrimary.copy(alpha = 0.75f), modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(20.dp))
         }
 
         // Byline (on a narrow screen, the other-outlets pill sits just under the source instead).
-        val narrowByline = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 520
+        // Narrow column (the cover screen, or the reader beside the feed): the pill goes under the source.
+        val narrowByline = columnWidthDp in 1..559
         Row(Modifier.fillMaxWidth().padding(bottom = if (narrowByline) 10.dp else 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(36.dp).clip(CircleShape)
-                    .background(Brush.linearGradient(listOf(Indigo, g.accent)))
-                    .padding(1.5.dp).clip(CircleShape).background(Slate900),
-                contentAlignment = Alignment.Center,
-            ) { SourceLogo(article.domain, article.source, size = 22.dp) }
+            SourceRing(start = settled, size = 36.dp) { SourceLogo(article.domain, article.source, size = 22.dp) }
             Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
+            val nameIn by androidx.compose.animation.core.animateFloatAsState(
+                if (settled) 1f else 0f, if (reduce) tween(0) else tween(420, delayMillis = 220), label = "name",
+            )
+            Column(Modifier.weight(1f).graphicsLayer { alpha = nameIn }) {
                 Text(
                     content?.author ?: article.source ?: article.domain ?: "",
                     style = sans(12.sp, FontWeight.SemiBold), color = g.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -392,10 +407,12 @@ internal fun ArticleBody(
                 Modifier.clip(CircleShape).background(g.chipFill.copy(alpha = g.chipFill.alpha / 2))
                     .border(1.dp, g.hairline, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
             ) {
-                Text(
-                    content?.let { tr(R.string.reader_minutes, it.readMinutes) } ?: tr(R.string.reader_minutes_unknown),
-                    style = mono(11.sp, tracking = 0.sp), color = g.textPrimary.copy(alpha = 0.6f),
-                )
+                CountUp(content?.readMinutes) { m ->
+                    Text(
+                        m?.let { tr(R.string.reader_minutes, it) } ?: tr(R.string.reader_minutes_unknown),
+                        style = mono(11.sp, tracking = 0.sp), color = g.textPrimary.copy(alpha = 0.6f),
+                    )
+                }
             }
         }
 
@@ -409,36 +426,27 @@ internal fun ArticleBody(
         AudioBriefingCard(article, content)
         Spacer(Modifier.height(16.dp))
 
-        // On-device summary: the article's own key sentences.
-        val keyPoints = remember(content) { content?.let { c -> c.combinedPoints.ifEmpty { news.openwire.domain.engine.Summarizer.keyPoints(c.text, 3) } }.orEmpty() }
-        androidx.compose.animation.AnimatedVisibility(keyPoints.isNotEmpty() && !useOthers, enter = androidx.compose.animation.expandVertically(springTween(420)) + androidx.compose.animation.fadeIn()) {
-            GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), contentPadding = PaddingValues(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(tr(R.string.reader_summary), style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = g.accentSoft, modifier = Modifier.weight(1f))
-                    Text(
-                        content?.otherOutlets?.takeIf { it.size > 1 }?.let { tr(R.string.reader_points_outlets, it.size) } ?: tr(R.string.reader_key_points),
-                        style = sans(10.sp), color = g.textSecondary,
-                    )
-                }
-                keyPoints.forEach { point ->
-                    Row(Modifier.padding(top = 10.dp)) {
-                        Box(Modifier.padding(top = 7.dp).size(5.dp).clip(CircleShape).background(g.accent))
-                        Spacer(Modifier.width(10.dp))
-                        Text(point, style = sans(13.5.sp, lineHeight = 21.sp), color = g.textPrimary.copy(alpha = 0.92f))
-                    }
-                }
-            }
-        }
+        // On-device summary: the article's own key sentences, written in front of you.
+        if (!useOthers) KeyPointsCard(state, content)
         Spacer(Modifier.height(16.dp))
 
         // Feature image (16:9, 24dp radius) with caption
-        article.imageUrl?.takeIf { showFeatureImage }?.let { img ->
+        // The page's own photo (full size) once the article has loaded; the feed's until then.
+        (content?.imageUrl?.takeIf { it.startsWith("http") } ?: article.imageUrl)?.takeIf { showFeatureImage }?.let { img ->
             Box(
                 Modifier.fillMaxWidth().aspectRatio(16f / 9f)
                     .sharedArticleImage(article.id, hasImage = true, cornerRadius = 24.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp)),
-            ) { ArticleImage(article.copy(imageUrl = img), Modifier.fillMaxSize(), logoSize = 72.dp) }
+            ) {
+                // Develops from the cached thumbnail; falls back to the usual image (or publisher canvas) if it won't load.
+                var failed by remember(img) { mutableStateOf(false) }
+                if (failed || !img.startsWith("http")) ArticleImage(article.copy(imageUrl = img), Modifier.fillMaxSize(), logoSize = 72.dp)
+                else DevelopingImage(
+                    preview = article.imageUrl, full = remember(img) { news.openwire.domain.engine.ImageExtractor.highRes(img) ?: img },
+                    modifier = Modifier.fillMaxSize(), onFailed = { failed = true },
+                )
+            }
             Text(
                 tr(R.string.reader_photo, article.publication()),
                 style = mono(10.sp, tracking = 0.05.em),
@@ -453,7 +461,8 @@ internal fun ArticleBody(
         if (useOthers) OtherOutletsView(others, original = article.source ?: article.domain ?: "", onBack = { useOthers = false }, loadPost = actions.loadPost)
         else when (val s = state) {
             BodyState.Loading -> {
-                LoadingBar(tr(R.string.reader_loading))
+                // The sheet shows loading as the comet along its top edge.
+                if (onLoading == null) LoadingBar(tr(R.string.reader_loading))
                 if (slow) SlowArticleCard(failed = false, onRetry = { attempt++ }, onOthers = openOthers, smryUrl = if (service == null) url else "")
                 else BodySkeleton()
             }
@@ -479,7 +488,9 @@ internal fun ArticleBody(
                 val mediaAfter = remember(s.content) { s.content.media.groupBy { it.after } }
                 s.content.paragraphs.forEachIndexed { i, para ->
                     // Drop caps are a Latin-type tradition; Arabic (and Hebrew) text opens plainly.
-                    if (i == 0 && !RX_RTL.containsMatchIn(para.take(40))) DropCapParagraph(para) else BodyParagraph(para)
+                    Box(Modifier.revealDown(i, reduce)) {
+                        if (i == 0 && !RX_RTL.containsMatchIn(para.take(40))) DropCapParagraph(para) else BodyParagraph(para)
+                    }
                     Spacer(Modifier.height(16.dp))
                     // The story's own photos and videos, where the publisher placed them.
                     mediaAfter[i]?.forEach { m -> StoryMedia(m); Spacer(Modifier.height(16.dp)) }
@@ -536,7 +547,7 @@ private val bodyStyle = sans(14.5.sp, lineHeight = 25.sp)
 
 @Composable
 private fun BodyParagraph(text: String) {
-    Text(text, style = bodyStyle, color = Glass.textPrimary.copy(alpha = 0.9f))
+    Text(text, style = bodyStyle.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Content), color = Glass.textPrimary.copy(alpha = 0.9f), modifier = Modifier.fillMaxWidth())
 }
 
 /**
@@ -938,10 +949,10 @@ private fun OutletReport(c: news.openwire.data.remote.ArticleContent, loadPost: 
     val context = LocalContext.current
     Column(Modifier.fillMaxWidth()) {
         if (c.title.isNotBlank()) {
-            Text(c.title, style = serif(21.sp, FontWeight.Bold, lineHeight = 27.sp), color = g.textPrimary)
+            Text(c.title, style = serif(21.sp, FontWeight.Bold, lineHeight = 27.sp), color = g.textPrimary, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
         }
-        c.description?.let { Text(it, style = sans(14.sp, lineHeight = 22.sp), color = g.textPrimary.copy(alpha = 0.75f)); Spacer(Modifier.height(10.dp)) }
+        c.description?.let { Text(it, style = sans(14.sp, lineHeight = 22.sp).reading(), color = g.textPrimary.copy(alpha = 0.75f), modifier = Modifier.fillMaxWidth()); Spacer(Modifier.height(10.dp)) }
         Text(
             listOfNotNull(c.author, c.viaName).joinToString(" · "),
             style = mono(10.sp, tracking = 0.06.em), color = g.textSecondary, modifier = Modifier.padding(bottom = 14.dp),
@@ -957,7 +968,7 @@ private fun OutletReport(c: news.openwire.data.remote.ArticleContent, loadPost: 
                     Row(Modifier.padding(top = 10.dp)) {
                         Box(Modifier.padding(top = 7.dp).size(5.dp).clip(CircleShape).background(g.accent))
                         Spacer(Modifier.width(10.dp))
-                        Text(point, style = sans(13.5.sp, lineHeight = 21.sp), color = g.textPrimary.copy(alpha = 0.92f))
+                        Text(point, style = sans(13.5.sp, lineHeight = 21.sp).reading(), color = g.textPrimary.copy(alpha = 0.92f), modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -988,3 +999,60 @@ private fun OutletReport(c: news.openwire.data.remote.ArticleContent, loadPost: 
     }
 }
 
+private sealed interface Points {
+    data object Waiting : Points
+    data object Writing : Points
+    data class Done(val points: List<String>, val ms: Long) : Points
+}
+
+/**
+ * The key-points card: shimmer until the summary starts; the points written letter by letter as
+ * they arrive; then the real time it took on this phone. No card when there's nothing to summarise.
+ */
+@Composable
+private fun KeyPointsCard(body: BodyState, content: news.openwire.data.remote.ArticleContent?) {
+    val g = Glass
+    val points by produceState<Points>(Points.Waiting, content) {
+        val c = content ?: return@produceState
+        value = Points.Writing
+        val t0 = System.nanoTime()
+        val list = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            c.combinedPoints.ifEmpty { news.openwire.domain.engine.Summarizer.keyPoints(c.text, 3) }
+        }
+        value = Points.Done(list, (System.nanoTime() - t0) / 1_000_000)
+    }
+    val p = points
+    if (body is BodyState.Failed || (p is Points.Done && p.points.isEmpty())) return
+    var written by remember(content) { mutableIntStateOf(0) }
+    val done = p is Points.Done && written >= p.points.size
+    GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), contentPadding = PaddingValues(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(tr(R.string.reader_summary), style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = g.accentSoft, modifier = Modifier.weight(1f))
+            if (!done) {
+                OrbitLoader(running = true)
+                Spacer(Modifier.width(6.dp))
+                Text(tr(R.string.reader_points_working), style = sans(10.sp), color = g.textSecondary)
+            } else {
+                val secs = (p as Points.Done).ms / 1000.0
+                Text(tr(R.string.reader_points_done, String.format(androidx.compose.ui.platform.LocalConfiguration.current.locales[0], "%.2f", secs)), style = sans(10.sp), color = g.textSecondary)
+            }
+        }
+        when (p) {
+            Points.Waiting, Points.Writing -> ShimmerLines()
+            is Points.Done -> {
+                var offset = 0
+                p.points.forEach { point ->
+                    val at = offset
+                    offset += point.length + 4
+                    Row(Modifier.padding(top = 10.dp)) {
+                        Box(Modifier.padding(top = 7.dp).size(5.dp).clip(CircleShape).background(g.accent))
+                        Spacer(Modifier.width(10.dp))
+                        Box(Modifier.weight(1f)) {
+                            WrittenText(point, startAt = at, style = sans(13.5.sp, lineHeight = 21.sp).reading(), settled = g.textPrimary.copy(alpha = 0.92f)) { written++ }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

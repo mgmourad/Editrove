@@ -12,6 +12,11 @@ interface FeedRepository {
     /** Fetches a source with the same path the feed uses (library audit / add-source validation). */
     suspend fun verifyFeed(url: String): FeedCheck = FeedCheck(ok = false, error = "Unsupported")
 
+    /** Each refresh's sources as they answer (pull-to-refresh progress). Never slows the fetch. */
+    val refreshEvents: kotlinx.coroutines.flow.SharedFlow<RefreshEvent> get() = NO_EVENTS
+
     /** The stories last stored for a topic (no network). */
     suspend fun cachedArticles(topicId: String): List<news.openwire.domain.model.Article> = emptyList()
 }
+
+private val NO_EVENTS = kotlinx.coroutines.flow.MutableSharedFlow<RefreshEvent>()

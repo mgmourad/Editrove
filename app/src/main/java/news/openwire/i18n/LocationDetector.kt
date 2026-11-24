@@ -88,6 +88,9 @@ object LocationDetector {
             ?.edition
     }
 
+    /** The cities Editrove knows offline (suggested while typing a city in setup). */
+    val knownCities: List<LocalEdition> get() = CITIES.map { it.edition }
+
     private class City(val edition: LocalEdition, val lat: Double, val lon: Double)
     private fun c(city: String, region: String, country: String, lat: Double, lon: Double) = City(LocalEdition(city, region, country), lat, lon)
 

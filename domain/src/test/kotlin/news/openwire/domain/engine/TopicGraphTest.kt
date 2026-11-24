@@ -35,4 +35,9 @@ class TopicGraphTest {
         assertTrue("الأهلي" in t && "الزمالك" in t)
         assertFalse("على" in t)
     }
+
+    @Test fun possessivesAreTheName() {
+        assertTrue("Jensen Huang" in KeywordMiner.terms("Trump backs Jensen Huang’s return to Nvidia", emptySet()))
+        assertFalse(KeywordMiner.terms("Trump backs Jensen Huang's return", emptySet()).any { it.endsWith("'s") })
+    }
 }

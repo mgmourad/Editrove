@@ -291,7 +291,8 @@ object Onboarding {
      * settings that differ from the defaults. They're counted as set up and never shown it.
      */
     fun isExistingUser(settings: UserSettings, updatedInstall: Boolean): Boolean =
-        updatedInstall || settings.copy(previousEdition = null, previousLanguage = null) != UserSettings()
+        // The language alone doesn't count: it is copied from the phone's own per-app setting on launch.
+        updatedInstall || settings.copy(previousEdition = null, previousLanguage = null, language = "") != UserSettings()
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 

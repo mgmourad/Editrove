@@ -123,6 +123,8 @@ class OnboardingTest {
         assertFalse(Onboarding.isExistingUser(UserSettings(), updatedInstall = false))
         assertTrue(Onboarding.isExistingUser(UserSettings(), updatedInstall = true))
         assertTrue(Onboarding.isExistingUser(UserSettings(hiddenTopics = setOf("SPORTS")), updatedInstall = false))
+        // The phone's per-app language is copied in on launch: still a new user.
+        assertFalse(Onboarding.isExistingUser(UserSettings(language = "ar"), updatedInstall = false))
     }
 
     @Test fun stateSurvivesProcessDeath() {

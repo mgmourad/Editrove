@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="refresh_pull">اسحب لأحدث نسخة</string>
+    <string name="refresh_release">أفلت للتحديث</string>
+    <string name="refresh_checking">جارٍ فحص مصادرك</string>
+    <string name="refresh_news_search">بحث الأخبار</string>
+    <string name="refresh_edition">نسخة Editrove</string>
+    <string name="refresh_ms">%d م.ث</string>
+    <string name="refresh_no_answer">لم يستجب</string>
+    <string name="refresh_count">%1$d من %2$d</string>
+    <string name="refresh_announce_start">جارٍ التحديث</string>
+    <string name="refresh_announce_done">تم التحديث</string>
+    <string name="refresh_announce_new_one">تم التحديث، خبر جديد واحد</string>
+    <string name="refresh_announce_new_many">تم التحديث، %d أخبار جديدة</string>
+    <string name="refresh_new">%d جديد</string>
+    <string name="refresh_new_since">%1$d جديد منذ %2$s</string>
+    <string name="refresh_new_dot">جديد</string>
+    <string name="reader_points_done">أُنجز على هذا الهاتف في %s ث</string>
+    <string name="reader_points_working">يُلخَّص على هذا الهاتف</string>
+</resources>

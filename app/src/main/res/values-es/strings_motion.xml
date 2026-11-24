@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="refresh_pull">Desliza para la última edición</string>
+    <string name="refresh_release">Suelta para actualizar</string>
+    <string name="refresh_checking">Revisando tus fuentes</string>
+    <string name="refresh_news_search">Búsqueda de noticias</string>
+    <string name="refresh_edition">Edición de Editrove</string>
+    <string name="refresh_ms">%d ms</string>
+    <string name="refresh_no_answer">no respondió</string>
+    <string name="refresh_count">%1$d de %2$d</string>
+    <string name="refresh_announce_start">Actualizando</string>
+    <string name="refresh_announce_done">Actualizado</string>
+    <string name="refresh_announce_new_one">Actualizado, %d noticia nueva</string>
+    <string name="refresh_announce_new_many">Actualizado, %d noticias nuevas</string>
+    <string name="refresh_new">%d nuevas</string>
+    <string name="refresh_new_since">%1$d nuevas desde las %2$s</string>
+    <string name="refresh_new_dot">Nueva</string>
+    <string name="reader_points_done">Hecho en este teléfono en %s s</string>
+    <string name="reader_points_working">Resumiendo en este teléfono</string>
+</resources>

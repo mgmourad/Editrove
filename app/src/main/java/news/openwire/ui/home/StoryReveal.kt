@@ -67,7 +67,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -498,35 +498,47 @@ fun CometLine(loading: Boolean, progress: () -> Float, modifier: Modifier = Modi
  * about a second. Paragraphs already on screen settle top-down, a little after one another.
  * Each plays once; with animations off, text is simply there.
  */
+/**
+ * Whether the article body may start revealing: opened once the key points have finished
+ * writing (plus a pause), so the eye has finished with the summary before the text arrives.
+ */
+val LocalBodyGate = androidx.compose.runtime.compositionLocalOf<androidx.compose.runtime.State<Boolean>> { androidx.compose.runtime.mutableStateOf(true) }
+
+/**
+ * A paragraph that settles onto the page only when both are true: the body gate is open (the
+ * summary is done, and a beat has passed) and the reader has scrolled the paragraph well into
+ * view. A soft ink wipe top to bottom, a small rise and (Android 12+) blur to focus, ~1.4 s.
+ * Paragraphs that come into view together settle one after another, top first.
+ */
 @Composable
 fun Modifier.revealOnScroll(): Modifier {
     val reduce = rememberReduceMotion()
     if (reduce) return this
     val view = androidx.compose.ui.platform.LocalView.current
+    val gate by LocalBodyGate.current
     val k = remember { Animatable(0f) }
-    var seenAt by remember { mutableStateOf(-1f) }
-    LaunchedEffect(seenAt >= 0f) {
-        if (seenAt < 0f) return@LaunchedEffect
-        // Lower on the screen → a touch later: what's already in view settles from the top down.
-        delay((seenAt * 220f).toLong())
-        // An even, unhurried settle (not front-loaded), so the eye catches it.
+    // Where the paragraph's top sits on screen (0 top … 1 bottom), or -1 while still below the fold.
+    var inView by remember { mutableStateOf(-1f) }
+    LaunchedEffect(gate, inView >= 0f) {
+        if (!gate || inView < 0f || k.value > 0f) return@LaunchedEffect
+        delay((inView * 420f).toLong()) // a staircase down the screen
         k.animateTo(1f, tween(1400, easing = SettleEasing))
     }
     return this
         .then(
             Modifier.onGloballyPositioned { c ->
-                if (seenAt >= 0f) return@onGloballyPositioned
+                if (inView >= 0f) return@onGloballyPositioned
                 val h = view.height.toFloat().takeIf { it > 0f } ?: return@onGloballyPositioned
-                val top = c.boundsInWindow().top
-                // Starts once the paragraph's top is well into view (not at the very edge).
-                if (top < h * .82f) seenAt = (top / h).coerceIn(0f, 1f)
+                // Unclipped position: an off-screen paragraph is really off screen (boundsInWindow
+                // clips it to an empty box at the top, which made everything "visible" at once).
+                val top = c.positionInWindow().y
+                if (c.isAttached && top < h * .82f && top + c.size.height > 0f) inView = (top / h).coerceIn(0f, 1f)
             },
         )
         .graphicsLayer {
             val v = k.value
             translationY = (1f - v) * 22.dp.toPx()
             alpha = if (v <= 0f) 0f else 1f
-            // Out of focus into focus (Android 12+), alongside the wipe.
             renderEffect = if (v > 0f && v < .85f) BlurSteps.of(5.dp.toPx() * (1f - v / .85f)) else null
             compositingStrategy = if (v in 0.001f..0.999f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
         }

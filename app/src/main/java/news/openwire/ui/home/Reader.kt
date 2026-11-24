@@ -297,6 +297,15 @@ internal fun ArticleBody(
     // The page is in place (the sheet finished opening): the headline and kicker set now.
     val settled = rememberReaderSettled()
     val reduce = news.openwire.ui.theme.rememberReduceMotion()
+    // Time + action: the body may reveal once the summary has finished writing and a beat has
+    // passed; each paragraph then waits to be scrolled into view.
+    var summaryDone by remember(article.id) { mutableStateOf(false) }
+    val bodyGate = remember(article.id) { mutableStateOf(false) }
+    LaunchedEffect(summaryDone, state is BodyState.Loaded) {
+        if (state !is BodyState.Loaded) return@LaunchedEffect
+        if (summaryDone) { kotlinx.coroutines.delay(BODY_PAUSE_MS); bodyGate.value = true }
+        else { kotlinx.coroutines.delay(SUMMARY_TIMEOUT_MS); bodyGate.value = true } // never hold the text back for long
+    }
 
     // The whole article (headline, standfirst, summary, body) follows the chosen text size.
     val baseDensity = androidx.compose.ui.platform.LocalDensity.current
@@ -431,7 +440,8 @@ internal fun ArticleBody(
         Spacer(Modifier.height(16.dp))
 
         // On-device summary: the article's own key sentences, written in front of you.
-        if (!useOthers) Box(Modifier.cascadeIn(7, settled)) { KeyPointsCard(state, content) }
+        if (!useOthers) Box(Modifier.cascadeIn(7, settled)) { KeyPointsCard(state, content, onDone = { summaryDone = true }) }
+        else LaunchedEffect(Unit) { summaryDone = true }
         Spacer(Modifier.height(16.dp))
 
         if (noOthers) Text(tr(R.string.reader_other_none), style = sans(13.sp, lineHeight = 20.sp), color = g.indigo, modifier = Modifier.padding(bottom = 16.dp))
@@ -472,6 +482,7 @@ internal fun ArticleBody(
                     }
                 }
                 val mediaAfter = remember(s.content) { s.content.media.groupBy { it.after } }
+                androidx.compose.runtime.CompositionLocalProvider(LocalBodyGate provides bodyGate) {
                 s.content.paragraphs.forEachIndexed { i, para ->
                     // Drop caps are a Latin-type tradition; Arabic (and Hebrew) text opens plainly.
                     Box(Modifier.revealOnScroll()) {
@@ -480,6 +491,7 @@ internal fun ArticleBody(
                     Spacer(Modifier.height(16.dp))
                     // The story's own photos and videos, where the publisher placed them.
                     mediaAfter[i]?.forEach { m -> Box(Modifier.revealOnScroll()) { StoryMedia(m) }; Spacer(Modifier.height(16.dp)) }
+                }
                 }
                 if (s.content.embeds.isNotEmpty()) {
                     EmbeddedPosts(s.content.embeds, actions.loadPost)
@@ -569,6 +581,11 @@ private fun DropCapParagraph(text: String) {
         }
     }
 }
+
+/** The beat between the summary finishing and the body being allowed to reveal. */
+private const val BODY_PAUSE_MS = 700L
+/** The body never waits on the summary longer than this after the text arrives. */
+private const val SUMMARY_TIMEOUT_MS = 14_000L
 
 /** How long an article loads before the reader is offered Retry or other outlets. */
 private const val SLOW_ARTICLE_MS = 12_000L
@@ -996,7 +1013,7 @@ private sealed interface Points {
  * they arrive; then the real time it took on this phone. No card when there's nothing to summarise.
  */
 @Composable
-private fun KeyPointsCard(body: BodyState, content: news.openwire.data.remote.ArticleContent?) {
+private fun KeyPointsCard(body: BodyState, content: news.openwire.data.remote.ArticleContent?, onDone: () -> Unit) {
     val g = Glass
     val points by produceState<Points>(Points.Waiting, content) {
         val c = content ?: return@produceState
@@ -1008,9 +1025,10 @@ private fun KeyPointsCard(body: BodyState, content: news.openwire.data.remote.Ar
         value = Points.Done(list, (System.nanoTime() - t0) / 1_000_000)
     }
     val p = points
-    if (body is BodyState.Failed || (p is Points.Done && p.points.isEmpty())) return
+    if (body is BodyState.Failed || (p is Points.Done && p.points.isEmpty())) { LaunchedEffect(Unit) { onDone() }; return }
     var written by remember(content) { mutableIntStateOf(0) }
     val done = p is Points.Done && written >= p.points.size
+    LaunchedEffect(done) { if (done) onDone() }
     GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), contentPadding = PaddingValues(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(tr(R.string.reader_summary), style = mono(10.sp, FontWeight.SemiBold, 0.16.em), color = g.accentSoft, modifier = Modifier.weight(1f))

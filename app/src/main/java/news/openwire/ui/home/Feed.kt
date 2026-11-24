@@ -261,8 +261,6 @@ private fun PulseDot(refreshing: Boolean) {
     )
 }
 
-/** Emphasized decelerate (M3): the odometer's roll. */
-private val EmphasizedDecelerate = androidx.compose.animation.core.CubicBezierEasing(.05f, .7f, .1f, 1f)
 
 /**
  * Text that rolls over like an odometer when it changes: the part that stays put doesn't move,

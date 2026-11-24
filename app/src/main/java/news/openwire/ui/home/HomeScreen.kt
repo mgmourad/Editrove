@@ -290,7 +290,9 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
             } else {
                 val openId = if (sheetOpen) selected?.id else null
                 CompositionLocalProvider(LocalImageTransition provides ImageTransition(this@SharedTransitionLayout, null, openId)) {
-                    CompactLayout(vm, tab, shownTab, pager, stateFor, FeedUi(savedIds, liked, null), onSelectTab)
+                    Box(Modifier.fillMaxSize().sinkBehind(sheetOpen && selected != null)) {
+                        CompactLayout(vm, tab, shownTab, pager, stateFor, FeedUi(savedIds, liked, null), onSelectTab)
+                    }
                 }
                 ReaderSheetHost(
                     visible = sheetOpen && selected != null,
@@ -390,8 +392,9 @@ private fun SharedTransitionScope.ReaderSheetHost(
 
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically(springTween(520)) { it } + fadeIn(tween(200)),
-        exit = slideOutVertically(springTween(420)) { it } + fadeOut(tween(300, delayMillis = 120)),
+        // The photo is what grows into the page (a shared element); the sheet itself only rises a little.
+        enter = slideInVertically(tween(620, easing = EmphasizedDecelerate)) { it / 10 } + fadeIn(tween(240)),
+        exit = slideOutVertically(tween(520, easing = EmphasizedAccelerate)) { it / 10 } + fadeOut(tween(300, delayMillis = 140)),
     ) {
         // Keep showing the last story while the sheet slides away.
         var shown by remember { mutableStateOf(article) }

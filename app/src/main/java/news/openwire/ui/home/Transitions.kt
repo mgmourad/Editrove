@@ -59,10 +59,13 @@ class ImageTransition(
 
 val LocalImageTransition = compositionLocalOf<ImageTransition?> { null }
 
+/** Opening: the card's photo grows into the reader hero (620 ms, emphasized decelerate). */
 @OptIn(ExperimentalSharedTransitionApi::class)
-private val ImageBounds = BoundsTransform { _: Rect, _: Rect ->
-    spring(dampingRatio = 0.9f, stiffness = 380f, visibilityThreshold = Rect.VisibilityThreshold)
-}
+private val ImageBounds = BoundsTransform { _: Rect, _: Rect -> tween(620, easing = EmphasizedDecelerate) }
+
+/** Closing: back into its card (520 ms, emphasized accelerate). */
+@OptIn(ExperimentalSharedTransitionApi::class)
+private val ImageBoundsBack = BoundsTransform { _: Rect, _: Rect -> tween(520, easing = EmphasizedAccelerate) }
 
 /** Tags an article photo as a shared element. Feed cards hide theirs while it is shown in the reader. */
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -80,7 +83,7 @@ fun Modifier.sharedArticleImage(articleId: String, hasImage: Boolean, cornerRadi
             this@sharedArticleImage.sharedElementWithCallerManagedVisibility(
                 state,
                 visible = t.openId != articleId,
-                boundsTransform = ImageBounds,
+                boundsTransform = ImageBoundsBack,
                 clipInOverlayDuringTransition = clip,
             )
         }

@@ -38,7 +38,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -202,7 +202,7 @@ fun OnboardingScreen(
         if (state.step == Step.FINISHING) {
             stopLine()
             vm.save()
-            delay(director.cascade())
+            delay(director.cascade(short = state.skipped))
             vm.dispatch(OnboardingEvent.Finished)
             onFinished(vm.state.value)
         }
@@ -218,7 +218,13 @@ fun OnboardingScreen(
     val fold = layoutInfo.displayFeatures.filterIsInstance<FoldingFeature>().firstOrNull()
 
     var frame by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(engine) { while (isActive) withFrameMillis { t -> if (engine.tick(t)) frame = t } }
+    // Frames only while something moves; a still graph lets the UI go idle.
+    LaunchedEffect(engine) {
+        while (isActive) {
+            val busy = withFrameMillis { t -> engine.tick(t).also { if (it) frame = t } }
+            if (!busy) engine.awaitChange()
+        }
+    }
 
     val tm = rememberTextMeasurer(cacheSize = 64)
     val styles = remember(density) {
@@ -236,14 +242,15 @@ fun OnboardingScreen(
         val wPx = with(density) { maxWidth.toPx() }
         val hPx = with(density) { maxHeight.toPx() }
         val tabletop = fold != null && fold.state == FoldingFeature.State.HALF_OPENED && fold.orientation == FoldingFeature.Orientation.HORIZONTAL
-        val book = fold != null && fold.isSeparating && fold.orientation == FoldingFeature.Orientation.VERTICAL
+        // A vertical hinge (flat or half-open): the panel docks on the far side, clear of it.
+        val book = fold != null && fold.orientation == FoldingFeature.Orientation.VERTICAL
         val mode = when { tabletop -> PanelMode.TABLETOP; maxWidth >= 600.dp -> PanelMode.SIDE; else -> PanelMode.SHEET }
         val topBarPx = with(density) { 96.dp.toPx() }
         var sheetPx by remember { mutableIntStateOf(0) }
         // The panel's width beside the graph: the far side of a book-posture hinge, else ~40%.
         val sidePanelDp: Dp = when {
             book && fold != null -> with(density) { (wPx - fold.bounds.right).toDp() } - 24.dp
-            else -> (maxWidth * 0.42f).coerceIn(360.dp, 460.dp)
+            else -> (maxWidth * 0.42f).coerceIn(320.dp, 460.dp)
         }
         val graphRect = when (mode) {
             PanelMode.SHEET -> Rect(0f, topBarPx, wPx, hPx - sheetPx)
@@ -257,7 +264,9 @@ fun OnboardingScreen(
         // A little air around the network.
         val inset = with(density) { 16.dp.toPx() }
         val view = Rect(graphRect.left + inset, graphRect.top, graphRect.right - inset, graphRect.bottom - inset)
-        LaunchedEffect(view) { engine.setView(view); a11yVersion++ }
+        // Topic labels need room around the ring; once sources are out, only the chosen few show.
+        val outer = state.step >= Step.SOURCES
+        LaunchedEffect(view, outer) { engine.labelPad = with(density) { (if (outer) 36.dp else 84.dp).toPx() }; engine.setView(view, force = true); a11yVersion++ }
 
         val aurora = remember(wPx, hPx) {
             Brush.radialGradient(listOf(Rose.copy(alpha = .10f), Indigo.copy(alpha = .06f), Color.Transparent), center = Offset(wPx * .3f, hPx * .25f), radius = maxOf(wPx, hPx) * .8f)
@@ -290,11 +299,11 @@ fun OnboardingScreen(
         // The brand mark (welcome): the ET mark at the centre of the network.
         AnimatedVisibility(state.step == Step.WELCOME, enter = fadeIn(), exit = fadeOut(tween(250))) {
             val img = ImageBitmapCache.brand()
-            Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.AbsoluteAlignment.TopLeft) {
                 Image(
                     img, contentDescription = null,
                     modifier = Modifier
-                        .offset { frame; val s = (92f * engine.scale.coerceIn(.55f, 1.6f) * density.density).roundToInt(); IntOffset((engine.sx(0f) - s / 2).roundToInt(), (engine.sy(0f) - s / 2).roundToInt()) }
+                        .absoluteOffset { frame; val s = (92f * engine.scale.coerceIn(.55f, 1.6f) * density.density).roundToInt(); IntOffset((engine.sx(0f) - s / 2).roundToInt(), (engine.sy(0f) - s / 2).roundToInt()) }
                         .size(with(density) { (92f * engine.scale.coerceIn(.55f, 1.6f) * density.density).toDp() })
                         .clip(CircleShape)
                         .border(1.dp, Color.White.copy(alpha = .22f), CircleShape),
@@ -316,7 +325,7 @@ fun OnboardingScreen(
                 val panelMod = when (mode) {
                     PanelMode.SHEET -> Modifier.align(Alignment.BottomCenter).fillMaxWidth().heightIn(max = with(density) { (hPx * 0.62f).toDp() })
                     PanelMode.TABLETOP -> Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(with(density) { (hPx - fold!!.bounds.bottom).toDp() })
-                    PanelMode.SIDE -> Modifier.align(Alignment.CenterEnd).statusBarsPadding().navigationBarsPadding().padding(12.dp).width(sidePanelDp).fillMaxHeight()
+                    PanelMode.SIDE -> Modifier.align(Alignment.TopEnd).statusBarsPadding().navigationBarsPadding().padding(12.dp).padding(top = 52.dp).width(sidePanelDp)
                 }
                 Box(
                     panelMod.onSizeChanged { if (mode == PanelMode.SHEET) sheetPx = it.height }
@@ -327,7 +336,7 @@ fun OnboardingScreen(
                 ) {
                     Column(
                         Modifier.fillMaxWidth().then(if (mode == PanelMode.SHEET) Modifier.navigationBarsPadding() else Modifier)
-                            .verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 20.dp),
+                            .verticalScroll(androidx.compose.runtime.key(state.step) { rememberScrollState() }).padding(horizontal = 22.dp, vertical = 20.dp),
                     ) { panel() }
                 }
             }
@@ -381,7 +390,7 @@ private fun GraphTargets(engine: GraphEngine, state: OnboardingState, version: I
     val size = 48.dp
     val half = with(density) { (size / 2).toPx() }
     val on = tr(R.string.onb_on); val off = tr(R.string.onb_off)
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.AbsoluteAlignment.TopLeft) {
         version // re-place when nodes settle somewhere new
         engine.nodes.values.filter { it.kind == kind && it.visible }.forEach { n ->
             val p = engine.restingScreen(n)
@@ -390,7 +399,7 @@ private fun GraphTargets(engine: GraphEngine, state: OnboardingState, version: I
                 else vm.dispatch(OnboardingEvent.ToggleSource(n.id.removePrefix("s:")))
             }
             Box(
-                Modifier.offset { IntOffset((p.x - half).roundToInt(), (p.y - half).roundToInt()) }.size(size)
+                Modifier.absoluteOffset { IntOffset((p.x - half).roundToInt(), (p.y - half).roundToInt()) }.size(size)
                     .semantics {
                         contentDescription = n.label
                         role = Role.Checkbox
@@ -459,7 +468,7 @@ private fun PillButton(text: String, primary: Boolean, modifier: Modifier = Modi
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
     ) {
         icon?.let { Icon(it, null, tint = if (primary) Color.White else g.textPrimary, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)) }
-        Text(text, style = sans(15.sp, FontWeight.SemiBold), color = if (primary) Color.White.copy(alpha = if (enabled) 1f else .7f) else g.textPrimary)
+        Text(text, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis, style = sans(15.sp, FontWeight.SemiBold), color = if (primary) Color.White.copy(alpha = if (enabled) 1f else .7f) else g.textPrimary)
     }
 }
 
@@ -597,13 +606,16 @@ private fun EditionPanel(state: OnboardingState, vm: OnboardingViewModel, onLang
                     Icon(Icons.Outlined.MyLocation, null, tint = Rose400, modifier = Modifier.size(22.dp))
                 }
                 Spacer(Modifier.width(14.dp))
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text(p.city, style = serif(22.sp, FontWeight.Bold), color = g.textPrimary)
                     Text(tr(R.string.onb_edition_of, Languages.countryName(p.country, lang)), style = mono(11.sp, FontWeight.SemiBold, 0.1.em), color = g.textSecondary)
                 }
+                Text(
+                    tr(R.string.onb_change), style = sans(14.sp, FontWeight.SemiBold), color = Rose400,
+                    modifier = Modifier.clip(CircleShape).clickable { vm.dispatch(OnboardingEvent.ChangeEdition) }.padding(horizontal = 12.dp, vertical = 14.dp),
+                )
             }
             Actions(back) {
-                PillButton(tr(R.string.onb_change), primary = false) { vm.dispatch(OnboardingEvent.ChangeEdition) }
                 PillButton(tr(R.string.onb_use_edition), primary = true, modifier = Modifier.weight(1f)) { vm.dispatch(OnboardingEvent.Next) }
             }
             // An edition that reads in another language offers it (the same question Settings asks).
@@ -642,7 +654,7 @@ private fun CityTyping(state: OnboardingState, vm: OnboardingViewModel, back: ()
     suggestions.forEach { s ->
         SuggestionRow(
             highlight(if (s.place.region.isBlank() || s.place.region == s.place.city || s.place.city.contains(",")) s.place.city else "${s.place.city}, ${s.place.region}", q),
-            tr(R.string.onb_edition_of, s.countryName),
+            tr(R.string.onb_country_edition, s.countryName),
             onClick = { vm.dispatch(OnboardingEvent.ChooseEdition(s.place)) },
         )
     }
@@ -712,12 +724,12 @@ private fun Counter(text: AnnotatedString, fraction: Float) {
     }
 }
 
-private fun countText(n: Int, total: Int, template: String) = buildAnnotatedString {
-    val s = template
-    val i = s.indexOf("%1\$d")
-    if (i < 0) { append(s); return@buildAnnotatedString }
-    append(s.substring(0, i)); withStyle(SpanStyle(color = TextPrimaryDark, fontWeight = FontWeight.Bold)) { append(n.toString()) }
-    append(s.substring(i + 4).replace("%2\$d", total.toString()))
+/** "12 of 117 sources": the formatted line with its first number in bold. */
+private fun countText(line: String, n: Int) = buildAnnotatedString {
+    val i = line.indexOf(n.toString())
+    if (i < 0) { append(line); return@buildAnnotatedString }
+    append(line.substring(0, i)); withStyle(SpanStyle(color = TextPrimaryDark, fontWeight = FontWeight.Bold)) { append(n.toString()) }
+    append(line.substring(i + n.toString().length))
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -729,7 +741,7 @@ private fun TopicsPanel(state: OnboardingState, vm: OnboardingViewModel) {
     Kicker(tr(R.string.onb_step, 2, 4))
     Title(tr(R.string.onb_topics_title))
     Lede(tr(R.string.onb_topics_lede, state.choices.edition?.city.orEmpty()))
-    Counter(countText(n, topics.size, tr(R.string.onb_wired_template)), n / topics.size.coerceAtLeast(1).toFloat())
+    Counter(countText(tr(R.string.onb_wired_template, n, topics.size), n), n / topics.size.coerceAtLeast(1).toFloat())
     Spacer(Modifier.height(12.dp))
     // Keyword topics: ready-made ones as you type, or the name itself (up to three here).
     var q by rememberSaveable { mutableStateOf("") }
@@ -778,13 +790,10 @@ private fun SourcesPanel(state: OnboardingState, vm: OnboardingViewModel, direct
     Kicker(tr(R.string.onb_step, 3, 4))
     Title(tr(R.string.onb_sources_title))
     Lede(tr(R.string.onb_sources_lede))
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.weight(1f)) { Counter(countText(n, vm.librarySize, tr(R.string.onb_sources_template)), n / vm.librarySize.coerceAtLeast(1).toFloat()) }
-        Spacer(Modifier.width(10.dp))
-        val all = keys.isNotEmpty() && keys.all { it in state.choices.sources }
-        Box(Modifier.padding(top = 14.dp)) {
-            ToggleChip(tr(if (all) R.string.onb_clear_all else R.string.onb_select_all), on = false) { vm.dispatch(OnboardingEvent.SetSources(keys, !all)) }
-        }
+    Counter(countText(tr(R.string.onb_sources_template, n, vm.librarySize), n), n / vm.librarySize.coerceAtLeast(1).toFloat())
+    val all = keys.isNotEmpty() && keys.all { it in state.choices.sources }
+    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.End) {
+        ToggleChip(tr(if (all) R.string.onb_clear_all else R.string.onb_select_all), on = false) { vm.dispatch(OnboardingEvent.SetSources(keys, !all)) }
     }
     Spacer(Modifier.height(10.dp))
     val topics = vm.topicNodes(state).associateBy { it.id }
@@ -924,8 +933,8 @@ private fun PresenterPanel(state: OnboardingState, vm: OnboardingViewModel, dire
         Text("“" + line.take(shown) + if (shown < line.length) "▍" else "”", style = serif(16.sp, FontWeight.Normal, lineHeight = 23.sp), color = g.textPrimary)
     }
     Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        PillButton(tr(R.string.onb_play), primary = false, icon = Icons.AutoMirrored.Outlined.VolumeUp) { sayLine(line) }
-        PillButton(tr(R.string.onb_another), primary = false) { vm.dispatch(OnboardingEvent.AnotherLine); director.presenterChanged() }
+        PillButton(tr(R.string.onb_play), primary = false, modifier = Modifier.weight(1.2f), icon = Icons.AutoMirrored.Outlined.VolumeUp) { sayLine(line) }
+        PillButton(tr(R.string.onb_another), primary = false, modifier = Modifier.weight(1f)) { vm.dispatch(OnboardingEvent.AnotherLine); director.presenterChanged() }
     }
     Text(tr(R.string.onb_when).uppercase(), style = mono(11.sp, FontWeight.SemiBold, 0.14.em), color = g.textSecondary, modifier = Modifier.padding(top = 18.dp, bottom = 8.dp))
     val slots = vm.slotDefaults

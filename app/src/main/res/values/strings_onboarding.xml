@@ -14,6 +14,7 @@
     <string name="onb_your_edition">Your edition</string>
     <string name="onb_choose_place">CHOOSE A PLACE</string>
     <string name="onb_edition_of">%s EDITION</string>
+    <string name="onb_country_edition">%s edition</string>
     <string name="onb_edition_title">Where do you read from?</string>
     <string name="onb_edition_lede">Your city sets the local topic and the country edition.</string>
     <string name="onb_use_location">Use my location</string>

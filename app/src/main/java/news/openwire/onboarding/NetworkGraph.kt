@@ -175,13 +175,28 @@ class GraphEngine(private val reduceMotion: Boolean) {
 
     // ---- Camera ----
 
-    fun setView(r: Rect) { if (r != view) { val first = view == Rect.Zero; view = r; fit(fitBox, if (first) 0 else 450) } }
+    /** Something changed without motion (an instant camera cut, a toggle with animations off): draw once. */
+    private var dirty = false
+    private val wake = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
+    fun invalidate() { dirty = true; wake.trySend(Unit) }
+    /** Suspends until something asks for a redraw (the frame loop sleeps while the graph is still). */
+    suspend fun awaitChange() { wake.receive() }
+
+    /** The topic ring's radius (world units) while it shows, else 0. */
+    var ringRadius = 0f
+
+    /** Screen room kept for labels around the framed box (px). */
+    var labelPad = 0f
+
+    fun setView(r: Rect, force: Boolean = false) { if (r != view || force) { val first = view == Rect.Zero; view = r; fit(fitBox, if (first) 0 else 450) } }
 
     /** Frames [box] (world units) inside the view, animated over [dur] ms. */
     fun fit(box: Rect, dur: Long = 900) {
         fitBox = box
+        invalidate()
         if (view.width <= 0f || view.height <= 0f) return
-        val s = min(view.width / box.width, view.height / box.height)
+        // Labels are screen-sized: keep [labelPad] px clear on each side for them.
+        val s = min((view.width - 2 * labelPad).coerceAtLeast(view.width * .3f) / box.width, (view.height - labelPad).coerceAtLeast(view.height * .5f) / box.height)
         val ncx = box.center.x; val ncy = box.center.y
         if (dur <= 0 || reduceMotion) { cx = ncx; cy = ncy; sc = s; tcx = ncx; tcy = ncy; tsc = s; camDur = 0; return }
         fcx = cx; fcy = cy; fsc = sc; tcx = ncx; tcy = ncy; tsc = s; camStart = now; camDur = dur
@@ -224,7 +239,8 @@ class GraphEngine(private val reduceMotion: Boolean) {
     fun tick(t: Long): Boolean {
         val first = now == 0L
         now = t
-        var busy = first
+        var busy = first || dirty
+        dirty = false
         nodes.values.forEach { if (it.step(t)) busy = true }
         if (camDur > 0) {
             val k = ((t - camStart).toFloat() / camDur).coerceIn(0f, 1f); val e = easeInOut(k)
@@ -250,7 +266,7 @@ class GraphEngine(private val reduceMotion: Boolean) {
             }
             if (t <= ambPulse.start + ambPulse.dur) busy = true
         }
-        if (radar || showBriefRings || nodes.values.any { it.visible && it.appearAt > t - 400 }) busy = true
+        if (!reduceMotion && (radar || showBriefRings || nodes.values.any { it.visible && it.appearAt > t - 400 })) busy = true
         return busy
     }
 
@@ -272,6 +288,11 @@ class GraphEngine(private val reduceMotion: Boolean) {
     private val pt = FloatArray(2)
 
     fun edgeColor(k: EdgeKind) = when (k) { EdgeKind.TOPIC -> Rose; EdgeKind.SOURCE -> Indigo400; EdgeKind.BRIEF -> Amber400 }
+
+    /** Unselected topics lose their labels once sources are out (less clutter on the outer ring). */
+    var quietOff = false
+    /** Source node size, 1 for a sparse ring down to .6 for a crowded one. */
+    var sourceScale = 1f
 
     fun draw(scope: DrawScope, tm: TextMeasurer, styles: GraphStyles, px: Float) = with(scope) {
         val a = fade
@@ -343,8 +364,12 @@ class GraphEngine(private val reduceMotion: Boolean) {
                 drawCircle(gc, g, Offset(x, y), style = s13)
                 drawOval(gc, Offset(x - g * .43f, y - g), androidx.compose.ui.geometry.Size(g * .86f, g * 2), style = s13)
                 drawLine(gc, Offset(x - g, y), Offset(x + g, y), 1.3f * px)
-                text(this, tm, n, n.label, st.edition, x, y + 46f * z * px, center = true, isSub = false, a = a)
-                text(this, tm, n, n.sub, st.mono, x, y + 46f * z * px + st.editionLine, center = true, isSub = true, a = a)
+                // Inside a small topic ring the name would sit on the nodes: the panel names it then.
+                val ringPx = ringRadius * sc
+                if (ringRadius == 0f || ringPx > 46f * z * px + st.editionLine + 26f * px) {
+                    text(this, tm, n, n.label, st.edition, x, y + 46f * z * px, center = true, isSub = false, a = a)
+                    text(this, tm, n, n.sub, st.mono, x, y + 46f * z * px + st.editionLine, center = true, isSub = true, a = a)
+                }
             }
             NodeKind.TOPIC -> {
                 val accent = when { n.local -> Indigo400; n.keyword -> Emerald400; else -> Rose }
@@ -353,11 +378,13 @@ class GraphEngine(private val reduceMotion: Boolean) {
                 drawCircle((if (n.on) Color.White else TextSecondaryDark).copy(alpha = (if (n.on) .6f else .5f) * a), 8.5f * z * px, Offset(x, y), style = s12)
                 val c = cos(n.angle); val s = sin(n.angle); val d = 21f * z * px
                 val anchor = if (c > .12f) 1 else if (c < -.12f) -1 else 0
-                labelAt(this, tm, n, st.topic, x + c * d, y + s * d, anchor, s, if (n.on) 1f else .78f, a)
+                if (n.on || !quietOff) labelAt(this, tm, n, st.topic, x + c * d, y + s * d, anchor, s, if (n.on) 1f else .78f, a)
             }
             NodeKind.SOURCE -> {
-                val r = 6f * z * px
-                if (n.on || n.focus) drawCircle(Indigo400.copy(alpha = (if (n.focus) .35f else .18f) * a), 13f * z * px, Offset(x, y))
+                // Smaller as the ring fills up (a dozen sources read big; a hundred, small).
+                val k = sourceScale
+                val r = 6f * z * k * px
+                if (n.on || n.focus) drawCircle(Indigo400.copy(alpha = (if (n.focus) .35f else .18f) * a), (if (n.focus) 13f else 10f) * z * k * px, Offset(x, y))
                 drawCircle((if (n.on) Indigo400 else ObsidianSurface).copy(alpha = a), r, Offset(x, y))
                 drawCircle(Color.White.copy(alpha = .35f * a), r, Offset(x, y), style = s1)
                 if (n.focus) {

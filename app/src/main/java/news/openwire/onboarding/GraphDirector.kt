@@ -41,6 +41,8 @@ class GraphDirector(private val engine: GraphEngine, private val vm: OnboardingV
         engine.radar = s.step == Step.EDITION && s.editionMode == EditionMode.LOCATING
         if (old != null && old.choices.edition != s.choices.edition && s.choices.edition != null) { engine.bloom(ed, Rose400); engine.bloom(ed, Indigo400, 180) }
         engine.ambientOn = s.step == Step.WELCOME || s.step == Step.EDITION
+        engine.quietOff = s.step >= Step.SOURCES
+        engine.ringRadius = if (s.step >= Step.TOPICS) R_TOPICS else 0f
 
         when (s.step) {
             Step.WELCOME -> { hideFrom(NodeKind.TOPIC); hideFrom(NodeKind.SOURCE); hideBrief(); ed.visible = false; if (stepChanged) engine.fit(BOX_WELCOME, d(900)) }
@@ -71,6 +73,7 @@ class GraphDirector(private val engine: GraphEngine, private val vm: OnboardingV
             Step.DONE -> Unit
         }
         version++
+        engine.invalidate()
     }
 
     private fun hideFrom(kind: NodeKind) { engine.nodes.values.forEach { if (it.kind == kind) it.visible = false } }
@@ -87,7 +90,7 @@ class GraphDirector(private val engine: GraphEngine, private val vm: OnboardingV
             val isNew = id !in engine.nodes
             val node = engine.node(id, NodeKind.TOPIC)
             node.label = t.label; node.local = t.local; node.keyword = t.keyword
-            val a = (-PI / 2 + i * 2 * PI / n).toFloat()
+            val a = (-PI / 2 + (i + .5) * 2 * PI / n).toFloat() // half a step: nothing sits under the edition label
             node.angle = a
             val tx = cos(a) * R_TOPICS; val ty = sin(a) * R_TOPICS
             val e = engine.edge(ed, node, EdgeKind.TOPIC, .12f)
@@ -121,6 +124,7 @@ class GraphDirector(private val engine: GraphEngine, private val vm: OnboardingV
             P(src.key, a)
         }.sortedBy { it.angle }
         val n = placed.size
+        engine.sourceScale = (28f / maxOf(n, 1)).coerceIn(.6f, 1f)
         val start = placed.firstOrNull()?.angle ?: 0f
         val ed = engine.nodes.getValue("ed")
         placed.forEachIndexed { i, p ->
@@ -172,19 +176,24 @@ class GraphDirector(private val engine: GraphEngine, private val vm: OnboardingV
         val b = engine.nodes["brief"] ?: return
         engine.edges.filter { it.kind == EdgeKind.BRIEF }.forEachIndexed { k, e -> engine.pulse(e, Amber400, 700, d(50L * k)) }
         engine.bloom(b, Amber400, d(700))
+        engine.invalidate()
     }
 
     /** Focus from a source chip: its node and edges light up. */
     fun focusSource(key: String?) {
         engine.nodes.values.forEach { if (it.kind == NodeKind.SOURCE) it.focus = it.id == "s:$key" }
         engine.edges.forEach { if (it.kind == EdgeKind.SOURCE) it.focus = it.b.id == "s:$key" }
+        engine.invalidate()
     }
 
     /**
      * The finale: pulses run edition → topics → sources → briefing, then the whole network
      * draws in toward the masthead. Returns how long it takes (ms).
      */
-    fun cascade(): Long {
+    fun cascade(short: Boolean = false): Long {
+        // Skip plays the same finale at about a third of the length.
+        val f = if (short) .35f else 1f
+        fun d(ms: Long) = this.d((ms * f).toLong())
         engine.fit(BOX_PRESENTER, d(700))
         val ed = engine.nodes.getValue("ed")
         engine.bloom(ed, Rose400); engine.bloom(ed, Indigo400, d(120))
@@ -194,26 +203,27 @@ class GraphDirector(private val engine: GraphEngine, private val vm: OnboardingV
         var t = 0L
         tEdges.forEachIndexed { i, e -> engine.pulse(e, Rose, 520, d(t + i * 45L)); engine.bloom(e.b, Rose400, d(t + i * 45L + 520)) }
         t += d(tEdges.size * 45L + 560)
-        sEdges.take(80).forEachIndexed { i, e -> engine.pulse(e, Indigo400, 480, d(t + i * 12L)) }
-        t += d(minOf(sEdges.size, 80) * 12L + 520)
+        sEdges.take(if (short) 24 else 80).forEachIndexed { i, e -> engine.pulse(e, Indigo400, 480, d(t + i * 12L)) }
+        t += d(minOf(sEdges.size, if (short) 24 else 80) * 12L + 520)
         bEdges.forEachIndexed { i, e -> engine.pulse(e, Amber400, 620, d(t + i * 40L)) }
         t += d(bEdges.size * 40L + 650)
         engine.nodes["brief"]?.let { engine.bloom(it, Amber400, t); engine.bloom(it, Rose400, t + d(80)) }
         t += d(250)
         engine.nodes.values.forEach { it.moveTo(it.tx * .08f, it.ty * .08f - 40f, engine.now, d(900), t) }
         engine.fadeOut(d(700), t + d(500))
+        engine.invalidate()
         return t + d(1000)
     }
 
     companion object {
         const val R_TOPICS = 150f
         const val R_SOURCES = 272f
-        const val Y_BRIEF = 390f
+        const val Y_BRIEF = 430f
         val BOX_WELCOME = Rect(-150f, -150f, 150f, 150f)
         val BOX_EDITION = Rect(-150f, -140f, 150f, 150f)
-        val BOX_TOPICS = Rect(-275f, -215f, 275f, 225f)
-        val BOX_SOURCES = Rect(-300f, -290f, 300f, 290f)
-        val BOX_PRESENTER = Rect(-300f, -300f, 300f, 440f)
+        val BOX_TOPICS = Rect(-185f, -190f, 185f, 200f)
+        val BOX_SOURCES = Rect(-290f, -290f, 290f, 290f)
+        val BOX_PRESENTER = Rect(-290f, -290f, 290f, 480f)
     }
 }
 

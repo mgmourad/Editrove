@@ -91,6 +91,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import androidx.compose.ui.node.invalidateDraw
 import news.openwire.ui.theme.Glass
+import news.openwire.ui.theme.Amber400
 import news.openwire.ui.theme.Indigo400
 import news.openwire.ui.theme.Rose
 import news.openwire.ui.theme.Rose400
@@ -300,12 +301,13 @@ fun SettingHeadline(text: String, start: Boolean, size: androidx.compose.ui.unit
 fun ShimmerLines(lines: Int = 3) {
     val reduce = rememberReduceMotion()
     val x = if (reduce) null else rememberInfiniteTransition(label = "shimmer").animateFloat(-1f, 2f, infiniteRepeatable(tween(1300, easing = LinearEasing)), label = "x")
+    val accent = Glass.accent
     Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
         repeat(lines) { i ->
             Box(
                 Modifier.fillMaxWidth(if (i == lines - 1) .62f else 1f).height(10.dp).clip(CircleShape).drawWithCache {
                     val base = Glass_Track
-                    val band = Brush.horizontalGradient(listOf(Color.Transparent, Indigo400.copy(alpha = .22f), Color.Transparent), startX = 0f, endX = size.width * .5f)
+                    val band = Brush.horizontalGradient(listOf(Color.Transparent, accent.copy(alpha = .20f), Color.Transparent), startX = 0f, endX = size.width * .5f)
                     onDrawBehind {
                         drawRect(base)
                         x?.let { v -> translate(left = size.width * v.value - size.width * .25f) { drawRect(band, size = Size(size.width * .5f, size.height)) } }
@@ -326,18 +328,18 @@ fun OrbitLoader(running: Boolean, modifier: Modifier = Modifier) {
     Box(
         modifier.size(14.dp).drawBehind {
             val r = size.minDimension / 2 - 2.dp.toPx()
-            drawCircle(Indigo400.copy(alpha = .25f), r, style = Stroke(1.dp.toPx()))
+            drawCircle(Rose400.copy(alpha = .25f), r, style = Stroke(1.dp.toPx()))
             val ang = Math.toRadians((a?.value ?: 0f).toDouble())
             val c = center
-            drawCircle(Indigo400, 2.dp.toPx(), Offset(c.x + r * kotlin.math.cos(ang).toFloat(), c.y + r * kotlin.math.sin(ang).toFloat()))
-            drawCircle(Rose400, 1.5.dp.toPx(), Offset(c.x - r * kotlin.math.cos(ang).toFloat(), c.y - r * kotlin.math.sin(ang).toFloat()))
+            drawCircle(Rose, 2.dp.toPx(), Offset(c.x + r * kotlin.math.cos(ang).toFloat(), c.y + r * kotlin.math.sin(ang).toFloat()))
+            drawCircle(Amber400, 1.5.dp.toPx(), Offset(c.x - r * kotlin.math.cos(ang).toFloat(), c.y - r * kotlin.math.sin(ang).toFloat()))
         },
     )
 }
 
 /**
  * Key-point text arriving the way a model writes: one character every ~16 ms, each landing
- * indigo with a soft glow and cooling to the body colour. Text that arrives all at once plays
+ * in the rose accent with a soft glow and cooling to the body colour. Text that arrives all at once plays
  * the same reveal. The layout is the final text from the start (unrevealed letters are clear).
  */
 @Composable
@@ -351,11 +353,13 @@ fun WrittenText(text: String, startAt: Int, style: TextStyle, settled: Color, on
         while (isActive && n < text.length + GLOW) withFrameMillis { n = ((it - t0) / 16L).toInt() }
         onDone()
     }
+    // Letters land in the app's own rose accent and cool to the body colour.
+    val glow = Glass.accent
     val shown: AnnotatedString = buildAnnotatedString {
         val settledEnd = (n - GLOW).coerceIn(0, text.length)
         val glowEnd = n.coerceIn(0, text.length)
         withStyle(SpanStyle(color = settled)) { append(text, 0, settledEnd) }
-        if (glowEnd > settledEnd) withStyle(SpanStyle(color = Indigo400, shadow = Shadow(Indigo400.copy(alpha = .7f), blurRadius = 10f))) { append(text, settledEnd, glowEnd) }
+        if (glowEnd > settledEnd) withStyle(SpanStyle(color = glow, shadow = Shadow(glow.copy(alpha = .6f), blurRadius = 10f))) { append(text, settledEnd, glowEnd) }
         if (glowEnd < text.length) withStyle(SpanStyle(color = Color.Transparent)) { append(text, glowEnd, text.length) }
     }
     Text(shown, style = style, modifier = Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = text })

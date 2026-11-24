@@ -451,6 +451,15 @@ internal fun ArticleBody(
                 SlowArticleCard(failed = true, onRetry = { attempt++ }, onOthers = openOthers, smryUrl = if (service == null) url else "")
             }
             is BodyState.Loaded -> {
+                // The original turned the reader away: say whose report this is, up front.
+                if (s.content.via == news.openwire.data.remote.TextSource.OTHER_OUTLETS) {
+                    Text(
+                        tr(R.string.reader_auto_other, article.source ?: article.domain ?: "", s.content.viaName ?: tr(R.string.reader_other_outlet)),
+                        style = sans(13.sp, FontWeight.Medium, lineHeight = 19.sp), color = g.indigo,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 18.dp).clip(RoundedCornerShape(14.dp))
+                            .background(g.indigo.copy(alpha = .10f)).padding(horizontal = 14.dp, vertical = 10.dp),
+                    )
+                }
                 s.content.pullQuote?.let { quote ->
                     Row(Modifier.fillMaxWidth().padding(bottom = 24.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
                         Box(Modifier.width(2.dp).fillMaxHeight().background(g.accent))
@@ -488,7 +497,7 @@ internal fun ArticleBody(
                 if (s.content.via != news.openwire.data.remote.TextSource.PUBLISHER) {
                     val viaUrl = s.content.viaUrl
                     Text(
-                        tr(R.string.reader_text_via, s.content.via.label),
+                        tr(R.string.reader_text_via, if (s.content.via == news.openwire.data.remote.TextSource.OTHER_OUTLETS) s.content.viaName ?: s.content.via.label else s.content.via.label),
                         style = mono(10.sp, tracking = 0.06.em), color = g.textPrimary.copy(alpha = 0.55f),
                         modifier = Modifier.clip(CircleShape).clickable(enabled = viaUrl != null) {
                             viaUrl?.let { androidx.browser.customtabs.CustomTabsIntent.Builder().build().launchUrl(context, android.net.Uri.parse(it)) }
@@ -1063,7 +1072,6 @@ internal fun HeroPhoto(
         loading && feed != null -> null // wait for the page's photo; the thumbnail develops meanwhile
         else -> feed
     }
-    if (full == null && feed == null) return
     Box(
         modifier.fillMaxWidth().aspectRatio(aspect)
             .sharedArticleImage(article.id, hasImage = feed != null, cornerRadius = radius)
@@ -1071,11 +1079,28 @@ internal fun HeroPhoto(
             .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(radius)),
     ) {
         var failed by remember(full) { mutableStateOf(false) }
-        if (failed) ArticleImage(article.copy(imageUrl = feed ?: full), Modifier.fillMaxSize(), logoSize = 72.dp)
-        else DevelopingImage(preview = feed, full = full, modifier = Modifier.fillMaxSize(), start = rememberReaderSettled(), onFailed = { failed = true })
+        val settled = rememberReaderSettled()
+        if (failed || full == null) {
+            // No photo to be had (or it won't load): the publisher's canvas develops the same way,
+            // once the page has finished looking for one.
+            DevelopReveal(ready = !loading || failed, start = settled, modifier = Modifier.fillMaxSize()) {
+                ArticleImage(article.copy(imageUrl = if (failed) null else feed), Modifier.fillMaxSize(), logoSize = 72.dp)
+            }
+        } else {
+            // No thumbnail to soften: the publisher canvas stays soft underneath until the photo arrives.
+            if (feed == null) DevelopReveal(ready = false, start = false, modifier = Modifier.fillMaxSize()) {
+                ArticleImage(article.copy(imageUrl = null), Modifier.fillMaxSize(), logoSize = 72.dp)
+            }
+            DevelopingImage(preview = feed, full = full, modifier = Modifier.fillMaxSize(), start = settled, onFailed = { failed = true })
+        }
     }
     Text(
-        tr(R.string.reader_photo, article.publication()),
+        // A photo from another newsroom's report is credited to it.
+        tr(
+            R.string.reader_photo,
+            if (full != null && full != upgraded && content?.via == news.openwire.data.remote.TextSource.OTHER_OUTLETS) (content.viaName ?: article.publication()).uppercase()
+            else article.publication(),
+        ),
         style = mono(10.sp, tracking = 0.05.em),
         color = g.textPrimary.copy(alpha = 0.5f),
         textAlign = TextAlign.End,

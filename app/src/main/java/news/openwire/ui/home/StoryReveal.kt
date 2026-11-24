@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
@@ -506,9 +507,10 @@ fun Modifier.revealOnScroll(): Modifier {
     var seenAt by remember { mutableStateOf(-1f) }
     LaunchedEffect(seenAt >= 0f) {
         if (seenAt < 0f) return@LaunchedEffect
-        // Lower on the screen → a touch later: the page settles from the top down.
-        delay((seenAt * 260f).toLong())
-        k.animateTo(1f, tween(1050, easing = EmphasizedDecelerate))
+        // Lower on the screen → a touch later: what's already in view settles from the top down.
+        delay((seenAt * 220f).toLong())
+        // An even, unhurried settle (not front-loaded), so the eye catches it.
+        k.animateTo(1f, tween(1400, easing = SettleEasing))
     }
     return this
         .then(
@@ -516,29 +518,111 @@ fun Modifier.revealOnScroll(): Modifier {
                 if (seenAt >= 0f) return@onGloballyPositioned
                 val h = view.height.toFloat().takeIf { it > 0f } ?: return@onGloballyPositioned
                 val top = c.boundsInWindow().top
-                if (top < h * .9f) seenAt = (top / h).coerceIn(0f, 1f)
+                // Starts once the paragraph's top is well into view (not at the very edge).
+                if (top < h * .82f) seenAt = (top / h).coerceIn(0f, 1f)
             },
         )
         .graphicsLayer {
             val v = k.value
-            translationY = (1f - v) * 16.dp.toPx()
+            translationY = (1f - v) * 22.dp.toPx()
             alpha = if (v <= 0f) 0f else 1f
-            // Offscreen only while the mask is moving.
+            // Out of focus into focus (Android 12+), alongside the wipe.
+            renderEffect = if (v > 0f && v < .85f) BlurSteps.of(5.dp.toPx() * (1f - v / .85f)) else null
             compositingStrategy = if (v in 0.001f..0.999f) CompositingStrategy.Offscreen else CompositingStrategy.Auto
         }
         .drawWithCache {
-            val feather = size.height * .45f + 24.dp.toPx()
+            val feather = size.height * .6f + 32.dp.toPx()
             onDrawWithContent {
                 val v = k.value
                 drawContent()
                 if (v >= 1f || v <= 0f) return@onDrawWithContent
-                // The edge travels from above the paragraph to below it, feathered.
                 val edge = -feather + (size.height + feather) * v
-                val mask = Brush.verticalGradient(
-                    0f to Color.Black, 1f to Color.Transparent,
-                    startY = edge, endY = edge + feather,
-                )
+                val mask = Brush.verticalGradient(0f to Color.Black, 1f to Color.Transparent, startY = edge, endY = edge + feather)
                 drawRect(mask, blendMode = BlendMode.DstIn)
             }
         }
+}
+
+/** A gentle S-curve: eases in, travels evenly, eases out. */
+private val SettleEasing = CubicBezierEasing(.4f, 0f, .2f, 1f)
+
+/**
+ * The develop effect for anything that isn't a single photo (a publisher's logo canvas): soft,
+ * dim and desaturated until [ready], then the sharp version wipes in top to bottom behind the
+ * same light line as a photo. [content] is drawn twice (the soft layer and the sharp one).
+ */
+@Composable
+fun DevelopReveal(ready: Boolean, start: Boolean, modifier: Modifier, content: @Composable () -> Unit) {
+    val reduce = rememberReduceMotion()
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val reveal = remember { Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(ready, start) {
+        if (!ready || !start || reveal.value >= 1f) return@LaunchedEffect
+        reveal.animateTo(1f, tween(1150, easing = FastOutSlowInEasing))
+    }
+    Box(modifier) {
+        if (reveal.value < 1f) Box(
+            Modifier.fillMaxSize().graphicsLayer {
+                alpha = 1f - reveal.value * reveal.value
+                renderEffect = if (alpha > 0f) BlurSteps.of(14.dp.toPx()) else null
+                scaleX = 1.04f; scaleY = 1.04f
+            }.drawWithContent { drawContent(); drawRect(Color.Black.copy(alpha = .35f)) },
+        ) { content() }
+        Box(
+            Modifier.fillMaxSize().drawWithCache {
+                val line = Brush.horizontalGradient(if (rtl) listOf(Indigo400, Rose400) else listOf(Rose400, Indigo400))
+                val glow = Brush.verticalGradient(listOf(Color.Transparent, Rose.copy(alpha = .22f)), startY = 0f, endY = 18.dp.toPx())
+                val lw = 2.dp.toPx(); val gh = 18.dp.toPx()
+                onDrawWithContent {
+                    val k = reveal.value
+                    if (k <= 0f) return@onDrawWithContent
+                    if (k >= 1f) { drawContent(); return@onDrawWithContent }
+                    val y = size.height * k
+                    clipRect(bottom = y) { this@onDrawWithContent.drawContent() }
+                    translate(top = y - gh) { drawRect(glow, size = Size(size.width, gh)) }
+                    drawLine(line, Offset(0f, y), Offset(size.width, y), lw)
+                }
+            },
+        ) { content() }
+    }
+}
+
+/** Gravity: starts still and keeps accelerating (a page let go). */
+val FreeFall = CubicBezierEasing(.55f, 0f, .9f, .45f)
+
+/** The story the reader just let fall back into the feed: its card takes the landing. */
+object Landing {
+    var id by androidx.compose.runtime.mutableStateOf<String?>(null)
+        private set
+    var at by androidx.compose.runtime.mutableLongStateOf(0L)
+        private set
+
+    fun mark(articleId: String) { id = articleId; at = System.nanoTime() }
+}
+
+/**
+ * The card a closed story falls back into: as the page lands (about 420 ms after closing), it
+ * gives a little under the impact and springs back, once.
+ */
+@Composable
+fun Modifier.landing(articleId: String): Modifier {
+    val reduce = rememberReduceMotion()
+    if (reduce) return this
+    val mine = Landing.id == articleId
+    val k = remember(articleId) { Animatable(0f) }
+    val at = Landing.at
+    LaunchedEffect(mine, at) {
+        if (!mine) return@LaunchedEffect
+        delay(400)
+        k.snapTo(0f)
+        k.animateTo(1f, tween(90, easing = LinearEasing)) // impact
+        k.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = .42f, stiffness = 420f)) // rebound
+    }
+    return graphicsLayer {
+        val v = k.value
+        scaleY = 1f - .045f * v
+        scaleX = 1f + .015f * v
+        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(.5f, 1f)
+        translationY = 4.dp.toPx() * v
+    }
 }

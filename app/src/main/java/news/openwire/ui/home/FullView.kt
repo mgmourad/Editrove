@@ -13,6 +13,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -98,10 +99,12 @@ fun SharedTransitionScope.FullReaderHost(
     AnimatedVisibility(
         visible = visible,
         enter = slideInHorizontally(springTween(520)) { it / 5 } + fadeIn(springTween(360)) + scaleIn(springTween(520), initialScale = 0.985f),
-        exit = slideOutHorizontally(springTween(420)) { it / 5 } + fadeOut(tween(260)) + scaleOut(springTween(420), targetScale = 0.985f),
+        // Let go: the page free-falls back into the feed.
+        exit = slideOutVertically(tween(560, easing = FreeFall)) { it } + scaleOut(tween(560, easing = FreeFall), targetScale = 0.94f) + fadeOut(tween(160, delayMillis = 400)),
     ) {
         var shown by remember { mutableStateOf(article) }
         LaunchedEffect(article) { if (article != null) shown = article }
+        LaunchedEffect(visible) { if (!visible) shown?.let { Landing.mark(it.id) } }
         shown?.let { a ->
             CompositionLocalProvider(LocalImageTransition provides ImageTransition(this@FullReaderHost, this, a.id)) {
                 Box(

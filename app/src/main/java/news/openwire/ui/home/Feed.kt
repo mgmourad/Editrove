@@ -399,6 +399,7 @@ fun LazyGridScope.feedItems(
     if (showTicker && marketWatch) fullRow("markets") { MarketBar() }
     val hero = articles.first()
     fullRow("hero-${hero.id}") {
+        Box(Modifier.landing(hero.id)) {
         if (magazine) LeadStoryCard(
             article = hero.withArchive(state(hero)),
             locked = state(hero) == ArchiveState.Locked,
@@ -415,6 +416,7 @@ fun LazyGridScope.feedItems(
             onOpen = onOpen,
             onToggleSaved = onToggleSaved,
         )
+        }
     }
     val rest = articles.drop(1)
     if (rest.isNotEmpty()) {
@@ -445,7 +447,7 @@ fun LazyGridScope.feedItems(
             }
         },
     ) { index, article ->
-        Box(feedItemMotion()) {
+        Box(feedItemMotion().landing(article.id)) {
             BentoCard(
                 article = article.withArchive(state(article)),
                 locked = state(article) == ArchiveState.Locked,
@@ -1027,7 +1029,7 @@ private fun NewSinceGrid(stories: List<Article>, onOpen: (Article) -> Unit) {
     Column(Modifier.fillMaxWidth().animateContentSize(tween(320, easing = FastOutSlowInEasing)), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         shown.chunked(2).forEachIndexed { r, pair ->
             Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                pair.forEachIndexed { c, a -> NewStoryCell(a, r * 2 + c, onOpen, Modifier.weight(1f).fillMaxHeight()) }
+                pair.forEachIndexed { c, a -> NewStoryCell(a, r * 2 + c, onOpen, Modifier.weight(1f).fillMaxHeight().landing(a.id)) }
                 if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }

@@ -22,4 +22,6 @@
     <string name="refresh_show_more">عرض %d أخرى</string>
     <string name="refresh_show_less">عرض أقل</string>
     <string name="live_play_channel">تشغيل %s مباشرة</string>
+    <string name="reader_auto_other">تعذّر فتح %1$s هنا، فهذا تقرير %2$s عن الخبر نفسه.</string>
+    <string name="reader_other_outlet">وسيلة أخرى</string>
 </resources>

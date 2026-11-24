@@ -23,6 +23,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
@@ -394,11 +395,15 @@ private fun SharedTransitionScope.ReaderSheetHost(
         visible = visible,
         // The photo is what grows into the page (a shared element); the sheet itself only rises a little.
         enter = slideInVertically(tween(620, easing = EmphasizedDecelerate)) { it / 10 } + fadeIn(tween(240)),
-        exit = slideOutVertically(tween(520, easing = EmphasizedAccelerate)) { it / 10 } + fadeOut(tween(300, delayMillis = 140)),
+        // Let go: the page free-falls back down into the feed while its photo returns to the card.
+        exit = slideOutVertically(tween(560, easing = FreeFall)) { it } + scaleOut(tween(560, easing = FreeFall), targetScale = .94f) +
+            fadeOut(tween(160, delayMillis = 400)),
     ) {
         // Keep showing the last story while the sheet slides away.
         var shown by remember { mutableStateOf(article) }
         LaunchedEffect(article) { if (article != null) shown = article }
+        // Closing: the card this story came from takes the landing.
+        LaunchedEffect(visible) { if (!visible) shown?.let { Landing.mark(it.id) } }
         shown?.let { a ->
             CompositionLocalProvider(LocalImageTransition provides ImageTransition(this@ReaderSheetHost, this, a.id)) {
                 Box(

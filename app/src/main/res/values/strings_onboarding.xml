@@ -62,4 +62,9 @@
     <string name="onb_afternoon">Afternoon</string>
     <string name="onb_evening">Evening</string>
     <string name="onb_build">Build my front page</string>
+    <string name="onb_notice">%1$s briefing is set · %2$s · %3$s</string>
+    <string name="onb_notice_play">Tap to hear today\'s now</string>
+    <string name="onb_dismiss">Dismiss</string>
+    <string name="onb_run_again">Run setup again</string>
+    <string name="onb_run_again_sub">Edition, topics, sources and briefing, starting from your current choices</string>
 </resources>

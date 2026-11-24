@@ -48,12 +48,19 @@ class OnboardingViewModel(
         sourcesFor = { id -> catalog().filter { f -> f.topics.any { it.equals(id, true) } }.map(SourceLibrary::sourceKey) },
     )
 
-    private val _state = MutableStateFlow(
-        Onboarding.decode(handle.get<String>(KEY)) ?: if (rerun) {
-            OnboardingState(choices = Onboarding.choicesFrom(settingsRepo.settings.value, catalog()))
-                .let { it.copy(editionMode = news.openwire.domain.onboarding.EditionMode.CONFIRMED) }
-        } else OnboardingState(),
-    )
+    private fun fresh(rerun: Boolean) = if (rerun) {
+        OnboardingState(choices = Onboarding.choicesFrom(settingsRepo.settings.value, catalog()))
+            .copy(editionMode = news.openwire.domain.onboarding.EditionMode.CONFIRMED)
+    } else OnboardingState()
+
+    private val _state = MutableStateFlow(Onboarding.decode(handle.get<String>(KEY))?.takeIf { it.step != Step.DONE } ?: fresh(rerun))
+
+    /** A new run (Settings › Run setup again): from the current settings, at the welcome step. */
+    fun restart(rerun: Boolean) {
+        _state.value = fresh(rerun)
+        handle[KEY] = Onboarding.encode(_state.value)
+        _feedCheck.value = FeedCheck.Idle
+    }
     val state: StateFlow<OnboardingState> = _state.asStateFlow()
 
     fun dispatch(e: OnboardingEvent) {

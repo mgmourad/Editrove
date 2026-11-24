@@ -550,12 +550,16 @@ class SettingsViewModel(
         Instant.ofEpochMilli(clock()).toString(),
     )
 
+    /** Called after a successful import (an imported setup counts as onboarded). */
+    var onImported: () -> Unit = {}
+
     fun importJson(text: String) {
         try {
             val r = SettingsCodec.import(text, settings.value)
             settingsRepo.replace(r.settings)
             r.paywallRules.forEach { (d, rule) -> registry.setDomainRule(d, rule.strategy, rule.paywall ?: "custom", rule.label.orEmpty()) }
             _rules.value = registry.getAllRules()
+            onImported()
             _message.value = (listOf(tr(R.string.msg_imported)) + r.notes).joinToString(" ")
         } catch (e: IllegalArgumentException) {
             _message.value = e.message

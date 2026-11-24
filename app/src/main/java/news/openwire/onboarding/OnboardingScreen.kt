@@ -834,7 +834,7 @@ private fun SourcesPanel(state: OnboardingState, vm: OnboardingViewModel, direct
     }
 }
 
-private fun presenterName(p: Presenter) = tr(when (p) {
+internal fun presenterName(p: Presenter) = tr(when (p) {
     Presenter.ANCHOR -> R.string.presenter_anchor
     Presenter.MODERN -> R.string.presenter_modern
     Presenter.CORRESPONDENT -> R.string.presenter_correspondent

@@ -1518,6 +1518,13 @@ private fun BackupPage(vm: SettingsViewModel) {
         Hint(tr(R.string.backup_hint))
         PrimaryButton(tr(R.string.export_settings)) { exporter.launch("openwire_settings_${LocalDate.now()}.json") }
         SecondaryButton(tr(R.string.import_settings)) { importer.launch(arrayOf("application/json", "text/plain", "*/*")) }
+        // First-run setup again, starting from what's set now.
+        Spacer(Modifier.height(4.dp))
+        Hint(tr(R.string.onb_run_again_sub))
+        SecondaryButton(tr(R.string.onb_run_again)) {
+            news.openwire.onboarding.OnboardingGate.rerun = true
+            news.openwire.onboarding.OnboardingGate.showing = true
+        }
         Spacer(Modifier.height(8.dp))
         if (!confirmReset) TextButton(tr(R.string.reset_everything)) { confirmReset = true }
         else Section {

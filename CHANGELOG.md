@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (0.9.3 beta 112426)
+
+- Every story's photo develops in, cached or not.
+- Article text settles in as you scroll down to it, with a soft ink wipe.
+- Live: channel thumbnails show the broadcaster's own large brand art under a half-dark
+  veil, with a LIVE STREAM sticker and the play mark in a dark rounded box.
+
 ### Fixed (0.9.2.1)
 
 - Article photos are sharp: the full-page reader no longer stretches the feed's small

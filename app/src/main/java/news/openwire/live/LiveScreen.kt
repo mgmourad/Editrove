@@ -60,6 +60,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.remember
@@ -310,10 +312,14 @@ private fun ChannelTile(c: LivePalette, ch: Channel, selected: Boolean, onClick:
 private fun ChannelThumbnail(c: LivePalette, ch: Channel, selected: Boolean) {
     val logos = news.openwire.ui.home.LocalLogoResolver.current
     val fallback = news.openwire.ui.home.faviconUrl(ch.domain, 256)
-    val logo by produceState<String?>(null, ch.domain) { value = logos?.logo(ch.domain) ?: fallback }
+    val art = remember(ch.id) { news.openwire.domain.live.ChannelArt.of(ch.id) }
+    var artFailed by remember(ch.id) { mutableStateOf(false) }
+    val logo by produceState<String?>(art.takeIf { !artFailed }, ch.domain, artFailed) {
+        value = art.takeIf { !artFailed } ?: logos?.logo(ch.domain) ?: fallback
+    }
     var src by remember(logo) { mutableStateOf(logo) }
     BoxWithConstraints(
-        Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Brush.verticalGradient(listOf(c.surfaceHi, c.surface))),
+        Modifier.fillMaxWidth().aspectRatio(16f / 9f).clipToBounds().background(Brush.verticalGradient(listOf(c.surfaceHi, c.surface))),
         contentAlignment = Alignment.Center,
     ) {
         val w = maxWidth
@@ -321,25 +327,31 @@ private fun ChannelThumbnail(c: LivePalette, ch: Channel, selected: Boolean) {
         if (l == null) {
             news.openwire.ui.home.SourceLogo(ch.domain, ch.name, size = 46.dp)
         } else {
-            val onError: (coil.compose.AsyncImagePainter.State.Error) -> Unit = { if (src != fallback) src = fallback else src = null }
+            val onError: (coil.compose.AsyncImagePainter.State.Error) -> Unit = {
+                when {
+                    src == art && !artFailed -> artFailed = true // curated art gone: look the logo up instead
+                    src != fallback -> src = fallback
+                    else -> src = null
+                }
+            }
             // Brand-coloured backdrop: the logo, enlarged and softened.
             coil.compose.AsyncImage(
                 model = l, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, onError = onError,
                 modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = 1.5f; scaleY = 1.5f; alpha = .85f }
                     .blur(36.dp, androidx.compose.ui.draw.BlurredEdgeTreatment.Rectangle),
             )
-            // The logo itself, as large as the frame allows.
+            // The logo itself, as large as the frame holds it whole (wide brand cards fill it exactly).
             coil.compose.AsyncImage(
                 model = l, contentDescription = ch.name, contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding(vertical = w * .07f, horizontal = w * .12f),
+                modifier = Modifier.fillMaxSize(),
             )
         }
         // Half-dark veil: depth without hiding the logo.
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .38f), Color.Black.copy(alpha = .52f)))))
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .42f), Color.Black.copy(alpha = .58f)))))
         // LIVE STREAM, top right.
         Image(
             painterResource(R.drawable.live_sticker), contentDescription = tr(R.string.live),
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = w * .05f, end = w * .04f).width(w * .3f),
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = w * .05f, end = w * .04f).width(w * .32f),
         )
         // External channels say where they open.
         if (!ch.playsInApp) Row(
@@ -350,15 +362,17 @@ private fun ChannelThumbnail(c: LivePalette, ch: Channel, selected: Boolean) {
             Spacer(Modifier.width(3.dp))
             Icon(Icons.AutoMirrored.Filled.OpenInNew, null, tint = c.text, modifier = Modifier.size(10.dp))
         }
-        // The play mark on a soft drop shadow (blurred on Android 12+, a faint offset copy below).
-        val play = w * (if (selected) .2f else .17f)
-        Box(Modifier.size(play * 1.6f), contentAlignment = Alignment.Center) {
-            Image(
-                painterResource(R.drawable.live_play), contentDescription = null,
-                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.Black),
-                modifier = Modifier.height(play).graphicsLayer { translationY = 2.dp.toPx(); alpha = if (android.os.Build.VERSION.SDK_INT >= 31) .6f else .3f }
-                    .blur(7.dp, androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded),
-            )
+        // The play mark in a dark rounded box, lifted by a soft shadow.
+        val play = w * (if (selected) .15f else .13f)
+        val box = RoundedCornerShape(play * .42f)
+        Box(
+            Modifier.width(play * 2.1f).height(play * 1.55f)
+                .shadow(14.dp, box, ambientColor = Color.Black, spotColor = Color.Black)
+                .clip(box)
+                .background(Color.Black.copy(alpha = .62f))
+                .border(1.dp, Color.White.copy(alpha = .12f), box),
+            contentAlignment = Alignment.Center,
+        ) {
             Image(painterResource(R.drawable.live_play), contentDescription = tr(R.string.live_play_channel, ch.name), modifier = Modifier.height(play))
         }
     }

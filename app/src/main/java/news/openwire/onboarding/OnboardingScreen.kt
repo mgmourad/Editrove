@@ -120,12 +120,12 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.window.layout.FoldingFeature
 import androidx.window.layout.WindowInfoTracker
-import androidx.window.layout.WindowLayoutInfo
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.map
 import news.openwire.R
 import news.openwire.domain.engine.Languages
 import news.openwire.domain.engine.TopicPresets
@@ -211,11 +211,12 @@ fun OnboardingScreen(
 
     // Fold posture: the hinge's bounds, in window pixels (this screen fills the window).
     val activity = context.findActivity()
-    val layoutInfo by remember(activity) {
-        if (activity == null) kotlinx.coroutines.flow.flowOf(WindowLayoutInfo(emptyList()))
+    val foldState = remember(activity) {
+        if (activity == null) kotlinx.coroutines.flow.flowOf(null)
         else WindowInfoTracker.getOrCreate(activity).windowLayoutInfo(activity)
-    }.collectAsState(initial = WindowLayoutInfo(emptyList()))
-    val fold = layoutInfo.displayFeatures.filterIsInstance<FoldingFeature>().firstOrNull()
+            .map { info -> info.displayFeatures.filterIsInstance<FoldingFeature>().firstOrNull() }
+    }.collectAsState(initial = null)
+    val fold = foldState.value
 
     var frame by remember { mutableLongStateOf(0L) }
     // Frames only while something moves; a still graph lets the UI go idle.

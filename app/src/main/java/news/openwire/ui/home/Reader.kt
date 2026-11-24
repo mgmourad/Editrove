@@ -1034,7 +1034,7 @@ private fun KeyPointsCard(body: BodyState, content: news.openwire.data.remote.Ar
                 Text(tr(R.string.reader_points_working), style = sans(10.sp), color = g.textSecondary)
             } else {
                 val secs = (p as Points.Done).ms / 1000.0
-                Text(tr(R.string.reader_points_done, String.format(java.util.Locale.getDefault(), "%.2f", secs)), style = sans(10.sp), color = g.textSecondary)
+                Text(tr(R.string.reader_points_done, String.format(androidx.compose.ui.platform.LocalConfiguration.current.locales[0], "%.2f", secs)), style = sans(10.sp), color = g.textSecondary)
             }
         }
         when (p) {

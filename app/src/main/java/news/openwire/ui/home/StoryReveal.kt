@@ -385,9 +385,9 @@ fun WrittenText(text: String, startAt: Int, style: TextStyle, settled: Color, on
     var n by remember(text) { mutableIntStateOf(if (reduce) Int.MAX_VALUE / 2 else 0) }
     LaunchedEffect(text) {
         if (reduce) { onDone(); return@LaunchedEffect }
-        delay(startAt * 16L)
+        delay(startAt * 7L)
         val t0 = withFrameMillis { it }
-        while (isActive && n < text.length + GLOW) withFrameMillis { n = ((it - t0) / 16L).toInt() }
+        while (isActive && n < text.length + GLOW) withFrameMillis { n = ((it - t0) / 7L).toInt() }
         onDone()
     }
     // Letters land in the app's own rose accent and cool to the body colour.
@@ -521,8 +521,8 @@ fun Modifier.revealOnScroll(): Modifier {
     var inView by remember { mutableStateOf(-1f) }
     LaunchedEffect(gate, inView >= 0f) {
         if (!gate || inView < 0f || k.value > 0f) return@LaunchedEffect
-        delay((inView * 420f).toLong()) // a staircase down the screen
-        k.animateTo(1f, tween(1400, easing = SettleEasing))
+        delay((inView * 140f).toLong()) // a quick staircase down the screen
+        k.animateTo(1f, tween(700, easing = SettleEasing))
     }
     return this
         .then(
@@ -532,7 +532,7 @@ fun Modifier.revealOnScroll(): Modifier {
                 // Unclipped position: an off-screen paragraph is really off screen (boundsInWindow
                 // clips it to an empty box at the top, which made everything "visible" at once).
                 val top = c.positionInWindow().y
-                if (c.isAttached && top < h * .82f && top + c.size.height > 0f) inView = (top / h).coerceIn(0f, 1f)
+                if (c.isAttached && top < h * .92f && top + c.size.height > 0f) inView = (top / h).coerceIn(0f, 1f)
             },
         )
         .graphicsLayer {

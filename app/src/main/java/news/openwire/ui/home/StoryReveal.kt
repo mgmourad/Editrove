@@ -385,9 +385,9 @@ fun WrittenText(text: String, startAt: Int, style: TextStyle, settled: Color, on
     var n by remember(text) { mutableIntStateOf(if (reduce) Int.MAX_VALUE / 2 else 0) }
     LaunchedEffect(text) {
         if (reduce) { onDone(); return@LaunchedEffect }
-        delay(startAt * 7L)
+        delay((startAt * 5.6f).toLong())
         val t0 = withFrameMillis { it }
-        while (isActive && n < text.length + GLOW) withFrameMillis { n = ((it - t0) / 7L).toInt() }
+        while (isActive && n < text.length + GLOW) withFrameMillis { n = ((it - t0) / 5.6f).toInt() }
         onDone()
     }
     // Letters land in the app's own rose accent and cool to the body colour.
@@ -521,8 +521,8 @@ fun Modifier.revealOnScroll(): Modifier {
     var inView by remember { mutableStateOf(-1f) }
     LaunchedEffect(gate, inView >= 0f) {
         if (!gate || inView < 0f || k.value > 0f) return@LaunchedEffect
-        delay((inView * 140f).toLong()) // a quick staircase down the screen
-        k.animateTo(1f, tween(700, easing = SettleEasing))
+        delay((inView * 112f).toLong()) // a quick staircase down the screen
+        k.animateTo(1f, tween(560, easing = SettleEasing))
     }
     return this
         .then(

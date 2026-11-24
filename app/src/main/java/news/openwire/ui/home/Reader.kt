@@ -583,9 +583,9 @@ private fun DropCapParagraph(text: String) {
 }
 
 /** The beat between the summary finishing and the body being allowed to reveal. */
-private const val BODY_PAUSE_MS = 150L
+private const val BODY_PAUSE_MS = 120L
 /** The body never waits on the summary longer than this after the text arrives. */
-private const val SUMMARY_TIMEOUT_MS = 2_500L
+private const val SUMMARY_TIMEOUT_MS = 2_000L
 
 /** How long an article loads before the reader is offered Retry or other outlets. */
 private const val SLOW_ARTICLE_MS = 12_000L

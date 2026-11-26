@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="ft_k_start">أهلًا</string>
+    <string name="ft_k_fold">شاشتك الكبيرة</string>
+    <string name="ft_k_front">صفحتك الأولى</string>
+    <string name="ft_k_read">القراءة</string>
+    <string name="ft_k_watch">المشاهدة</string>
+    <string name="ft_k_listen">الاستماع</string>
+    <string name="ft_k_yours">اجعله لك</string>
+    <string name="ft_k_end">لا شيء يغادر هاتفك</string>
+    <string name="ft_today_t">صفحتك الأولى</string>
+    <string name="ft_today_b">تبدأ «اليوم» بأهم أربعة أخبار في عرض متتابع: مرّر بينها أو دعها تتبدل كل بضع ثوانٍ. المواضيع في الأزرار أعلاه، ويغيّر «منسّق» و«الأحدث» و«الأقدم» الترتيب.</string>
+    <string name="ft_split_t">العرض المقسّم</string>
+    <string name="ft_split_b">عند فتح الهاتف يعرض Editrove الأخبار والخبر المفتوح جنبًا إلى جنب، فتقرأ خبرًا وأنت تختار التالي.</string>
+    <string name="ft_split_w">عند الفتح · الإعداد الافتراضي</string>
+    <string name="ft_full_t">تفضّل العرض الكامل؟</string>
+    <string name="ft_full_b">يمنح العرض الكامل الأخبار الشاشة كلها كمجلة، ويفتح كل خبر في صفحة كاملة. بدّل متى شئت.</string>
+    <string name="ft_full_w">زر ▭ في الشريط الجانبي · أو الإعدادات › المظهر › تخطيط الشاشة المفتوحة والجهاز اللوحي</string>
+    <string name="ft_pull_t">اسحب لأحدث نسخة</string>
+    <string name="ft_pull_b">اسحب الصفحة إلى الأسفل: يذكر السطر تحت الترويسة كل مصدر عند استجابته، وتظهر الأخبار الجديدة منذ آخر مرة تحت فاصل «جديد منذ».</string>
+    <string name="ft_reader_t">اقرأ أي خبر</string>
+    <string name="ft_reader_b">تفتح الأخبار بصورتها وملخص يُكتب على هاتفك والنص الكامل، حتى من مواقع كثيرة خلف جدار دفع. وإن لم يُفتح موقع، يقرأ Editrove الخبر نفسه من غرف أخبار أخرى.</string>
+    <string name="ft_videos_t">لحظات مصوّرة</string>
+    <string name="ft_videos_b">مقاطع إخبارية قصيرة من قنوات الوسائل نفسها، مختارة للتبويب الذي تتصفحه. يمزج «أهم الأخبار» الأخبار والرياضة والتقنية والأعمال والترفيه.</string>
+    <string name="ft_player_t">شاهد، مرّر، التالي</string>
+    <string name="ft_player_b">اضغط على مقطع لمشاهدته بملء الشاشة. مرّر للأعلى للتالي؛ الصوت والإعجاب والحفظ والمشاركة على الجانب. اضغط على المقطع للإيقاف المؤقت.</string>
+    <string name="ft_foryou_t">لك</string>
+    <string name="ft_foryou_b">أعجب بخبر عبر القلب وسيتعلّم قسم «لك» ما تحب: أربعة اختيارات في الصفحة وخمس صفحات، تُحسب على هاتفك ولا تُرسل إلى أي مكان.</string>
+    <string name="ft_audio_t">الموجز الصوتي</string>
+    <string name="ft_audio_b">صفحتك الأولى مقروءة كنشرة أخبار بصوت مذيع تختاره. جدول موجزًا صباحيًا أو ظهرًا أو مساءً.</string>
+    <string name="ft_audio_w">الشريط السفلي · أيقونة السمّاعة</string>
+    <string name="ft_live_t">التلفزيون والراديو المباشر</string>
+    <string name="ft_live_b">قنوات إخبارية تبث الآن ومحطات راديو من حول العالم، بلغتك أو بأي لغة.</string>
+    <string name="ft_live_w">الشريط السفلي · أيقونة التلفاز</string>
+    <string name="ft_opinion_t">تحليل ورأي</string>
+    <string name="ft_opinion_b">مقالات ومقالات رأي والنقاش حول الأخبار. تابع الكتّاب والمواضيع بزر +، واحصل على تنبيه عند النشر.</string>
+    <string name="ft_opinion_w">الشريط السفلي · أيقونة الاقتباس</string>
+    <string name="ft_discover_t">اكتشف وابحث</string>
+    <string name="ft_discover_b">ابحث في كل الأخبار والناشرين، وشاهد أهم الأخبار من جميع مواضيعك في مكان واحد.</string>
+    <string name="ft_discover_w">الشريط السفلي · العدسة</string>
+    <string name="ft_saved_t">الأخبار المحفوظة</string>
+    <string name="ft_saved_b">اضغط على علامة الحفظ في أي خبر للاحتفاظ به. تبقى المحفوظات على هاتفك وتُفتح دون اتصال.</string>
+    <string name="ft_saved_w">الشريط السفلي · علامة الحفظ</string>
+    <string name="ft_topics_t">المواضيع والمصادر</string>
+    <string name="ft_topics_b">رتّب المواضيع أو أخفها، وأنشئ مواضيعك من كلمات مفتاحية، وغيّر مدينتك ونسخة بلدك، واختر الصحف التي يقرأها كل موضوع.</string>
+    <string name="ft_topics_w">الإعدادات › المواضيع · المصادر · النسخة</string>
+    <string name="ft_alerts_t">تنبيهات على طريقتك</string>
+    <string name="ft_alerts_b">اختر المواضيع التي تنبّهك وفعّل الأخبار العاجلة. أصوات التنبيه وساعات الهدوء والإيقاف المؤقت كلها هنا؛ ولن ينبّهك الخبر نفسه مرتين.</string>
+    <string name="ft_alerts_w">الإعدادات › الإشعارات والتحديث</string>
+    <string name="ft_appear_t">الشكل والإحساس</string>
+    <string name="ft_appear_b">الزجاج الأسود أو الورق التحريري، وحجم نص مريح، وترتيب الأخبار الذي تحب.</string>
+    <string name="ft_appear_w">الإعدادات › المظهر</string>
+    <string name="ft_privacy_t">خصوصية من الأساس</string>
+    <string name="ft_privacy_b">بلا حساب ولا إعلانات ولا تتبّع. تبقى اختياراتك وإعجاباتك ومحفوظاتك على هذا الهاتف. أعد هذه الجولة متى شئت.</string>
+    <string name="ft_privacy_w">الإعدادات › دليل الاستخدام › إعادة جولة الميزات</string>
+</resources>

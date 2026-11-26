@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="ft_k_start">Welcome</string>
+    <string name="ft_k_fold">Your Big Screen</string>
+    <string name="ft_k_front">Your Front Page</string>
+    <string name="ft_k_read">Reading</string>
+    <string name="ft_k_watch">Watching</string>
+    <string name="ft_k_listen">Listening</string>
+    <string name="ft_k_yours">Make It Yours</string>
+    <string name="ft_k_end">Nothing Leaves Your Phone</string>
+    <string name="ft_today_t">Your Front Page</string>
+    <string name="ft_today_b">Today leads with the top four stories as a slideshow: swipe through, or let it turn every few seconds. Topics sit in the pills above; Curated, Newest and Oldest change the order.</string>
+    <string name="ft_split_t">Split View</string>
+    <string name="ft_split_b">Unfolded, Editrove shows the feed and the open story side by side, so you can read one story while you pick the next.</string>
+    <string name="ft_split_w">Unfolded · the default</string>
+    <string name="ft_full_t">Prefer Full View?</string>
+    <string name="ft_full_b">Full View gives the feed the whole screen as a magazine, and each story opens as its own full page. Switch any time.</string>
+    <string name="ft_full_w">Side rail ▭ button · or Settings › Appearance › Unfolded &amp; Tablet Layout</string>
+    <string name="ft_pull_t">Pull for the Latest Edition</string>
+    <string name="ft_pull_b">Pull the page down: the line under the masthead names each source as it answers, and stories that are new since last time arrive under a New Since divider.</string>
+    <string name="ft_reader_t">Read Any Story</string>
+    <string name="ft_reader_b">Stories open with their photo, a summary written on your phone, and the full text, even from many paywalled sites. If a site won\'t open, Editrove reads the same story from other newsrooms.</string>
+    <string name="ft_videos_t">Video Moments</string>
+    <string name="ft_videos_b">Short news videos from the outlets\' own channels, picked for the tab you\'re on. Top Stories mixes news, sports, tech, business and entertainment.</string>
+    <string name="ft_player_t">Watch, Swipe, Next</string>
+    <string name="ft_player_b">Tap a video to watch it full screen. Swipe up for the next one; sound, love, save and share are on the right. Tap the video to pause.</string>
+    <string name="ft_foryou_t">For You</string>
+    <string name="ft_foryou_b">Love a story with the heart and For You learns what you like: four picks a page, five pages, worked out on your phone and never sent anywhere.</string>
+    <string name="ft_audio_t">Audio Briefing</string>
+    <string name="ft_audio_b">Your front page read aloud like a news broadcast, with a presenter you choose. Schedule a morning, afternoon or evening briefing.</string>
+    <string name="ft_audio_w">Bottom bar · speaker icon</string>
+    <string name="ft_live_t">Live TV and Radio</string>
+    <string name="ft_live_b">News channels streaming now and radio stations from around the world, in your language or any other.</string>
+    <string name="ft_live_w">Bottom bar · TV icon</string>
+    <string name="ft_opinion_t">Analysis &amp; Opinion</string>
+    <string name="ft_opinion_b">Columns, essays and the conversation around the news. Follow writers and topics with the + button, and get an alert when they publish.</string>
+    <string name="ft_opinion_w">Bottom bar · quote icon</string>
+    <string name="ft_discover_t">Discover and Search</string>
+    <string name="ft_discover_b">Search every story and publisher, and see the top stories across all your topics in one place.</string>
+    <string name="ft_discover_w">Bottom bar · magnifier</string>
+    <string name="ft_saved_t">Saved Stories</string>
+    <string name="ft_saved_b">Tap the bookmark on any story to keep it. Saved stories stay on your phone and open offline.</string>
+    <string name="ft_saved_w">Bottom bar · bookmark</string>
+    <string name="ft_topics_t">Topics and Sources</string>
+    <string name="ft_topics_b">Reorder or hide topics, create your own from keywords, change your city and country edition, and choose the newspapers each topic reads.</string>
+    <string name="ft_topics_w">Settings › Topics · Sources · Edition</string>
+    <string name="ft_alerts_t">Alerts Your Way</string>
+    <string name="ft_alerts_b">Pick the topics that alert you, and turn breaking news on. Alert sounds, quiet hours and a pause are all here; the same story never alerts you twice.</string>
+    <string name="ft_alerts_w">Settings › Notifications &amp; Refresh</string>
+    <string name="ft_appear_t">Look and Feel</string>
+    <string name="ft_appear_b">Black Glass or Editorial Paper, a comfortable text size, and the feed order you like.</string>
+    <string name="ft_appear_w">Settings › Appearance</string>
+    <string name="ft_privacy_t">Private by Design</string>
+    <string name="ft_privacy_b">No account, no ads, no tracking. Your choices, loves and saved stories stay on this phone. Replay this tour any time.</string>
+    <string name="ft_privacy_w">Settings › User Guide › Replay the Feature Tour</string>
+</resources>

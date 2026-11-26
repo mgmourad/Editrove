@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
@@ -147,9 +148,24 @@ fun ShortsPlayer(
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             VerticalPager(state = pager, beyondViewportPageCount = 0, key = { videos[it].id }) { page ->
                 val v = videos[page]
-                Box(Modifier.fillMaxSize()) {
+                // The video starts below Editrove's header, so YouTube's own title strip sits under it,
+                // clear of the status bar (nothing of YouTube's is covered).
+                Box(Modifier.fillMaxSize().statusBarsPadding().padding(top = HEADER_H)) {
                     AsyncImage(v.thumbnail, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    if (pager.settledPage == page) ShortEmbed(v.id, muted, Modifier.fillMaxSize())
+                    // YouTube's own buttons only appear when the video is touched: Editrove takes every tap
+                    // (play / pause through the player API) so they never show.
+                    var paused by remember(v.id) { mutableStateOf(false) }
+                    if (pager.settledPage == page) ShortEmbed(v.id, muted, paused, Modifier.fillMaxSize())
+                    Box(
+                        Modifier.fillMaxSize().clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null,
+                        ) { paused = !paused },
+                    ) {
+                        if (paused) Box(
+                            Modifier.align(Alignment.Center).size(76.dp).clip(CircleShape).background(Color.Black.copy(alpha = .45f)),
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Filled.PlayArrow, tr(R.string.reader_play_video), tint = Color.White, modifier = Modifier.size(44.dp)) }
+                    }
                     // The story line and channel, bottom left.
                     Box(Modifier.fillMaxWidth().height(260.dp).align(Alignment.BottomCenter).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .75f)))))
                     Column(Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(start = 16.dp, end = 88.dp, bottom = 24.dp)) {
@@ -184,11 +200,7 @@ fun ShortsPlayer(
             }
             // Back, top left; the source of the stream, top right — on a dark band that fades into the
             // picture, so it reads over any video (and covers YouTube's own title strip).
-            Box(
-                Modifier.fillMaxWidth().background(Brush.verticalGradient(0f to Color.Black.copy(alpha = .85f), .55f to Color.Black.copy(alpha = .55f), 1f to Color.Transparent))
-                    .statusBarsPadding().height(96.dp),
-            )
-            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start = 12.dp, end = 16.dp, top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().background(Color.Black).statusBarsPadding().height(HEADER_H).padding(start = 12.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier.size(44.dp).clip(CircleShape).background(Color.Black.copy(alpha = .35f)).clickable(onClick = onClose),
                     contentAlignment = Alignment.Center,
@@ -199,6 +211,8 @@ fun ShortsPlayer(
         }
     }
 }
+
+private val HEADER_H = 60.dp
 
 @Composable
 private fun RailButton(icon: ImageVector, label: String, on: Boolean, onClick: () -> Unit) {
@@ -215,7 +229,7 @@ private fun RailButton(icon: ImageVector, label: String, on: Boolean, onClick: (
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun ShortEmbed(id: String, muted: Boolean, modifier: Modifier) {
+private fun ShortEmbed(id: String, muted: Boolean, paused: Boolean, modifier: Modifier) {
     AndroidView(
         factory = { ctx ->
             WebView(ctx).apply {
@@ -228,17 +242,23 @@ private fun ShortEmbed(id: String, muted: Boolean, modifier: Modifier) {
                     <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
                     <style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}</style></head>
                     <body><iframe id="p" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
-                    src="https://www.youtube-nocookie.com/embed/$id?autoplay=1&playsinline=1&controls=0&loop=1&playlist=$id&rel=0&modestbranding=1&iv_load_policy=3&enablejsapi=1&mute=${if (muted) 1 else 0}"></iframe>
+                    src="https://www.youtube-nocookie.com/embed/$id?autoplay=1&playsinline=1&controls=0&loop=1&playlist=$id&rel=0&iv_load_policy=3&cc_load_policy=0&disablekb=1&fs=0&enablejsapi=1&mute=${if (muted) 1 else 0}"></iframe>
                     <script>function cmd(f){var p=document.getElementById('p');p&&p.contentWindow.postMessage(JSON.stringify({event:'command',func:f,args:[]}),'*')}</script>
                     </body></html>
                 """.trimIndent()
                 // A real https origin (Editrove's own page) so YouTube accepts the embed.
                 loadDataWithBaseURL("https://mgmourad.github.io/Editrove/", html, "text/html", "utf-8", null)
-                tag = muted
+                tag = muted to false
+                // The page never receives touches (Editrove's layer above takes them).
+                isClickable = false; isFocusable = false
+                setOnTouchListener { _, _ -> true }
             }
         },
         update = { w ->
-            if (w.tag != muted) { w.tag = muted; w.evaluateJavascript("cmd('${if (muted) "mute" else "unMute"}')", null) }
+            val (m, p) = w.tag as? Pair<*, *> ?: (null to null)
+            if (m != muted) w.evaluateJavascript("cmd('${if (muted) "mute" else "unMute"}')", null)
+            if (p != paused) w.evaluateJavascript("cmd('${if (paused) "pauseVideo" else "playVideo"}')", null)
+            w.tag = muted to paused
         },
         onRelease = { it.stopLoading(); it.loadUrl("about:blank"); it.destroy() },
         modifier = modifier,

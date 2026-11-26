@@ -1448,7 +1448,7 @@ private fun AlertsQuietSection(vm: SettingsViewModel, s: news.openwire.domain.mo
             }
         } else {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(1, 3, 8).forEach { h -> Chip(tr(R.string.n_hours, h), selected = false) { vm.updateAlerts { it.copy(pausedUntil = System.currentTimeMillis() + h * 3_600_000L) } } }
+                listOf(1, 3, 8).forEach { h -> Chip(if (h == 1) tr(R.string.one_hour) else tr(R.string.n_hours, h), selected = false) { vm.updateAlerts { it.copy(pausedUntil = System.currentTimeMillis() + h * 3_600_000L) } } }
                 Chip(tr(R.string.alerts_until_morning), selected = false) { vm.updateAlerts { it.copy(pausedUntil = news.openwire.domain.alerts.QuietTime.nextMorning(System.currentTimeMillis())) } }
             }
         }

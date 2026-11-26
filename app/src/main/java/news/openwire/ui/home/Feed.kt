@@ -407,7 +407,8 @@ fun LazyGridScope.feedItems(
     // The lead: the top four stories as a slideshow (5 s each; a touch holds it for 10 s).
     val leads = articles.take(LEAD_SLIDES)
     fullRow("hero-slides") {
-        LeadSlideshow(leads) { hero ->
+        // The magazine card has its buttons bottom-right: dots go bottom-left, over the photo.
+        LeadSlideshow(leads, dotsAtStart = magazine) { hero ->
             Box(Modifier.landing(hero.id)) {
                 if (magazine) LeadStoryCard(
                     article = hero.withArchive(state(hero)),
@@ -725,10 +726,13 @@ fun HeroCard(
                 modifier = Modifier.fillMaxWidth().padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ScrimPill { Text(category.uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.1.em), color = Color.White) }
-                Spacer(Modifier.weight(1f))
+                ScrimPill { Text(category.uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.1.em), color = Color.White, maxLines = 1) }
+                Spacer(Modifier.weight(1f).widthIn(min = 4.dp))
+                // The badge gives way first when the card is narrow (the three buttons always fit).
                 article.badgeLabel()?.let { badge ->
-                    ScrimPill { Text(badge, style = mono(10.sp), color = Color.White.copy(alpha = 0.9f)) }
+                    Box(Modifier.weight(1f, fill = false)) {
+                        ScrimPill { Text(badge, style = mono(10.sp), color = Color.White.copy(alpha = 0.9f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    }
                     Spacer(Modifier.width(6.dp))
                 }
                 // Love, share, save: the same 15 dp icons in the same 31 dp circles.
@@ -1163,7 +1167,7 @@ private const val HOLD_AFTER_TOUCH_MS = 10_000L
  * position; with animations off it doesn't advance on its own.
  */
 @Composable
-private fun LeadSlideshow(stories: List<Article>, card: @Composable (Article) -> Unit) {
+private fun LeadSlideshow(stories: List<Article>, dotsAtStart: Boolean = false, card: @Composable (Article) -> Unit) {
     if (stories.size <= 1) { stories.firstOrNull()?.let { card(it) }; return }
     val reduce = news.openwire.ui.theme.rememberReduceMotion()
     val pager = androidx.compose.foundation.pager.rememberPagerState { stories.size }
@@ -1196,7 +1200,7 @@ private fun LeadSlideshow(stories: List<Article>, card: @Composable (Article) ->
         ) { page -> card(stories[page]) }
         // Position dots inside the card, bottom corner (clear of the headline and the top pills).
         Row(
-            Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 14.dp).clip(CircleShape)
+            Modifier.align(if (dotsAtStart) Alignment.BottomStart else Alignment.BottomEnd).padding(start = 16.dp, end = 16.dp, bottom = 14.dp).clip(CircleShape)
                 .background(Color.Black.copy(alpha = .35f)).padding(horizontal = 6.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

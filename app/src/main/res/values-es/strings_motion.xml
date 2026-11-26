@@ -24,4 +24,18 @@
     <string name="live_play_channel">Ver %s en directo</string>
     <string name="reader_auto_other">%1$s no se abre aquí, así que esta es la crónica de %2$s sobre la misma noticia.</string>
     <string name="reader_other_outlet">otro medio</string>
+    <string name="alerts_sound_quiet">Sonido y descanso</string>
+    <string name="alerts_sound">Sonido de alertas</string>
+    <string name="alerts_sound_sub">La campana de Editrove para alertas de temas. Desactivado: llegan en silencio.</string>
+    <string name="alerts_breaking_sound">Sonido de última hora</string>
+    <string name="alerts_breaking_sound_sub">El aviso de última hora. Desactivado: llegan en silencio.</string>
+    <string name="alerts_pause">Pausar alertas</string>
+    <string name="alerts_paused_until">En pausa hasta las %s</string>
+    <string name="alerts_resume">Reanudar</string>
+    <string name="alerts_until_morning">Hasta la mañana</string>
+    <string name="alerts_quiet_hours">Horas de silencio</string>
+    <string name="alerts_quiet_hours_sub">Sin alertas de %1$s a %2$s, cada día</string>
+    <string name="alerts_from">De</string>
+    <string name="alerts_to">a</string>
+    <string name="alerts_quiet_hint">Las noticias que llegan en pausa o en horas de silencio no se guardan para después: están en la app cuando la abras.</string>
 </resources>

@@ -87,7 +87,7 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
                     val fresh = FeedOrdering.newStories(articles, seen)
                     container.feedState.setSeen(topic.id, (articles.map(FeedOrdering::storyKey) + seen.orEmpty()).toSet())
                     if (topic.id in s.notifyTopics && fresh.isNotEmpty()) {
-                        updates += TopicUpdate(topic.id, topic.label, fresh.take(8).map { NewHeadline(it.title, it.source, it.originalUrl) })
+                        updates += TopicUpdate(topic.id, topic.label, fresh.take(8).map { NewHeadline(it.title, it.source, it.originalUrl, FeedOrdering.storyKey(it)) })
                     }
                 }
                 runCatching { opinionUpdate(s) }.getOrNull()?.let { updates += it }
@@ -125,6 +125,10 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
             }
 
             override fun notificationsEnabled(): Boolean = container.settingsRepository.settings.value.notificationsEnabled
+
+            override fun alertPrefs() = container.settingsRepository.settings.value.alerts
+
+            override fun pauseAlerts(untilMs: Long) = container.settingsRepository.update { it.copy(alerts = it.alerts.copy(pausedUntil = untilMs)) }
 
             override suspend fun breaking(): List<BreakingAlert> {
                 val s = container.settingsRepository.settings.value

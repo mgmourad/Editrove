@@ -24,4 +24,18 @@
     <string name="live_play_channel">Play %s live</string>
     <string name="reader_auto_other">%1$s wouldn\'t open here, so this is %2$s\'s report of the same story.</string>
     <string name="reader_other_outlet">another outlet</string>
+    <string name="alerts_sound_quiet">Sound and quiet time</string>
+    <string name="alerts_sound">Alert sound</string>
+    <string name="alerts_sound_sub">Editrove\'s bell for topic alerts. Off: they arrive silently.</string>
+    <string name="alerts_breaking_sound">Breaking news sound</string>
+    <string name="alerts_breaking_sound_sub">The breaking sting. Off: breaking alerts arrive silently.</string>
+    <string name="alerts_pause">Pause alerts</string>
+    <string name="alerts_paused_until">Paused until %s</string>
+    <string name="alerts_resume">Resume</string>
+    <string name="alerts_until_morning">Until morning</string>
+    <string name="alerts_quiet_hours">Quiet hours</string>
+    <string name="alerts_quiet_hours_sub">No alerts from %1$s to %2$s, every day</string>
+    <string name="alerts_from">From</string>
+    <string name="alerts_to">to</string>
+    <string name="alerts_quiet_hint">Stories that come in while alerts are paused or quiet aren\'t saved up for later: they\'re in the app when you open it.</string>
 </resources>

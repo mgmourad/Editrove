@@ -24,4 +24,18 @@
     <string name="live_play_channel">Regarder %s en direct</string>
     <string name="reader_auto_other">%1$s ne s\'ouvre pas ici : voici le reportage de %2$s sur la même info.</string>
     <string name="reader_other_outlet">un autre média</string>
+    <string name="alerts_sound_quiet">Son et moments calmes</string>
+    <string name="alerts_sound">Son des alertes</string>
+    <string name="alerts_sound_sub">La cloche d’Editrove pour les alertes de sujets. Désactivé : elles arrivent en silence.</string>
+    <string name="alerts_breaking_sound">Son des alertes info</string>
+    <string name="alerts_breaking_sound_sub">Le jingle des dernières infos. Désactivé : elles arrivent en silence.</string>
+    <string name="alerts_pause">Mettre les alertes en pause</string>
+    <string name="alerts_paused_until">En pause jusqu’à %s</string>
+    <string name="alerts_resume">Reprendre</string>
+    <string name="alerts_until_morning">Jusqu’au matin</string>
+    <string name="alerts_quiet_hours">Heures calmes</string>
+    <string name="alerts_quiet_hours_sub">Aucune alerte de %1$s à %2$s, chaque jour</string>
+    <string name="alerts_from">De</string>
+    <string name="alerts_to">à</string>
+    <string name="alerts_quiet_hint">Les infos arrivées pendant une pause ou les heures calmes ne sont pas gardées pour plus tard : elles sont dans l’app quand vous l’ouvrez.</string>
 </resources>

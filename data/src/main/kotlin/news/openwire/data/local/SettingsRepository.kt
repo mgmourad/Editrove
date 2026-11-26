@@ -97,6 +97,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         val briefingEngine: String? = null,
         val briefingPresenter: String? = null,
         val opinionMuted: Set<String> = emptySet(),
+        val alerts: news.openwire.domain.alerts.AlertPrefs = news.openwire.domain.alerts.AlertPrefs(),
     ) {
         fun toSettings() = UserSettings(
             edition = LocalEdition(city, region, country),
@@ -109,6 +110,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
             opinionTabs = opinionTabs,
             opinionMuted = opinionMuted,
             realtimeAlerts = realtimeAlerts,
+            alerts = alerts,
             customTopics = customTopics.map { Topic(it.id, it.label, liveUrl = it.liveUrl, liveOnly = true, keywords = it.keywords, sources = it.sources, isCustom = true) },
             hiddenTopics = hiddenTopics,
             topicOrder = topicOrder,
@@ -159,6 +161,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 s.briefing.engine,
                 s.briefing.presenter.name,
                 s.opinionMuted,
+                s.alerts,
             )
         }
     }
@@ -214,5 +217,6 @@ class FeedStateStore(context: Context) {
 
     /** null until the topic has been observed once (baseline). */
     fun seen(topicId: String): Set<String>? = prefs.getStringSet("seen_$topicId", null)?.toSet()
-    fun setSeen(topicId: String, keys: Set<String>) = prefs.edit().putStringSet("seen_$topicId", keys.take(400).toSet()).apply()
+    // Long enough to cover two days of a busy topic (a story dropped from memory could alert again).
+    fun setSeen(topicId: String, keys: Set<String>) = prefs.edit().putStringSet("seen_$topicId", keys.take(1500).toSet()).apply()
 }

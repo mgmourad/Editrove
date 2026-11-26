@@ -24,4 +24,18 @@
     <string name="live_play_channel">%s live ansehen</string>
     <string name="reader_auto_other">%1$s lässt sich hier nicht öffnen, deshalb der Bericht von %2$s zur selben Meldung.</string>
     <string name="reader_other_outlet">einem anderen Medium</string>
+    <string name="alerts_sound_quiet">Ton und Ruhezeit</string>
+    <string name="alerts_sound">Hinweiston</string>
+    <string name="alerts_sound_sub">Editroves Glocke für Themenhinweise. Aus: Sie kommen lautlos.</string>
+    <string name="alerts_breaking_sound">Eilmeldungston</string>
+    <string name="alerts_breaking_sound_sub">Der Eilmeldungs-Jingle. Aus: Eilmeldungen kommen lautlos.</string>
+    <string name="alerts_pause">Hinweise pausieren</string>
+    <string name="alerts_paused_until">Pausiert bis %s</string>
+    <string name="alerts_resume">Fortsetzen</string>
+    <string name="alerts_until_morning">Bis morgen früh</string>
+    <string name="alerts_quiet_hours">Ruhezeiten</string>
+    <string name="alerts_quiet_hours_sub">Keine Hinweise von %1$s bis %2$s, täglich</string>
+    <string name="alerts_from">Von</string>
+    <string name="alerts_to">bis</string>
+    <string name="alerts_quiet_hint">Meldungen aus Pausen oder Ruhezeiten werden nicht gesammelt nachgeliefert: Sie finden sie in der App.</string>
 </resources>

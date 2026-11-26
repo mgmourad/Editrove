@@ -1367,6 +1367,7 @@ private fun NotificationsPage(vm: SettingsViewModel) {
             Divider()
             SwitchRow(tr(R.string.bg_refresh), tr(R.string.bg_refresh_sub, refreshLabel(s.refreshMinutes, long = true)), s.backgroundRefresh) { vm.setBackgroundRefresh(it) }
         }
+        AlertsQuietSection(vm, s)
         Section {
             Label(tr(R.string.refresh_every))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1418,6 +1419,58 @@ private fun NotificationsPage(vm: SettingsViewModel) {
                 SwitchRow(t.label, null, t.id in s.notifyTopics, enabled = s.notificationsEnabled) { vm.setNotifyTopic(t.id, it) }
             }
         }
+    }
+}
+
+/** Sounds on or off, pause for a while, and daily quiet hours, all inside Editrove. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AlertsQuietSection(vm: SettingsViewModel, s: news.openwire.domain.model.UserSettings) {
+    val context = LocalContext.current
+    val a = s.alerts
+    val zone = java.time.ZoneId.systemDefault()
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(a.pausedUntil) { while (true) { now = System.currentTimeMillis(); kotlinx.coroutines.delay(30_000) } }
+    fun clock(ms: Long) = java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT).format(java.time.Instant.ofEpochMilli(ms).atZone(zone))
+    fun clockOf(minute: Int) = java.time.format.DateTimeFormatter.ofLocalizedTime(java.time.format.FormatStyle.SHORT).format(java.time.LocalTime.of(minute / 60, minute % 60))
+    Section {
+        Label(tr(R.string.alerts_sound_quiet))
+        SwitchRow(tr(R.string.alerts_sound), tr(R.string.alerts_sound_sub), a.sound, enabled = s.notificationsEnabled) { on -> vm.updateAlerts { it.copy(sound = on) } }
+        Divider()
+        SwitchRow(tr(R.string.alerts_breaking_sound), tr(R.string.alerts_breaking_sound_sub), a.breakingSound, enabled = s.notificationsEnabled) { on -> vm.updateAlerts { it.copy(breakingSound = on) } }
+        Divider()
+        Spacer(Modifier.height(8.dp))
+        Label(tr(R.string.alerts_pause))
+        if (a.pausedUntil > now) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(tr(R.string.alerts_paused_until, clock(a.pausedUntil)), style = sans(13.sp, FontWeight.Medium), color = Glass.accentSoft, modifier = Modifier.weight(1f))
+                TextButton(tr(R.string.alerts_resume)) { vm.updateAlerts { it.copy(pausedUntil = 0L) } }
+            }
+        } else {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(1, 3, 8).forEach { h -> Chip(tr(R.string.n_hours, h), selected = false) { vm.updateAlerts { it.copy(pausedUntil = System.currentTimeMillis() + h * 3_600_000L) } } }
+                Chip(tr(R.string.alerts_until_morning), selected = false) { vm.updateAlerts { it.copy(pausedUntil = news.openwire.domain.alerts.QuietTime.nextMorning(System.currentTimeMillis())) } }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Divider()
+        SwitchRow(
+            tr(R.string.alerts_quiet_hours), tr(R.string.alerts_quiet_hours_sub, clockOf(a.quietStart), clockOf(a.quietEnd)),
+            a.quietEnabled,
+        ) { on -> vm.updateAlerts { it.copy(quietEnabled = on) } }
+        if (a.quietEnabled) {
+            fun pick(minute: Int, set: (Int) -> Unit) = android.app.TimePickerDialog(
+                context, { _, h, m -> set(h * 60 + m) }, minute / 60, minute % 60, android.text.format.DateFormat.is24HourFormat(context),
+            ).show()
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(tr(R.string.alerts_from), style = sans(12.sp), color = Glass.textSecondary)
+                Chip(clockOf(a.quietStart), selected = true) { pick(a.quietStart) { v -> vm.updateAlerts { it.copy(quietStart = v) } } }
+                Text(tr(R.string.alerts_to), style = sans(12.sp), color = Glass.textSecondary)
+                Chip(clockOf(a.quietEnd), selected = true) { pick(a.quietEnd) { v -> vm.updateAlerts { it.copy(quietEnd = v) } } }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(tr(R.string.alerts_quiet_hint), style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary)
     }
 }
 

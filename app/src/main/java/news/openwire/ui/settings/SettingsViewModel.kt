@@ -113,6 +113,10 @@ class SettingsViewModel(
         if (lang.code != news.openwire.domain.engine.Languages.effective(settings.value.language)) _languageOffer.value = lang
     }
 
+    /** Alert sounds, quiet hours and pause (Settings › Notifications). */
+    fun updateAlerts(change: (news.openwire.domain.alerts.AlertPrefs) -> news.openwire.domain.alerts.AlertPrefs) =
+        settingsRepo.update { it.copy(alerts = change(it.alerts)) }
+
     /** Records Editrove's language ("" = the phone's); the screen applies it to Android. */
     fun setLanguage(tag: String) {
         _languageOffer.value = null

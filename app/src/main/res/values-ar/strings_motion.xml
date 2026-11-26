@@ -24,4 +24,18 @@
     <string name="live_play_channel">تشغيل %s مباشرة</string>
     <string name="reader_auto_other">تعذّر فتح %1$s هنا، فهذا تقرير %2$s عن الخبر نفسه.</string>
     <string name="reader_other_outlet">وسيلة أخرى</string>
+    <string name="alerts_sound_quiet">الصوت ووقت الهدوء</string>
+    <string name="alerts_sound">صوت التنبيه</string>
+    <string name="alerts_sound_sub">جرس Editrove لتنبيهات المواضيع. عند الإيقاف تصل بصمت.</string>
+    <string name="alerts_breaking_sound">صوت الأخبار العاجلة</string>
+    <string name="alerts_breaking_sound_sub">نغمة الأخبار العاجلة. عند الإيقاف تصل بصمت.</string>
+    <string name="alerts_pause">إيقاف التنبيهات مؤقتًا</string>
+    <string name="alerts_paused_until">متوقفة حتى %s</string>
+    <string name="alerts_resume">استئناف</string>
+    <string name="alerts_until_morning">حتى الصباح</string>
+    <string name="alerts_quiet_hours">ساعات الهدوء</string>
+    <string name="alerts_quiet_hours_sub">لا تنبيهات من %1$s إلى %2$s يوميًا</string>
+    <string name="alerts_from">من</string>
+    <string name="alerts_to">إلى</string>
+    <string name="alerts_quiet_hint">الأخبار التي تصل أثناء الإيقاف أو الهدوء لا تُجمع لوقت لاحق: تجدها في التطبيق عند فتحه.</string>
 </resources>

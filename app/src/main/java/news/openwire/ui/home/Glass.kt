@@ -257,6 +257,7 @@ fun ShareButton(
     background: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Transparent,
     border: androidx.compose.ui.graphics.Color = androidx.compose.ui.graphics.Color.Transparent,
     padding: androidx.compose.ui.unit.Dp = 6.dp,
+    iconSize: androidx.compose.ui.unit.Dp = 18.dp,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     Box(
@@ -272,7 +273,7 @@ fun ShareButton(
     ) {
         androidx.compose.material3.Icon(
             androidx.compose.material.icons.Icons.Outlined.Share, contentDescription = tr(R.string.share_story),
-            tint = tint, modifier = Modifier.size(18.dp),
+            tint = tint, modifier = Modifier.size(iconSize),
         )
     }
 }

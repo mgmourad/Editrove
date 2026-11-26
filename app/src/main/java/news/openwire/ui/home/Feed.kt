@@ -389,6 +389,8 @@ fun LazyGridScope.feedItems(
     newSince: Long = 0L,
     /** The tab's news Shorts ("Video moments"), shown after the first few stories. */
     videos: List<news.openwire.domain.video.ShortVideo> = emptyList(),
+    /** The grid's column count (rows are filled to it). */
+    columns: Int = 2,
 ) {
     if (articles.isEmpty()) return
     // New since the last refresh: under a divider at the top, each with the rose "new" dot.
@@ -412,6 +414,8 @@ fun LazyGridScope.feedItems(
                     saved = hero.id in savedIds,
                     onOpen = onOpen,
                     onToggleSaved = onToggleSaved,
+                    liked = hero.id in likedIds,
+                    onToggleLiked = onToggleLiked,
                 ) else HeroCard(
                     article = hero.withArchive(state(hero)),
                     locked = state(hero) == ArchiveState.Locked,
@@ -420,6 +424,8 @@ fun LazyGridScope.feedItems(
                     saved = hero.id in savedIds,
                     onOpen = onOpen,
                     onToggleSaved = onToggleSaved,
+                    liked = hero.id in likedIds,
+                    onToggleLiked = onToggleLiked,
                 )
             }
         }
@@ -442,9 +448,11 @@ fun LazyGridScope.feedItems(
         }
     }
     val videosAfter = if (videos.isEmpty()) Int.MAX_VALUE else VIDEOS_AFTER
-    bento(rest.take(videosAfter), 0, compact, magazine, category, selectedId, savedIds, likedIds, ::state, onOpen, onToggleSaved, onToggleLiked)
+    bento(rest.take(videosAfter), 0, compact, magazine, category, selectedId, savedIds, likedIds, ::state, onOpen, onToggleSaved, onToggleLiked,
+        columns, wideLast = videos.isNotEmpty() && rest.size >= videosAfter)
     if (rest.size >= minOf(videosAfter, rest.size) && videos.isNotEmpty()) fullRow("videos") { VideoMoments(videos, compact) }
-    if (rest.size > videosAfter) bento(rest.drop(videosAfter), videosAfter, compact, magazine, category, selectedId, savedIds, likedIds, ::state, onOpen, onToggleSaved, onToggleLiked)
+    if (rest.size > videosAfter) bento(rest.drop(videosAfter), videosAfter, compact, magazine, category, selectedId, savedIds, likedIds, ::state, onOpen, onToggleSaved, onToggleLiked,
+        columns, wideFirst = true)
 }
 
 /** Stories under the lead before the video carousel. */
@@ -454,25 +462,20 @@ private fun LazyGridScope.bento(
     rest: List<Article>, offset: Int, compact: Boolean, magazine: Boolean, category: String,
     selectedId: String?, savedIds: Set<String>, likedIds: Set<String>, state: (Article) -> ArchiveState?,
     onOpen: (Article) -> Unit, onToggleSaved: (Article) -> Unit, onToggleLiked: (Article) -> Unit,
+    columns: Int, wideFirst: Boolean = false, wideLast: Boolean = false,
 ) {
+    val spans = BentoLayout.spans(rest.size, columns, offset, compact, magazine, wideFirst, wideLast)
     itemsIndexed(
         rest,
         key = { _, a -> a.id },
-        // Every 7th bento item (starting with the 3rd) spans both columns on the cover screen.
-        span = { i0, _ -> val index = i0 + offset
-            when {
-                magazine && index % 5 == 0 && maxLineSpan > 2 -> GridItemSpan(2)
-                compact && index % 7 == 2 -> GridItemSpan(2)
-                else -> GridItemSpan(1)
-            }
-        },
-    ) { i0, article -> val index = i0 + offset
+        span = { i0, _ -> GridItemSpan(spans[i0].coerceAtMost(maxLineSpan)) },
+    ) { i0, article ->
         Box(feedItemMotion().landing(article.id)) {
             BentoCard(
                 article = article.withArchive(state(article)),
                 locked = state(article) == ArchiveState.Locked,
                 category = category,
-                wide = (compact && index % 7 == 2) || (magazine && index % 5 == 0),
+                wide = spans[i0] >= 2,
                 selected = !compact && selectedId == article.id,
                 saved = article.id in savedIds,
                 liked = article.id in likedIds,
@@ -481,6 +484,39 @@ private fun LazyGridScope.bento(
                 onToggleLiked = onToggleLiked,
             )
         }
+    }
+}
+
+/**
+ * How wide each story card is, so rows always fill: the usual rhythm (every 7th wide on the cover
+ * screen, every 5th on the magazine), full-width cards next to the video row, and a card that
+ * would leave a gap (a wide one that doesn't fit, or a lone last one) stretched to fill its row.
+ */
+internal object BentoLayout {
+    fun spans(n: Int, columns: Int, offset: Int, compact: Boolean, magazine: Boolean, wideFirst: Boolean, wideLast: Boolean): IntArray {
+        val out = IntArray(n)
+        var col = 0
+        for (i in 0 until n) {
+            val index = i + offset
+            val forced = (wideFirst && i == 0) || (wideLast && i == n - 1)
+            var w = when {
+                forced -> columns
+                magazine && index % 5 == 0 && columns > 2 -> 2
+                compact && index % 7 == 2 -> columns
+                else -> 1
+            }.coerceAtMost(columns)
+            if (col + w > columns) {
+                // Doesn't fit beside the previous card: that one stretches to close the row.
+                if (i > 0) out[i - 1] += columns - col
+                col = 0
+            }
+            out[i] = w
+            col += w
+            if (col >= columns) col = 0
+        }
+        // A part-filled last row: its last card takes the rest.
+        if (n > 0 && col > 0) out[n - 1] += columns - col
+        return out
     }
 }
 
@@ -647,6 +683,8 @@ fun HeroCard(
     saved: Boolean,
     onOpen: (Article) -> Unit,
     onToggleSaved: (Article) -> Unit,
+    liked: Boolean = false,
+    onToggleLiked: ((Article) -> Unit)? = null,
 ) {
     GlassCard(
         onClick = { onOpen(article) },
@@ -677,12 +715,21 @@ fun HeroCard(
                     ScrimPill { Text(badge, style = mono(10.sp), color = Color.White.copy(alpha = 0.9f)) }
                     Spacer(Modifier.width(6.dp))
                 }
-                ShareButton(article, tint = Color.White, background = Color.Black.copy(alpha = 0.45f), border = Color.White.copy(alpha = 0.20f), padding = 8.dp)
+                // Love, share, save: the same 15 dp icons in the same 31 dp circles.
+                onToggleLiked?.let { like ->
+                    SpringToggle(
+                        active = liked, kind = ToggleKind.LIKE, onToggle = { like(article) }, iconSize = 15.dp,
+                        inactiveTint = Color.White, background = Color.Black.copy(alpha = 0.45f), border = Color.White.copy(alpha = 0.20f), padding = 8.dp,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
+                ShareButton(article, tint = Color.White, background = Color.Black.copy(alpha = 0.45f), border = Color.White.copy(alpha = 0.20f), padding = 8.dp, iconSize = 15.dp)
                 Spacer(Modifier.width(6.dp))
                 SpringToggle(
                     active = saved,
                     kind = ToggleKind.BOOKMARK,
                     onToggle = { onToggleSaved(article) },
+                    iconSize = 15.dp,
                     inactiveTint = Color.White,
                     background = Color.Black.copy(alpha = 0.45f),
                     border = Color.White.copy(alpha = 0.20f),
@@ -738,6 +785,8 @@ fun LeadStoryCard(
     saved: Boolean,
     onOpen: (Article) -> Unit,
     onToggleSaved: (Article) -> Unit,
+    liked: Boolean = false,
+    onToggleLiked: ((Article) -> Unit)? = null,
 ) {
     val g = Glass
     GlassCard(
@@ -792,9 +841,13 @@ fun LeadStoryCard(
                         style = mono(11.sp, tracking = 0.sp), color = g.textSecondary,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                     )
-                    ShareButton(article, background = g.chipFill, padding = 8.dp)
+                    onToggleLiked?.let { like ->
+                        SpringToggle(liked, ToggleKind.LIKE, { like(article) }, iconSize = 15.dp, background = g.chipFill, padding = 8.dp)
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    ShareButton(article, background = g.chipFill, padding = 8.dp, iconSize = 15.dp)
                     Spacer(Modifier.width(6.dp))
-                    SpringToggle(saved, ToggleKind.BOOKMARK, { onToggleSaved(article) }, background = g.chipFill, padding = 8.dp)
+                    SpringToggle(saved, ToggleKind.BOOKMARK, { onToggleSaved(article) }, iconSize = 15.dp, background = g.chipFill, padding = 8.dp)
                 }
             }
         }

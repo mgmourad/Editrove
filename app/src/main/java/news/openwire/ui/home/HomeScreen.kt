@@ -653,6 +653,7 @@ private fun TabFeed(
                 newIds = newHere?.ids?.toSet().orEmpty(),
                 newSince = newHere?.since ?: 0L,
                 videos = if (t == NavTab.TODAY) videosMap[topic.id].orEmpty() else emptyList(),
+                columns = columns,
             )
             when (t) {
                 NavTab.TODAY, NavTab.AUDIO -> {

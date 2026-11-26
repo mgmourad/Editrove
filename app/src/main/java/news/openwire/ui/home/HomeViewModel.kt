@@ -63,7 +63,22 @@ class HomeViewModel(
     private val archiveLookup: suspend (Article) -> String?,
     /** news.google.com wrapper → publisher URL (shared or pasted Google News links). */
     private val resolveLink: suspend (String) -> String? = { null },
+    /** A tab's news Shorts (Top Stories: every flavour). */
+    private val loadVideos: suspend (String) -> List<news.openwire.domain.video.ShortVideo> = { emptyList() },
 ) : ViewModel() {
+
+    private val _videos = MutableStateFlow<Map<String, List<news.openwire.domain.video.ShortVideo>>>(emptyMap())
+    val videos: StateFlow<Map<String, List<news.openwire.domain.video.ShortVideo>>> = _videos.asStateFlow()
+    private val videoJobs = HashMap<String, kotlinx.coroutines.Job>()
+
+    /** Loads (or refreshes, with [force]) a tab's video carousel. */
+    fun loadVideos(topicId: String, force: Boolean = false) {
+        if (!force && (_videos.value.containsKey(topicId) || videoJobs[topicId]?.isActive == true)) return
+        videoJobs[topicId] = viewModelScope.launch {
+            val list = runCatching { loadVideos.invoke(topicId) }.getOrDefault(emptyList())
+            if (list.isNotEmpty() || !_videos.value.containsKey(topicId)) _videos.update { it + (topicId to list) }
+        }
+    }
 
     val settings: StateFlow<UserSettings> = settingsRepo.settings
 
@@ -204,7 +219,7 @@ class HomeViewModel(
         when (_tab.value) {
             NavTab.DISCOVER -> topics.forEach(::mark)
             NavTab.SAVED, NavTab.LIVE, NavTab.OPINION -> Unit
-            else -> mark(currentTopic)
+            else -> { mark(currentTopic); loadVideos(currentTopic.id, force = true) }
         }
         when (_tab.value) {
             NavTab.DISCOVER -> topics.forEach { load(it, force = true) }

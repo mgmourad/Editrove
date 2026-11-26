@@ -48,6 +48,8 @@ class AppContainer(context: Context) {
             diagnostics = true,
         ) }
     val markets: news.openwire.data.remote.MarketDataSource by lazy { news.openwire.data.remote.MarketDataSource() }
+    /** News Shorts from outlets' official YouTube channels (public feeds). */
+    val shorts: news.openwire.data.remote.ShortsSource by lazy { news.openwire.data.remote.ShortsSource() }
     val radioBrowser: news.openwire.data.remote.RadioBrowserSource by lazy { news.openwire.data.remote.RadioBrowserSource() }
     /** Editrove's own downloadable voices. */
     val voices: news.openwire.voice.VoiceStore by lazy { news.openwire.voice.VoiceStore(context) }

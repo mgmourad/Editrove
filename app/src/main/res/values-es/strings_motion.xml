@@ -38,4 +38,12 @@
     <string name="alerts_from">De</string>
     <string name="alerts_to">a</string>
     <string name="alerts_quiet_hint">Las noticias que llegan en pausa o en horas de silencio no se guardan para después: están en la app cuando la abras.</string>
+    <string name="video_moments">Momentos en vídeo</string>
+    <string name="video_moments_sub">Lo último en vídeos cortos</string>
+    <string name="video_via_youtube">VÍA YOUTUBE</string>
+    <string name="video_mute">Silenciar</string>
+    <string name="video_unmute">Activar sonido</string>
+    <string name="video_love">Me encanta</string>
+    <string name="video_save">Guardar</string>
+    <string name="video_share">Compartir</string>
 </resources>

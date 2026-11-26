@@ -211,6 +211,18 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
         { a -> (a.originalUrl ?: a.targetUrl)?.let { app.container.articleTextExtractor.preview(it, a.title) } }
     }
     CompositionLocalProvider(LocalTextScale provides userSettings.textScale, LocalArticlePreview provides previewLoader, LocalImageResolver provides app.container.imageResolver, LocalLogoResolver provides app.container.logoResolver, LocalMarkets provides app.container.markets, LocalBriefingPlayer provides briefing) {
+    // The full-screen video player (Video moments).
+    var playing by remember { mutableStateOf<Pair<List<news.openwire.domain.video.ShortVideo>, Int>?>(null) }
+    val savedNow by vm.saved.collectAsState()
+    val likedNow by vm.liked.collectAsState()
+    playing?.let { (list, i) ->
+        ShortsPlayer(
+            list, i, liked = likedNow, saved = remember(savedNow) { savedNow.mapTo(HashSet()) { it.id } },
+            onToggleLiked = { vm.toggleLiked(it.asArticle()) }, onToggleSaved = { vm.toggleSaved(it.asArticle()) },
+            onClose = { playing = null },
+        )
+    }
+    CompositionLocalProvider(LocalPlayVideo provides { list, i -> playing = list to i }) {
     SharedTransitionLayout {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= ExpandedBreakpoint
@@ -362,6 +374,7 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                 news.openwire.guide.WelcomeTour(onDone = { news.openwire.guide.Guide.showing = false; news.openwire.guide.Guide.markWelcomed(ctx) })
             }
         }
+    }
     }
     }
 }
@@ -519,6 +532,7 @@ private fun TabFeed(
     val archive by vm.archive.collectAsState()
     val refreshingIds by vm.refreshing.collectAsState()
     val newStoriesMap by vm.newStories.collectAsState()
+    val videosMap by vm.videos.collectAsState()
 
     val padding = PaddingValues(
         start = horizontalPadding, end = horizontalPadding,
@@ -619,6 +633,7 @@ private fun TabFeed(
             modifier = Modifier.fillMaxSize(),
         ) {
         val newHere = if (t == NavTab.TODAY) newStoriesMap[topic.id] else null
+        if (t == NavTab.TODAY) LaunchedEffect(topic.id) { vm.loadVideos(topic.id) }
         EditorialGrid(stateFor(t), padding, Modifier.fillMaxSize(), columns = columns) {
             fullRow("masthead") {
                 Masthead(userSettings.edition.city, onEdition = { vm.openSettings() }, onSettings = { vm.openSettings() })
@@ -637,6 +652,7 @@ private fun TabFeed(
                 ticker = tickerItems,
                 newIds = newHere?.ids?.toSet().orEmpty(),
                 newSince = newHere?.since ?: 0L,
+                videos = if (t == NavTab.TODAY) videosMap[topic.id].orEmpty() else emptyList(),
             )
             when (t) {
                 NavTab.TODAY, NavTab.AUDIO -> {

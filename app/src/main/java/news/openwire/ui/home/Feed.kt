@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.togetherWith
@@ -386,6 +387,8 @@ fun LazyGridScope.feedItems(
     /** Stories that arrived with the last refresh, and when the one before it was. */
     newIds: Set<String> = emptySet(),
     newSince: Long = 0L,
+    /** The tab's news Shorts ("Video moments"), shown after the first few stories. */
+    videos: List<news.openwire.domain.video.ShortVideo> = emptyList(),
 ) {
     if (articles.isEmpty()) return
     // New since the last refresh: under a divider at the top, each with the rose "new" dot.
@@ -397,28 +400,31 @@ fun LazyGridScope.feedItems(
     fun state(a: Article) = a.originalUrl?.let { archive[it] }
     if (showTicker) fullRow("ticker") { LiveTicker(ticker ?: articles.drop(1).take(12).map { TickerItem(it, category, category) }, onOpen) }
     if (showTicker && marketWatch) fullRow("markets") { MarketBar() }
-    val hero = articles.first()
-    fullRow("hero-${hero.id}") {
-        Box(Modifier.landing(hero.id)) {
-        if (magazine) LeadStoryCard(
-            article = hero.withArchive(state(hero)),
-            locked = state(hero) == ArchiveState.Locked,
-            category = category,
-            saved = hero.id in savedIds,
-            onOpen = onOpen,
-            onToggleSaved = onToggleSaved,
-        ) else HeroCard(
-            article = hero.withArchive(state(hero)),
-            locked = state(hero) == ArchiveState.Locked,
-            category = category,
-            selected = !compact && selectedId == hero.id,
-            saved = hero.id in savedIds,
-            onOpen = onOpen,
-            onToggleSaved = onToggleSaved,
-        )
+    // The lead: the top four stories as a slideshow (5 s each; a touch holds it for 10 s).
+    val leads = articles.take(LEAD_SLIDES)
+    fullRow("hero-slides") {
+        LeadSlideshow(leads) { hero ->
+            Box(Modifier.landing(hero.id)) {
+                if (magazine) LeadStoryCard(
+                    article = hero.withArchive(state(hero)),
+                    locked = state(hero) == ArchiveState.Locked,
+                    category = category,
+                    saved = hero.id in savedIds,
+                    onOpen = onOpen,
+                    onToggleSaved = onToggleSaved,
+                ) else HeroCard(
+                    article = hero.withArchive(state(hero)),
+                    locked = state(hero) == ArchiveState.Locked,
+                    category = category,
+                    selected = !compact && selectedId == hero.id,
+                    saved = hero.id in savedIds,
+                    onOpen = onOpen,
+                    onToggleSaved = onToggleSaved,
+                )
+            }
         }
     }
-    val rest = articles.drop(1)
+    val rest = articles.drop(leads.size)
     if (rest.isNotEmpty()) {
         fullRow("bento-header") {
             Row(
@@ -435,18 +441,32 @@ fun LazyGridScope.feedItems(
             }
         }
     }
+    val videosAfter = if (videos.isEmpty()) Int.MAX_VALUE else VIDEOS_AFTER
+    bento(rest.take(videosAfter), 0, compact, magazine, category, selectedId, savedIds, likedIds, ::state, onOpen, onToggleSaved, onToggleLiked)
+    if (rest.size >= minOf(videosAfter, rest.size) && videos.isNotEmpty()) fullRow("videos") { VideoMoments(videos, compact) }
+    if (rest.size > videosAfter) bento(rest.drop(videosAfter), videosAfter, compact, magazine, category, selectedId, savedIds, likedIds, ::state, onOpen, onToggleSaved, onToggleLiked)
+}
+
+/** Stories under the lead before the video carousel. */
+private const val VIDEOS_AFTER = 4
+
+private fun LazyGridScope.bento(
+    rest: List<Article>, offset: Int, compact: Boolean, magazine: Boolean, category: String,
+    selectedId: String?, savedIds: Set<String>, likedIds: Set<String>, state: (Article) -> ArchiveState?,
+    onOpen: (Article) -> Unit, onToggleSaved: (Article) -> Unit, onToggleLiked: (Article) -> Unit,
+) {
     itemsIndexed(
         rest,
         key = { _, a -> a.id },
         // Every 7th bento item (starting with the 3rd) spans both columns on the cover screen.
-        span = { index, _ ->
+        span = { i0, _ -> val index = i0 + offset
             when {
                 magazine && index % 5 == 0 && maxLineSpan > 2 -> GridItemSpan(2)
                 compact && index % 7 == 2 -> GridItemSpan(2)
                 else -> GridItemSpan(1)
             }
         },
-    ) { index, article ->
+    ) { i0, article -> val index = i0 + offset
         Box(feedItemMotion().landing(article.id)) {
             BentoCard(
                 article = article.withArchive(state(article)),
@@ -1060,5 +1080,65 @@ private fun NewStoryCell(a: Article, index: Int, onOpen: (Article) -> Unit, modi
         }
         Spacer(Modifier.height(3.dp))
         Text(a.title, style = serif(14.sp, FontWeight.SemiBold, lineHeight = 18.sp), color = g.textPrimary, maxLines = 3, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** How many top stories the lead slideshow shows. */
+private const val LEAD_SLIDES = 4
+private const val SLIDE_MS = 5_000L
+private const val HOLD_AFTER_TOUCH_MS = 10_000L
+
+/**
+ * The lead card as a slideshow of the top stories: it advances every 5 s; any touch (swiping
+ * through, pressing) holds it for 10 s from the last touch, then it carries on. Dots show the
+ * position; with animations off it doesn't advance on its own.
+ */
+@Composable
+private fun LeadSlideshow(stories: List<Article>, card: @Composable (Article) -> Unit) {
+    if (stories.size <= 1) { stories.firstOrNull()?.let { card(it) }; return }
+    val reduce = news.openwire.ui.theme.rememberReduceMotion()
+    val pager = androidx.compose.foundation.pager.rememberPagerState { stories.size }
+    var lastTouch by remember { mutableStateOf(0L) }
+    val dragged by pager.interactionSource.collectIsDraggedAsState()
+    LaunchedEffect(dragged) { if (dragged) lastTouch = System.currentTimeMillis() }
+    LaunchedEffect(stories.map { it.id }) {
+        if (reduce) return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(SLIDE_MS)
+            val held = System.currentTimeMillis() - lastTouch
+            if (held < HOLD_AFTER_TOUCH_MS) { kotlinx.coroutines.delay(HOLD_AFTER_TOUCH_MS - held); continue }
+            if (!pager.isScrollInProgress) pager.animateScrollToPage((pager.currentPage + 1) % stories.size, animationSpec = tween(650, easing = EmphasizedDecelerate))
+        }
+    }
+    Box(
+        Modifier.pointerInput(Unit) {
+            // Any touch on the card counts (a press, a swipe), without taking it from the card.
+            awaitPointerEventScope {
+                while (true) {
+                    awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    lastTouch = System.currentTimeMillis()
+                }
+            }
+        },
+    ) {
+        androidx.compose.foundation.pager.HorizontalPager(
+            state = pager, pageSpacing = 12.dp, beyondViewportPageCount = 1,
+            key = { stories[it].id },
+        ) { page -> card(stories[page]) }
+        // Position dots inside the card, bottom corner (clear of the headline and the top pills).
+        Row(
+            Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 14.dp).clip(CircleShape)
+                .background(Color.Black.copy(alpha = .35f)).padding(horizontal = 6.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(stories.size) { i ->
+                val on = pager.currentPage == i
+                val w by androidx.compose.animation.core.animateDpAsState(if (on) 14.dp else 5.dp, tween(300), label = "dot")
+                Box(
+                    Modifier.padding(horizontal = 2.dp).height(5.dp).width(w).clip(CircleShape)
+                        .background(if (on) Color.White else Color.White.copy(alpha = .45f)),
+                )
+            }
+        }
     }
 }

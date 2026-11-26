@@ -38,4 +38,12 @@
     <string name="alerts_from">Von</string>
     <string name="alerts_to">bis</string>
     <string name="alerts_quiet_hint">Meldungen aus Pausen oder Ruhezeiten werden nicht gesammelt nachgeliefert: Sie finden sie in der App.</string>
+    <string name="video_moments">Video-Momente</string>
+    <string name="video_moments_sub">Das Neueste in kurzen Videos</string>
+    <string name="video_via_youtube">ÜBER YOUTUBE</string>
+    <string name="video_mute">Stumm</string>
+    <string name="video_unmute">Ton an</string>
+    <string name="video_love">Gefällt mir</string>
+    <string name="video_save">Speichern</string>
+    <string name="video_share">Teilen</string>
 </resources>

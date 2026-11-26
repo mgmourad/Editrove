@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
                     registry = container.domainRegistry,
                     archiveLookup = { container.archiveFor(it) },
                     resolveLink = { container.googleLinks.resolve(it) },
+                    loadVideos = { container.shorts.forTopic(it) },
                 )
             }
         }

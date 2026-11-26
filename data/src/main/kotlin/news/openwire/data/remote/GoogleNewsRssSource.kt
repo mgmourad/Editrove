@@ -22,6 +22,8 @@ class GoogleNewsRssSource(
         .connectTimeout(6, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
         .build(),
+    /** Where moved feeds live now (the app keeps these across restarts). */
+    private val relocations: FeedRelocations = FeedRelocations.Memory,
 ) {
 
     suspend fun fetch(url: String): List<RssItem> = fetchFeed(url).items
@@ -39,40 +41,67 @@ class GoogleNewsRssSource(
     }
 
     /**
-     * Some servers reset HTTP/2 streams on feed paths they've retired or rewritten
-     * ("stream was reset: INTERNAL_ERROR"); the same address over HTTP/1.1 often still answers,
-     * and when it doesn't, the site's page usually says where the feed lives now.
+     * Feeds heal themselves. When a feed stops answering the way a feed should:
+     *
+     * 1. a reset HTTP/2 stream ("stream was reset: INTERNAL_ERROR") is retried once over HTTP/1.1;
+     * 2. a retired address (404/410, a reset that persists, a web page or an empty feed where the
+     *    feed was) is looked up again on the site itself: the homepage's advertised feeds, the
+     *    feed's own folder and the usual "RSS" directory pages. The candidate sharing the old
+     *    address's words (same section) that reads as a real feed is used instead.
+     *
+     * A site that refuses Editrove (401/403) or asks it to slow down (429) is left alone: no retry
+     * under another identity. A new address is remembered ([relocations], kept across restarts),
+     * so later fetches go straight there; if it ever fails, the original is tried again. A feed
+     * that can't be found isn't searched for again for six hours.
      */
     private val http1 by lazy { client.newBuilder().protocols(listOf(okhttp3.Protocol.HTTP_1_1)).build() }
-    private val moved = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val lastSearch = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     private suspend fun fetchOnce(url: String): ParsedFeed {
-        moved[url]?.let { m -> runCatching { return fetchWith(client, m) } }
-        return try {
-            fetchWith(client, url)
-        } catch (e: IOException) {
-            val reset = e is okhttp3.internal.http2.StreamResetException || e.message.orEmpty().contains("stream was reset", true) ||
-                e is java.net.ProtocolException
-            if (reset) runCatching { return fetchWith(http1, url) }
-            // Retired address (reset, 404, 410): look for the feed the site advertises now.
-            if (reset || e.message in GONE) relocate(url)?.let { (u, feed) -> moved[url] = u; return feed }
-            throw e
+        relocations.get(url)?.let { m ->
+            runCatching { return fetchWith(client, m).also { requireItems(it) } }.onFailure { relocations.remove(url) }
         }
+        val failure: Exception = try {
+            return fetchWith(client, url).also { requireItems(it) }
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            e
+        }
+        val msg = failure.message.orEmpty()
+        val reset = failure is okhttp3.internal.http2.StreamResetException || msg.contains("stream was reset", true) || failure is java.net.ProtocolException
+        if (reset) runCatching { return fetchWith(http1, url).also { requireItems(it) } }
+        val notAFeed = failure is org.xml.sax.SAXException || failure is NotAFeed
+        if (reset || notAFeed || msg in GONE) relocate(url)?.let { (to, feed) ->
+            relocations.put(url, to)
+            return feed
+        }
+        throw failure
     }
 
-    /** The site's current feed for the same section, read from its own pages' feed links. */
+    private class NotAFeed : IOException("The feed has no stories.")
+    private fun requireItems(f: ParsedFeed) { if (f.items.isEmpty()) throw NotAFeed() }
+
+    /** The site's current address for the same feed (see [fetchOnce]). */
     private suspend fun relocate(url: String): Pair<String, ParsedFeed>? = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        if (now - (lastSearch[url] ?: 0L) < 6 * 3_600_000L) return@withContext null
+        lastSearch[url] = now
         val u = runCatching { java.net.URI(url) }.getOrNull() ?: return@withContext null
-        val section = url.trimEnd('/').substringAfterLast('/').substringAfterLast("rss-").lowercase()
-        for (page in listOf("https://${u.host}/", "https://${u.host}${u.path.substringBeforeLast('/')}/")) {
+        val host = u.host ?: return@withContext null
+        val folder = u.path.substringBeforeLast('/', "")
+        val pages = (listOf("https://$host/", "https://$host$folder/") + news.openwire.domain.engine.FeedRelocation.DIRECTORY_PATHS.map { "https://$host$it" }).distinct()
+        val links = LinkedHashSet<String>()
+        for (page in pages) {
             val html = runCatching {
                 http1.newCall(Request.Builder().url(page).header("User-Agent", UA).build()).execute().use { r -> if (r.isSuccessful) r.body?.string() else null }
             }.getOrNull() ?: continue
-            val links = FEED_LINK.findAll(html).map { it.groupValues[1].replace("&amp;", "&") }
-                .map { l -> if (l.startsWith("http")) l else "https://${u.host}/${l.trimStart('/')}" }.distinct().toList()
-            val pick = links.firstOrNull { section.isNotEmpty() && it.lowercase().contains(section) } ?: links.firstOrNull() ?: continue
-            if (pick == url) continue
-            runCatching { return@withContext pick to fetchWith(http1, pick) }
+            links += news.openwire.domain.engine.FeedRelocation.feedLinks(html, page)
+            // Enough to choose from once the best match shares every word of the old address.
+            val best = news.openwire.domain.engine.FeedRelocation.rank(url, links.toList()).firstOrNull()
+            if (best != null && news.openwire.domain.engine.FeedRelocation.words(url).all { it in news.openwire.domain.engine.FeedRelocation.words(best) }) break
+        }
+        for (candidate in news.openwire.domain.engine.FeedRelocation.rank(url, links.toList()).take(4)) {
+            runCatching { return@withContext candidate to fetchWith(http1, candidate).also { requireItems(it) } }
         }
         null
     }
@@ -187,5 +216,19 @@ class GoogleNewsRssSource(
 }
 
 private const val UA = "Mozilla/5.0 (Linux; Android 15) Editrove/0.3"
-private val GONE = setOf("HTTP 404", "HTTP 410", "HTTP 301", "HTTP 308")
-private val FEED_LINK = Regex("<link[^>]+type=[\"']application/(?:rss|atom)\\+xml[\"'][^>]*href=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
+private val GONE = setOf("HTTP 400", "HTTP 404", "HTTP 410")
+
+/** Where feeds that moved live now: original address → current one. */
+interface FeedRelocations {
+    fun get(url: String): String?
+    fun put(url: String, to: String)
+    fun remove(url: String)
+
+    /** For tests and the default: forgotten when the app closes. */
+    object Memory : FeedRelocations {
+        private val map = java.util.concurrent.ConcurrentHashMap<String, String>()
+        override fun get(url: String) = map[url]
+        override fun put(url: String, to: String) { map[url] = to }
+        override fun remove(url: String) { map.remove(url) }
+    }
+}

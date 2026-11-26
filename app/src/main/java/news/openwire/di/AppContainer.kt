@@ -35,6 +35,9 @@ class AppContainer(context: Context) {
 
     internal val database: OpenWireDatabase by lazy { OpenWireDatabase.create(context) }
 
+    /** The feed reader every topic uses; feeds that moved are found again and remembered. */
+    val feedSource: GoogleNewsRssSource by lazy { GoogleNewsRssSource(relocations = news.openwire.data.remote.FeedRelocationStore(context)) }
+
     /** Paywall engine with the user's persisted per-domain overrides. */
     val domainRegistry = DomainRegistry(PrefsDomainRuleStore(context))
 
@@ -99,7 +102,7 @@ class AppContainer(context: Context) {
     val feedRepository: FeedRepository by lazy {
         FeedRepositoryImpl(
             remote = FallbackNewsRemote(primary = NewsRemoteDataSource(baseUrl = news.openwire.BuildConfig.DATA_BASE_URL), fallback = AssetNewsDataSource(context)),
-            rssSource = GoogleNewsRssSource(),
+            rssSource = feedSource,
             normalizer = RssNormalizer(domainRegistry),
             dao = database.articleDao(),
             registry = domainRegistry,

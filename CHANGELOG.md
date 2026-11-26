@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.9.4 beta 112626
+
+- Alerts: one memory for every alert (the same story never alerts twice in 48 hours, from any
+  outlet), alerts arrive one at a time, in-app sound switches, quiet hours and pause, and a
+  Notification Hub to set every alert On, Silent or Off.
+- Today: the lead is a slideshow of the top four stories; Video Moments (news Shorts, a week
+  back, from 52 outlets including your own sources) with a full-screen player; For You,
+  picked on the phone from the stories you love.
+- A feature tour with screenshots, after setup and once after updating; replay it from the User Guide.
+- Sources: add a feed to any section by address or by searching online, remove feeds in edit
+  mode, and edit the sources of built-in topics.
+- Feeds heal themselves: a feed that moves is found again on its site and remembered.
+- Fixes: the refresh band no longer sticks after automatic updates; CBC feeds load again;
+  badges no longer truncate on lead cards; captions off in videos.
+
 ### Changed (0.9.3 beta 112426)
 
 - Every story's photo develops in, cached or not, and so does the publisher's logo when a

@@ -211,6 +211,18 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
         { a -> (a.originalUrl ?: a.targetUrl)?.let { app.container.articleTextExtractor.preview(it, a.title) } }
     }
     CompositionLocalProvider(LocalTextScale provides userSettings.textScale, LocalArticlePreview provides previewLoader, LocalImageResolver provides app.container.imageResolver, LocalLogoResolver provides app.container.logoResolver, LocalMarkets provides app.container.markets, LocalBriefingPlayer provides briefing) {
+    // The full-screen video player (Video moments).
+    var playing by remember { mutableStateOf<Pair<List<news.openwire.domain.video.ShortVideo>, Int>?>(null) }
+    val savedNow by vm.saved.collectAsState()
+    val likedNow by vm.liked.collectAsState()
+    playing?.let { (list, i) ->
+        ShortsPlayer(
+            list, i, liked = likedNow, saved = remember(savedNow) { savedNow.mapTo(HashSet()) { it.id } },
+            onToggleLiked = { vm.toggleLiked(it.asArticle()) }, onToggleSaved = { vm.toggleSaved(it.asArticle()) },
+            onClose = { playing = null },
+        )
+    }
+    CompositionLocalProvider(LocalPlayVideo provides { list, i -> playing = list to i }) {
     SharedTransitionLayout {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= ExpandedBreakpoint
@@ -237,7 +249,8 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                                     ui = FeedUi(savedIds, liked, null),
                                     onOpen = { vm.openArticle(it) },
                                     bottomPadding = 40.dp,
-                                    columns = columns, magazine = true, horizontalPadding = 28.dp,
+                                    columns = columns,
+                                    magazine = true, horizontalPadding = 28.dp,
                                 )
                             }
                             PaneMiniPlayer(briefing, Modifier.align(Alignment.BottomCenter))
@@ -359,9 +372,12 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
             // The welcome tour sits over everything, Settings included (first launch, or replayed from the guide).
             if (news.openwire.guide.Guide.showing) {
                 val ctx = LocalContext.current
-                news.openwire.guide.WelcomeTour(onDone = { news.openwire.guide.Guide.showing = false; news.openwire.guide.Guide.markWelcomed(ctx) })
+                news.openwire.guide.FeatureTourScreen(onDone = {
+                    news.openwire.guide.Guide.showing = false; news.openwire.guide.Guide.markWelcomed(ctx); news.openwire.guide.FeatureTour.markSeen(ctx)
+                })
             }
         }
+    }
     }
     }
 }
@@ -519,6 +535,9 @@ private fun TabFeed(
     val archive by vm.archive.collectAsState()
     val refreshingIds by vm.refreshing.collectAsState()
     val newStoriesMap by vm.newStories.collectAsState()
+    val videosMap by vm.videos.collectAsState()
+    val forYouMap by vm.forYou.collectAsState()
+    val likedIds by vm.liked.collectAsState()
 
     val padding = PaddingValues(
         start = horizontalPadding, end = horizontalPadding,
@@ -605,10 +624,12 @@ private fun TabFeed(
             return@HorizontalPager
         }
 
+        // Only a refresh the reader started opens the pull band (automatic updates stay out of the way).
+        val userRefreshingIds by vm.userRefreshing.collectAsState()
         val isRefreshing = when (t) {
-            NavTab.DISCOVER -> refreshingIds.isNotEmpty()
+            NavTab.DISCOVER -> userRefreshingIds.isNotEmpty()
             NavTab.SAVED, NavTab.LIVE, NavTab.OPINION -> false
-            else -> topic.id in refreshingIds
+            else -> topic.id in userRefreshingIds
         }
         RuleRefreshBox(
             refreshing = isRefreshing,
@@ -619,6 +640,12 @@ private fun TabFeed(
             modifier = Modifier.fillMaxSize(),
         ) {
         val newHere = if (t == NavTab.TODAY) newStoriesMap[topic.id] else null
+        if (t == NavTab.TODAY) LaunchedEffect(topic.id) { vm.loadVideos(topic.id) }
+        // For You follows the loves and the stories on screen (the top of the page isn't repeated there).
+        if (t == NavTab.TODAY) {
+            val top = (feeds[topic.id] as? FeedResult.Success)?.articles?.take(12)?.map { it.id }?.toSet().orEmpty()
+            LaunchedEffect(topic.id, likedIds, top) { vm.buildForYou(topic.id, top) }
+        }
         EditorialGrid(stateFor(t), padding, Modifier.fillMaxSize(), columns = columns) {
             fullRow("masthead") {
                 Masthead(userSettings.edition.city, onEdition = { vm.openSettings() }, onSettings = { vm.openSettings() })
@@ -637,6 +664,9 @@ private fun TabFeed(
                 ticker = tickerItems,
                 newIds = newHere?.ids?.toSet().orEmpty(),
                 newSince = newHere?.since ?: 0L,
+                videos = if (t == NavTab.TODAY) videosMap[topic.id].orEmpty() else emptyList(),
+                columns = columns,
+                forYou = if (t == NavTab.TODAY) forYouMap[topic.id].orEmpty() else emptyList(),
             )
             when (t) {
                 NavTab.TODAY, NavTab.AUDIO -> {

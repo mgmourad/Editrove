@@ -63,7 +63,52 @@ class HomeViewModel(
     private val archiveLookup: suspend (Article) -> String?,
     /** news.google.com wrapper → publisher URL (shared or pasted Google News links). */
     private val resolveLink: suspend (String) -> String? = { null },
+    /** A tab's news Shorts (Top Stories: every flavour). */
+    private val loadVideos: suspend (String) -> List<news.openwire.domain.video.ShortVideo> = { emptyList() },
 ) : ViewModel() {
+
+    private val _videos = MutableStateFlow<Map<String, List<news.openwire.domain.video.ShortVideo>>>(emptyMap())
+    val videos: StateFlow<Map<String, List<news.openwire.domain.video.ShortVideo>>> = _videos.asStateFlow()
+    private val videoJobs = HashMap<String, kotlinx.coroutines.Job>()
+
+    private val _forYou = MutableStateFlow<Map<String, List<Article>>>(emptyMap())
+    /** For You per tab: stories like the ones the reader loved. */
+    val forYou: StateFlow<Map<String, List<Article>>> = _forYou.asStateFlow()
+    private val forYouJobs = HashMap<String, kotlinx.coroutines.Job>()
+
+    /**
+     * Rebuilds a tab's For You from what's been loved: Top Stories (and Latest) draw on every
+     * topic, any other tab on its own stories. [shown] are stories already at the top of the page.
+     */
+    fun buildForYou(topicId: String, shown: Set<String>) {
+        forYouJobs[topicId]?.cancel()
+        forYouJobs[topicId] = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            val loved = library.lovedStories().ifEmpty {
+                // Likes from before headlines were kept: whatever loved stories are still in the feeds.
+                val ids = library.liked.value
+                _feeds.value.values.flatMap { (it as? FeedResult.Success)?.articles.orEmpty() }.filter { it.id in ids }
+                    .map { news.openwire.domain.foryou.ForYou.Loved(it.title, it.domain) }
+            }
+            if (loved.isEmpty()) { _forYou.update { it - topicId }; return@launch }
+            val everywhere = topicId == "TOP" || topicId == "LATEST"
+            val topics = if (everywhere) this@HomeViewModel.topics.filter { it.isVisible } else this@HomeViewModel.topics.filter { it.id == topicId }
+            val candidates = topics.flatMap { t ->
+                val list = (_feeds.value[t.id] as? FeedResult.Success)?.articles ?: runCatching { repository.cachedArticles(t.id) }.getOrDefault(emptyList())
+                list.map { news.openwire.domain.foryou.ForYou.Candidate(t.id, it) }
+            }
+            val picks = news.openwire.domain.foryou.ForYou.recommend(loved, candidates, exclude = shown + library.liked.value)
+            _forYou.update { if (picks.size >= 4) it + (topicId to picks) else it - topicId }
+        }
+    }
+
+    /** Loads (or refreshes, with [force]) a tab's video carousel. */
+    fun loadVideos(topicId: String, force: Boolean = false) {
+        if (!force && (_videos.value.containsKey(topicId) || videoJobs[topicId]?.isActive == true)) return
+        videoJobs[topicId] = viewModelScope.launch {
+            val list = runCatching { loadVideos.invoke(topicId) }.getOrDefault(emptyList())
+            if (list.isNotEmpty() || !_videos.value.containsKey(topicId)) _videos.update { it + (topicId to list) }
+        }
+    }
 
     val settings: StateFlow<UserSettings> = settingsRepo.settings
 
@@ -97,6 +142,15 @@ class HomeViewModel(
     val ticker: StateFlow<news.openwire.data.repository.RefreshTicker> = _ticker.asStateFlow()
     /** Topics whose refresh the reader asked for (only those drive the wire). */
     private val pulled = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Topics with a refresh the reader started that is still waiting on sources. Only these open the
+     * pull band; it closes as soon as every source has answered (link checks carry on unseen), or
+     * after 25 s at most. Automatic refreshes never open it.
+     */
+    private val _userRefreshing = MutableStateFlow<Set<String>>(emptySet())
+    val userRefreshing: StateFlow<Set<String>> = _userRefreshing.asStateFlow()
+    private fun endUserRefresh(topicId: String) = _userRefreshing.update { it - topicId }
 
     /** Stories that arrived with the last refresh the reader asked for, per topic. */
     data class NewStories(val ids: List<String>, val since: Long)
@@ -146,6 +200,8 @@ class HomeViewModel(
                 _ticker.update { t ->
                     if (e is news.openwire.data.repository.RefreshEvent.Started) { if (e.topicId in pulled) t.reduce(e) else t } else t.reduce(e)
                 }
+                val t = _ticker.value
+                if (t.finished || (t.total > 0 && t.returned >= t.total)) endUserRefresh(t.topicId)
             }
         }
         load(currentTopic)
@@ -199,12 +255,14 @@ class HomeViewModel(
         // What was on screen, to tell which stories are new when this refresh lands.
         fun mark(t: Topic) {
             pulled += t.id
+            _userRefreshing.update { it + t.id }
+            viewModelScope.launch { kotlinx.coroutines.delay(25_000); endUserRefresh(t.id) }
             (_feeds.value[t.id] as? FeedResult.Success)?.let { r -> beforeRefresh[t.id] = r.articles.map { news.openwire.domain.motion.NewSince.key(it.title) } to r.updatedAt }
         }
         when (_tab.value) {
             NavTab.DISCOVER -> topics.forEach(::mark)
             NavTab.SAVED, NavTab.LIVE, NavTab.OPINION -> Unit
-            else -> mark(currentTopic)
+            else -> { mark(currentTopic); loadVideos(currentTopic.id, force = true) }
         }
         when (_tab.value) {
             NavTab.DISCOVER -> topics.forEach { load(it, force = true) }
@@ -394,6 +452,7 @@ class HomeViewModel(
             } finally {
                 _refreshing.update { it - topic.id }
                 if (pulled.remove(topic.id)) settleNew(topic.id)
+                endUserRefresh(topic.id)
             }
         }
     }

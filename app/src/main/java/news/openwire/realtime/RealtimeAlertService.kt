@@ -129,13 +129,12 @@ class RealtimeAlertService : Service() {
         val seen = container.feedState.seen("BREAKING").orEmpty()
         if (key in seen) return
         container.feedState.setSeen("BREAKING", seen + key)
-        val headline = NewHeadline(alert.article.title, alert.newsroom.name, alert.article.originalUrl)
-        val open = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(MainActivity.EXTRA_URL, headline.url)
-            putExtra(MainActivity.EXTRA_TITLE, headline.title)
-        }
-        Notifier.postBreaking(this, BreakingAlert(key, headline), open)
+        // The same memory, quiet time and pacing as every other alert.
+        news.openwire.notifications.AlertCenter.submit(
+            this,
+            listOf(news.openwire.domain.alerts.PendingAlert(key, alert.article.title, alert.newsroom.name, alert.article.originalUrl, breaking = true, foundAt = now, channel = "realtime")),
+            now,
+        )
     }
 
     private fun startInForeground(count: Int) {

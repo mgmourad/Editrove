@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <resources>
-    <string name="n_refresh_channel">Background refresh</string>
-    <string name="n_updating">Updating news</string>
-    <string name="n_headlines_channel">New headlines</string>
+    <string name="n_refresh_channel">Background Refresh</string>
+    <string name="n_updating">Updating News</string>
+    <string name="n_headlines_channel">New Headlines</string>
     <string name="n_headlines_channel_desc">New stories in topics you follow</string>
-    <string name="n_breaking_channel">Breaking news</string>
+    <string name="n_breaking_channel">Breaking News</string>
     <string name="n_breaking_channel_desc">Breaking stories from the newsrooms you follow</string>
     <string name="n_new_stories">%1$d new stories</string>
     <string name="n_topics_have_news">%1$d topics have new stories</string>
@@ -13,4 +13,5 @@
     <string name="n_more">+%1$d more</string>
     <string name="n_see_all">See all %1$d</string>
     <string name="n_breaking">Breaking</string>
+    <string name="n_pause_3h">Pause 3 h</string>
 </resources>

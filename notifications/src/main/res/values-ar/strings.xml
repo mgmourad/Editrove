@@ -13,4 +13,5 @@
     <string name="n_more">+%1$d أخرى</string>
     <string name="n_see_all">عرض الكل (%1$d)</string>
     <string name="n_breaking">عاجل</string>
+    <string name="n_pause_3h">إيقاف 3 ساعات</string>
 </resources>

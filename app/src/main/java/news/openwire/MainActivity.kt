@@ -43,6 +43,14 @@ class MainActivity : ComponentActivity() {
                     registry = container.domainRegistry,
                     archiveLookup = { container.archiveFor(it) },
                     resolveLink = { container.googleLinks.resolve(it) },
+                    loadVideos = { topic ->
+                        // Only outlets the reader keeps on: a switched-off source's site brings no videos.
+                        val s = container.settingsRepository.settings.value
+                        val catalog = container.feedCatalog.catalog
+                        val off = catalog.filter { news.openwire.domain.engine.SourceLibrary.sourceKey(it) in s.disabledSources }.map { it.domain }.toSet()
+                        val on = catalog.filter { news.openwire.domain.engine.SourceLibrary.sourceKey(it) !in s.disabledSources }.map { it.domain }.toSet()
+                        container.shorts.forTopic(topic, switchedOff = { d -> d in off && d !in on })
+                    },
                 )
             }
         }
@@ -106,9 +114,9 @@ class MainActivity : ComponentActivity() {
             gate.showing = true
             news.openwire.guide.Guide.markWelcomed(this)
         }
-        // A fresh install opened from the launcher starts with the welcome tour (when setup didn't run).
+        // The feature tour: once per tour version (people updating see it once too), from the launcher.
         if (!gate.showing && savedInstanceState == null && intent?.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_LAUNCHER) &&
-            news.openwire.guide.Guide.shouldWelcome(this)
+            news.openwire.guide.FeatureTour.due(this)
         ) news.openwire.guide.Guide.showing = true
         setContent {
             val mode by vm.themeMode.collectAsState()
@@ -178,6 +186,8 @@ class MainActivity : ComponentActivity() {
         if (st.choices.slots.isEmpty() && !gate.rerun) news.openwire.delivery.DeliveryCheck.markChecked(this)
         vm.openSettings(false)
         vm.selectTopicId("TOP")
+        // Right after first-run setup: the feature tour.
+        if (!gate.rerun && news.openwire.guide.FeatureTour.due(this)) news.openwire.guide.Guide.showing = true
         gate.showing = false; gate.rerun = false
         return news.openwire.onboarding.SetupNotice.text(st)
     }

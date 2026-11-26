@@ -21,4 +21,5 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     api(libs.work.runtime.ktx)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(project(":domain"))
 }

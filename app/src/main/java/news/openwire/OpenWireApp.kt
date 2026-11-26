@@ -87,7 +87,7 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
                     val fresh = FeedOrdering.newStories(articles, seen)
                     container.feedState.setSeen(topic.id, (articles.map(FeedOrdering::storyKey) + seen.orEmpty()).toSet())
                     if (topic.id in s.notifyTopics && fresh.isNotEmpty()) {
-                        updates += TopicUpdate(topic.id, topic.label, fresh.take(8).map { NewHeadline(it.title, it.source, it.originalUrl) })
+                        updates += TopicUpdate(topic.id, topic.label, fresh.take(8).map { NewHeadline(it.title, it.source, it.originalUrl, FeedOrdering.storyKey(it)) })
                     }
                 }
                 runCatching { opinionUpdate(s) }.getOrNull()?.let { updates += it }
@@ -109,12 +109,14 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
                 val found = ArrayList<NewHeadline>()
                 if (authors.isNotEmpty()) {
                     val cols = src.columns(lang, force = true).map { it.article }
-                    news.openwire.domain.opinion.OpinionCatalog.byAuthors(cols, authors).forEach { a -> found += NewHeadline(a.title, a.author ?: a.source, a.originalUrl) }
+                    news.openwire.domain.opinion.OpinionCatalog.byAuthors(cols, authors).forEach { a ->
+                        found += NewHeadline(a.title, a.author ?: a.source, a.originalUrl, channel = (a.author ?: a.source)?.let { "op:" + news.openwire.opinion.writerKey(it) })
+                    }
                 }
                 if (accounts.isNotEmpty()) {
-                    src.following(accounts, force = true).forEach { p -> found += NewHeadline(p.text.take(160), p.authorName, p.url) }
+                    src.following(accounts, force = true).forEach { p -> found += NewHeadline(p.text.take(160), p.authorName, p.url, channel = "op:" + news.openwire.opinion.accountKey(p.authorHandle)) }
                 }
-                tabs.forEach { t -> src.topicColumns(t, lang, force = true).take(5).forEach { a -> found += NewHeadline(a.title, a.source, a.originalUrl) } }
+                tabs.forEach { t -> src.topicColumns(t, lang, force = true).take(5).forEach { a -> found += NewHeadline(a.title, a.source, a.originalUrl, channel = "op:" + news.openwire.opinion.topicKey(t)) } }
                 val keys = found.mapNotNull { it.url }
                 val seen = container.feedState.seen(OPINION_ID)
                 container.feedState.setSeen(OPINION_ID, (keys + seen.orEmpty()).toSet())
@@ -125,6 +127,10 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
             }
 
             override fun notificationsEnabled(): Boolean = container.settingsRepository.settings.value.notificationsEnabled
+
+            override fun alertPrefs() = container.settingsRepository.settings.value.alerts
+
+            override fun pauseAlerts(untilMs: Long) = container.settingsRepository.update { it.copy(alerts = it.alerts.copy(pausedUntil = untilMs)) }
 
             override suspend fun breaking(): List<BreakingAlert> {
                 val s = container.settingsRepository.settings.value

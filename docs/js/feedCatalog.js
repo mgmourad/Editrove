@@ -4,7 +4,7 @@ export const FEED_CATALOG = [
     "id": "cbc_top",
     "name": "CBC News",
     "domain": "cbc.ca",
-    "url": "https://www.cbc.ca/cmlink/rss-topstories",
+    "url": "https://www.cbc.ca/webfeed/rss/rss-topstories",
     "topics": [
       "TOP",
       "LATEST"
@@ -235,7 +235,7 @@ export const FEED_CATALOG = [
     "id": "cbc_canada",
     "name": "CBC Canada",
     "domain": "cbc.ca",
-    "url": "https://www.cbc.ca/cmlink/rss-canada",
+    "url": "https://www.cbc.ca/webfeed/rss/rss-canada",
     "topics": [
       "CANADA"
     ],
@@ -261,7 +261,7 @@ export const FEED_CATALOG = [
     "id": "cbc_bc",
     "name": "CBC British Columbia",
     "domain": "cbc.ca",
-    "url": "https://www.cbc.ca/cmlink/rss-canada-britishcolumbia",
+    "url": "https://www.cbc.ca/webfeed/rss/rss-canada-britishcolumbia",
     "topics": [
       "VANCOUVER",
       "BC"
@@ -342,7 +342,7 @@ export const FEED_CATALOG = [
     "id": "cbc_world",
     "name": "CBC World",
     "domain": "cbc.ca",
-    "url": "https://www.cbc.ca/cmlink/rss-world",
+    "url": "https://www.cbc.ca/webfeed/rss/rss-world",
     "topics": [
       "WORLD"
     ],
@@ -407,7 +407,7 @@ export const FEED_CATALOG = [
     "id": "cbc_business",
     "name": "CBC Business",
     "domain": "cbc.ca",
-    "url": "https://www.cbc.ca/cmlink/rss-business",
+    "url": "https://www.cbc.ca/webfeed/rss/rss-business",
     "topics": [
       "BUSINESS"
     ],
@@ -498,7 +498,7 @@ export const FEED_CATALOG = [
     "id": "cbc_tech",
     "name": "CBC Tech",
     "domain": "cbc.ca",
-    "url": "https://www.cbc.ca/cmlink/rss-technology",
+    "url": "https://www.cbc.ca/webfeed/rss/rss-technology",
     "topics": [
       "TECHNOLOGY"
     ],
@@ -563,7 +563,7 @@ export const FEED_CATALOG = [
     "id": "cbc_sports",
     "name": "CBC Sports",
     "domain": "cbc.ca",
-    "url": "https://www.cbc.ca/cmlink/rss-sports",
+    "url": "https://www.cbc.ca/webfeed/rss/rss-sports",
     "topics": [
       "SPORTS"
     ],

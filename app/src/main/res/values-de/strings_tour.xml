@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="ft_k_start">Willkommen</string>
+    <string name="ft_k_fold">Dein großer Bildschirm</string>
+    <string name="ft_k_front">Deine Titelseite</string>
+    <string name="ft_k_read">Lesen</string>
+    <string name="ft_k_watch">Schauen</string>
+    <string name="ft_k_listen">Hören</string>
+    <string name="ft_k_yours">Ganz deins</string>
+    <string name="ft_k_end">Nichts verlässt dein Telefon</string>
+    <string name="ft_today_t">Deine Titelseite</string>
+    <string name="ft_today_b">Heute beginnt mit den vier Top-Meldungen als Diashow: wische oder lass sie weiterlaufen. Themen stehen oben; Kuratiert, Neueste und Älteste ändern die Reihenfolge.</string>
+    <string name="ft_split_t">Geteilte Ansicht</string>
+    <string name="ft_split_b">Aufgeklappt zeigt Editrove Feed und geöffnete Meldung nebeneinander: Du liest eine, während du die nächste wählst.</string>
+    <string name="ft_split_w">Aufgeklappt · Standard</string>
+    <string name="ft_full_t">Lieber Vollansicht?</string>
+    <string name="ft_full_b">Die Vollansicht gibt dem Feed den ganzen Bildschirm wie ein Magazin, und jede Meldung öffnet als eigene Seite. Jederzeit umschaltbar.</string>
+    <string name="ft_full_w">▭-Taste in der Seitenleiste · oder Einstellungen › Darstellung › Aufgeklappt &amp; Tablet</string>
+    <string name="ft_pull_t">Ziehen für die neueste Ausgabe</string>
+    <string name="ft_pull_b">Zieh die Seite nach unten: Die Zeile unter dem Titel nennt jede Quelle, sobald sie antwortet, und Neues erscheint unter „Neu seit“.</string>
+    <string name="ft_reader_t">Jede Meldung lesen</string>
+    <string name="ft_reader_b">Meldungen öffnen mit Foto, einer auf deinem Telefon geschriebenen Zusammenfassung und dem ganzen Text, auch bei vielen Bezahlseiten. Öffnet eine Seite nicht, liest Editrove dieselbe Meldung bei anderen Redaktionen.</string>
+    <string name="ft_videos_t">Video-Momente</string>
+    <string name="ft_videos_b">Kurze Nachrichtenvideos aus den Kanälen der Medien selbst, passend zum gewählten Tab. Top-Meldungen mischt News, Sport, Tech, Wirtschaft und Unterhaltung.</string>
+    <string name="ft_player_t">Schauen, wischen, weiter</string>
+    <string name="ft_player_b">Tipp ein Video an für Vollbild. Nach oben wischen für das nächste; Ton, Gefällt mir, Speichern und Teilen sind rechts. Tipp aufs Video zum Pausieren.</string>
+    <string name="ft_foryou_t">Für dich</string>
+    <string name="ft_foryou_b">Markiere Meldungen mit dem Herz, und Für dich lernt, was dir gefällt: vier Vorschläge pro Seite, fünf Seiten, berechnet auf deinem Telefon und nie gesendet.</string>
+    <string name="ft_audio_t">Audio-Briefing</string>
+    <string name="ft_audio_b">Deine Titelseite vorgelesen wie eine Nachrichtensendung, mit der Stimme deiner Wahl. Plane ein Briefing am Morgen, Mittag oder Abend.</string>
+    <string name="ft_audio_w">Untere Leiste · Lautsprecher</string>
+    <string name="ft_live_t">Live-TV und Radio</string>
+    <string name="ft_live_b">Nachrichtensender live und Radiosender aus aller Welt, in deiner Sprache oder jeder anderen.</string>
+    <string name="ft_live_w">Untere Leiste · TV-Symbol</string>
+    <string name="ft_opinion_t">Analyse &amp; Meinung</string>
+    <string name="ft_opinion_b">Kolumnen, Essays und die Debatte um die Nachrichten. Folge Autoren und Themen mit + und erhalte einen Hinweis, wenn sie veröffentlichen.</string>
+    <string name="ft_opinion_w">Untere Leiste · Anführungszeichen</string>
+    <string name="ft_discover_t">Entdecken und suchen</string>
+    <string name="ft_discover_b">Durchsuche alle Meldungen und Medien und sieh die Top-Meldungen aller Themen an einem Ort.</string>
+    <string name="ft_discover_w">Untere Leiste · Lupe</string>
+    <string name="ft_saved_t">Gespeicherte Meldungen</string>
+    <string name="ft_saved_b">Tipp auf das Lesezeichen einer Meldung, um sie zu behalten. Sie bleibt auf deinem Telefon und öffnet offline.</string>
+    <string name="ft_saved_w">Untere Leiste · Lesezeichen</string>
+    <string name="ft_topics_t">Themen und Quellen</string>
+    <string name="ft_topics_b">Ordne oder verstecke Themen, erstelle eigene aus Stichwörtern, ändere Stadt und Ausgabe und wähle die Zeitungen jedes Themas.</string>
+    <string name="ft_topics_w">Einstellungen › Themen · Quellen · Ausgabe</string>
+    <string name="ft_alerts_t">Hinweise nach deinem Geschmack</string>
+    <string name="ft_alerts_b">Wähle die Themen, die dich benachrichtigen, und schalte Eilmeldungen ein. Töne, Ruhezeiten und Pause findest du hier; dieselbe Meldung kommt nie zweimal.</string>
+    <string name="ft_alerts_w">Einstellungen › Benachrichtigungen &amp; Aktualisierung</string>
+    <string name="ft_appear_t">Aussehen</string>
+    <string name="ft_appear_b">Schwarzes Glas oder Redaktionspapier, eine angenehme Textgröße und die Feed-Reihenfolge, die dir gefällt.</string>
+    <string name="ft_appear_w">Einstellungen › Darstellung</string>
+    <string name="ft_privacy_t">Privat von Grund auf</string>
+    <string name="ft_privacy_b">Kein Konto, keine Werbung, kein Tracking. Deine Auswahl, Herzen und Gespeichertes bleiben auf diesem Telefon. Wiederhole die Tour jederzeit.</string>
+    <string name="ft_privacy_w">Einstellungen › Anleitung › Tour wiederholen</string>
+</resources>

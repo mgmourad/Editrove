@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="ft_k_start">Bienvenue</string>
+    <string name="ft_k_fold">Votre grand écran</string>
+    <string name="ft_k_front">Votre une</string>
+    <string name="ft_k_read">Lire</string>
+    <string name="ft_k_watch">Regarder</string>
+    <string name="ft_k_listen">Écouter</string>
+    <string name="ft_k_yours">À votre façon</string>
+    <string name="ft_k_end">Rien ne quitte votre téléphone</string>
+    <string name="ft_today_t">Votre une</string>
+    <string name="ft_today_b">Aujourd’hui s’ouvre sur les quatre grands titres en diaporama : faites défiler ou laissez-le tourner. Les sujets sont dans les pastilles ; Sélection, Récents et Anciens changent l’ordre.</string>
+    <string name="ft_split_t">Vue partagée</string>
+    <string name="ft_split_b">Déplié, Editrove affiche le fil et l’article ouvert côte à côte : vous lisez un article en choisissant le suivant.</string>
+    <string name="ft_split_w">Déplié · par défaut</string>
+    <string name="ft_full_t">Plutôt la vue complète ?</string>
+    <string name="ft_full_b">La vue complète donne tout l’écran au fil, comme un magazine, et chaque article s’ouvre en pleine page. Changez quand vous voulez.</string>
+    <string name="ft_full_w">Bouton ▭ du rail latéral · ou Réglages › Apparence › Disposition dépliée et tablette</string>
+    <string name="ft_pull_t">Tirez pour la dernière édition</string>
+    <string name="ft_pull_b">Tirez la page vers le bas : la ligne sous le titre nomme chaque source dès qu’elle répond, et les nouveaux articles arrivent sous « Nouveaux depuis ».</string>
+    <string name="ft_reader_t">Lisez n’importe quel article</string>
+    <string name="ft_reader_b">Les articles s’ouvrent avec leur photo, un résumé rédigé sur votre téléphone et le texte complet, même sur de nombreux sites payants. Si un site refuse, Editrove lit le même sujet chez d’autres rédactions.</string>
+    <string name="ft_videos_t">En vidéo</string>
+    <string name="ft_videos_b">De courtes vidéos d’actu des chaînes des médias eux-mêmes, choisies pour l’onglet affiché. À la une mêle actu, sport, tech, économie et divertissement.</string>
+    <string name="ft_player_t">Regardez, glissez, suivante</string>
+    <string name="ft_player_b">Touchez une vidéo pour la regarder en plein écran. Glissez vers le haut pour la suivante ; son, j’aime, enregistrer et partager sont à droite. Touchez la vidéo pour la mettre en pause.</string>
+    <string name="ft_foryou_t">Pour vous</string>
+    <string name="ft_foryou_b">Aimez un article avec le cœur et Pour vous apprend vos goûts : quatre choix par page, cinq pages, calculés sur votre téléphone et jamais envoyés.</string>
+    <string name="ft_audio_t">Briefing audio</string>
+    <string name="ft_audio_b">Votre une lue comme un journal radio, par la voix que vous choisissez. Programmez un briefing du matin, du midi ou du soir.</string>
+    <string name="ft_audio_w">Barre du bas · icône haut-parleur</string>
+    <string name="ft_live_t">TV et radio en direct</string>
+    <string name="ft_live_b">Des chaînes d’info en direct et des radios du monde entier, dans votre langue ou une autre.</string>
+    <string name="ft_live_w">Barre du bas · icône TV</string>
+    <string name="ft_opinion_t">Analyses et opinions</string>
+    <string name="ft_opinion_b">Chroniques, essais et débats autour de l’actu. Suivez auteurs et sujets avec le bouton + et soyez alerté à chaque parution.</string>
+    <string name="ft_opinion_w">Barre du bas · icône guillemets</string>
+    <string name="ft_discover_t">Découvrir et chercher</string>
+    <string name="ft_discover_b">Cherchez parmi tous les articles et éditeurs, et retrouvez les grands titres de tous vos sujets au même endroit.</string>
+    <string name="ft_discover_w">Barre du bas · loupe</string>
+    <string name="ft_saved_t">Articles enregistrés</string>
+    <string name="ft_saved_b">Touchez le signet d’un article pour le garder. Il reste sur votre téléphone et s’ouvre hors ligne.</string>
+    <string name="ft_saved_w">Barre du bas · signet</string>
+    <string name="ft_topics_t">Sujets et sources</string>
+    <string name="ft_topics_b">Réordonnez ou masquez des sujets, créez les vôtres à partir de mots-clés, changez de ville et d’édition, et choisissez les journaux de chaque sujet.</string>
+    <string name="ft_topics_w">Réglages › Sujets · Sources · Édition</string>
+    <string name="ft_alerts_t">Des alertes à votre façon</string>
+    <string name="ft_alerts_b">Choisissez les sujets qui vous alertent et activez les dernières infos. Sons, heures calmes et pause sont ici ; la même info ne vous alerte jamais deux fois.</string>
+    <string name="ft_alerts_w">Réglages › Notifications et actualisation</string>
+    <string name="ft_appear_t">Apparence</string>
+    <string name="ft_appear_b">Verre noir ou Papier éditorial, une taille de texte confortable et l’ordre du fil qui vous plaît.</string>
+    <string name="ft_appear_w">Réglages › Apparence</string>
+    <string name="ft_privacy_t">Privé par conception</string>
+    <string name="ft_privacy_b">Ni compte, ni pub, ni pistage. Vos choix, vos favoris et vos articles enregistrés restent sur ce téléphone. Revoyez cette visite quand vous voulez.</string>
+    <string name="ft_privacy_w">Réglages › Guide › Revoir la visite</string>
+</resources>

@@ -13,4 +13,5 @@
     <string name="n_more">+%1$d más</string>
     <string name="n_see_all">Ver todas (%1$d)</string>
     <string name="n_breaking">Última hora</string>
+    <string name="n_pause_3h">Pausar 3 h</string>
 </resources>

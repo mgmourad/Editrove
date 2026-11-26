@@ -59,7 +59,35 @@ class SettingsViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, libraryFor(settings.value))
 
     private fun libraryFor(s: UserSettings) = (listOf(SourceLibrary.GOOGLE_NEWS) + SourceLibrary.allSources(catalog(), s.customFeeds))
+        .filter { SourceLibrary.sourceKey(it) !in s.removedSources }
         .map { it.copy(enabled = SourceLibrary.isEnabled(it, s.disabledSources)) }
+
+    /** Takes a source off the list: a reader's own is deleted, a built-in one is switched off and hidden. */
+    fun removeSource(src: FeedSource) {
+        if (src.isCustom) { deleteSource(src.id); return }
+        val key = SourceLibrary.sourceKey(src)
+        settingsRepo.update { it.copy(disabledSources = it.disabledSources + key, removedSources = it.removedSources + key) }
+        _message.value = tr(R.string.msg_source_removed, src.name)
+    }
+
+    /** The topic a source section's new feed joins (News → Top Stories, Business → Business…). */
+    fun topicForCategory(category: String): String = when (category.lowercase()) {
+        "business" -> "BUSINESS"; "finance" -> "FINANCE"; "politics" -> "POLITICS"; "science" -> "SCIENCE"
+        "technology" -> "TECHNOLOGY"; "lifestyle" -> "LIFESTYLE"; "entertainment" -> "ENTERTAINMENT"; "sports" -> "SPORTS"
+        else -> "TOP"
+    }
+
+    /** Adds a found feed into a given section's topic. */
+    fun addFoundTo(f: news.openwire.data.remote.SourceFinder.Found, topic: String) {
+        if (settings.value.customFeeds.any { it.url == f.url }) return
+        settingsRepo.update { s ->
+            s.copy(customFeeds = s.customFeeds + FeedSource(
+                id = "found_${f.domain.replace(Regex("[^a-z0-9]"), "_")}_${clock().toString().takeLast(6)}",
+                name = f.name, url = f.url, domain = f.domain, topics = listOf(topic), maxArticles = 8, category = "Custom", isCustom = true,
+            ))
+        }
+        _message.value = tr(R.string.msg_added_to, f.name, topicsFor(settings.value).firstOrNull { it.id == topic }?.label ?: topic)
+    }
 
     private val _rules = MutableStateFlow(registry.getAllRules())
     val rules: StateFlow<Map<String, DomainRule>> = _rules.asStateFlow()
@@ -112,6 +140,10 @@ class SettingsViewModel(
         val lang = news.openwire.domain.engine.Languages.forCountry(country) ?: return
         if (lang.code != news.openwire.domain.engine.Languages.effective(settings.value.language)) _languageOffer.value = lang
     }
+
+    /** Alert sounds, quiet hours and pause (Settings › Notifications). */
+    fun updateAlerts(change: (news.openwire.domain.alerts.AlertPrefs) -> news.openwire.domain.alerts.AlertPrefs) =
+        settingsRepo.update { it.copy(alerts = change(it.alerts)) }
 
     /** Records Editrove's language ("" = the phone's); the screen applies it to Android. */
     fun setLanguage(tag: String) {
@@ -464,7 +496,7 @@ class SettingsViewModel(
 
     fun deleteSource(id: String) = settingsRepo.update { s -> s.copy(customFeeds = s.customFeeds.filterNot { it.id == id }) }
 
-    fun resetSources() = settingsRepo.update { it.copy(customFeeds = emptyList(), disabledSources = emptySet()) }
+    fun resetSources() = settingsRepo.update { it.copy(customFeeds = emptyList(), disabledSources = emptySet(), removedSources = emptySet()) }
 
     /** "Check enabled feeds" audit: fetches every enabled direct source, four at a time. */
     fun checkEnabledFeeds() {
@@ -536,6 +568,9 @@ class SettingsViewModel(
     fun setBreakingEnabled(on: Boolean) = settingsRepo.update { it.copy(breakingEnabled = on) }
 
     fun setRealtimeAlerts(on: Boolean) = settingsRepo.update { it.copy(realtimeAlerts = on) }
+
+    /** Alerts from one followed writer, account or opinion topic, on or off (Notification Hub). */
+    fun setOpinionMuted(key: String, muted: Boolean) = settingsRepo.update { s -> s.copy(opinionMuted = if (muted) s.opinionMuted + key else s.opinionMuted - key) }
     fun toggleBreakingOutlet(key: String) = settingsRepo.update { s ->
         s.copy(breakingOutlets = if (key in s.breakingOutlets) s.breakingOutlets - key else s.breakingOutlets + key)
     }

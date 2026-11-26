@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="ft_k_start">Bienvenida</string>
+    <string name="ft_k_fold">Tu pantalla grande</string>
+    <string name="ft_k_front">Tu portada</string>
+    <string name="ft_k_read">Leer</string>
+    <string name="ft_k_watch">Ver</string>
+    <string name="ft_k_listen">Escuchar</string>
+    <string name="ft_k_yours">A tu manera</string>
+    <string name="ft_k_end">Nada sale de tu teléfono</string>
+    <string name="ft_today_t">Tu portada</string>
+    <string name="ft_today_b">Hoy abre con las cuatro noticias principales en pase de diapositivas: desliza o deja que cambie sola. Los temas están arriba; Seleccionadas, Recientes y Antiguas cambian el orden.</string>
+    <string name="ft_split_t">Vista dividida</string>
+    <string name="ft_split_b">Desplegado, Editrove muestra el feed y la noticia abierta lado a lado: lees una mientras eliges la siguiente.</string>
+    <string name="ft_split_w">Desplegado · por defecto</string>
+    <string name="ft_full_t">¿Prefieres la vista completa?</string>
+    <string name="ft_full_b">La vista completa da toda la pantalla al feed, como una revista, y cada noticia se abre a página completa. Cambia cuando quieras.</string>
+    <string name="ft_full_w">Botón ▭ del riel lateral · o Ajustes › Apariencia › Diseño desplegado y tableta</string>
+    <string name="ft_pull_t">Desliza para la última edición</string>
+    <string name="ft_pull_b">Desliza la página hacia abajo: la línea bajo la cabecera nombra cada fuente cuando responde, y lo nuevo llega bajo «Nuevas desde».</string>
+    <string name="ft_reader_t">Lee cualquier noticia</string>
+    <string name="ft_reader_b">Las noticias se abren con su foto, un resumen escrito en tu teléfono y el texto completo, incluso de muchos sitios de pago. Si un sitio no abre, Editrove lee la misma noticia en otras redacciones.</string>
+    <string name="ft_videos_t">Momentos en vídeo</string>
+    <string name="ft_videos_b">Vídeos cortos de noticias de los canales de los propios medios, elegidos para la pestaña en la que estás. Portada mezcla noticias, deportes, tecnología, economía y entretenimiento.</string>
+    <string name="ft_player_t">Mira, desliza, siguiente</string>
+    <string name="ft_player_b">Toca un vídeo para verlo a pantalla completa. Desliza hacia arriba para el siguiente; sonido, me encanta, guardar y compartir están a la derecha. Toca el vídeo para pausarlo.</string>
+    <string name="ft_foryou_t">Para ti</string>
+    <string name="ft_foryou_b">Dale al corazón y Para ti aprende lo que te gusta: cuatro sugerencias por página, cinco páginas, calculadas en tu teléfono y nunca enviadas.</string>
+    <string name="ft_audio_t">Resumen de audio</string>
+    <string name="ft_audio_b">Tu portada leída como un informativo, con la voz que elijas. Programa un resumen de mañana, mediodía o noche.</string>
+    <string name="ft_audio_w">Barra inferior · icono de altavoz</string>
+    <string name="ft_live_t">TV y radio en directo</string>
+    <string name="ft_live_b">Canales de noticias en directo y emisoras de radio de todo el mundo, en tu idioma o en cualquiera.</string>
+    <string name="ft_live_w">Barra inferior · icono de TV</string>
+    <string name="ft_opinion_t">Análisis y opinión</string>
+    <string name="ft_opinion_b">Columnas, ensayos y la conversación sobre la actualidad. Sigue a autores y temas con el botón + y recibe un aviso cuando publiquen.</string>
+    <string name="ft_opinion_w">Barra inferior · icono de comillas</string>
+    <string name="ft_discover_t">Descubre y busca</string>
+    <string name="ft_discover_b">Busca en todas las noticias y medios, y ve lo más destacado de todos tus temas en un solo lugar.</string>
+    <string name="ft_discover_w">Barra inferior · lupa</string>
+    <string name="ft_saved_t">Noticias guardadas</string>
+    <string name="ft_saved_b">Toca el marcador de cualquier noticia para guardarla. Queda en tu teléfono y se abre sin conexión.</string>
+    <string name="ft_saved_w">Barra inferior · marcador</string>
+    <string name="ft_topics_t">Temas y fuentes</string>
+    <string name="ft_topics_b">Reordena u oculta temas, crea los tuyos con palabras clave, cambia de ciudad y edición, y elige los periódicos de cada tema.</string>
+    <string name="ft_topics_w">Ajustes › Temas · Fuentes · Edición</string>
+    <string name="ft_alerts_t">Alertas a tu manera</string>
+    <string name="ft_alerts_b">Elige los temas que te avisan y activa la última hora. Sonidos, horas de silencio y pausa están aquí; la misma noticia nunca te avisa dos veces.</string>
+    <string name="ft_alerts_w">Ajustes › Notificaciones y actualización</string>
+    <string name="ft_appear_t">Aspecto</string>
+    <string name="ft_appear_b">Cristal negro o Papel editorial, un tamaño de texto cómodo y el orden del feed que prefieras.</string>
+    <string name="ft_appear_w">Ajustes › Apariencia</string>
+    <string name="ft_privacy_t">Privado por diseño</string>
+    <string name="ft_privacy_b">Sin cuenta, sin anuncios, sin rastreo. Tus elecciones, favoritos y guardados se quedan en este teléfono. Repite este recorrido cuando quieras.</string>
+    <string name="ft_privacy_w">Ajustes › Guía › Repetir el recorrido</string>
+</resources>

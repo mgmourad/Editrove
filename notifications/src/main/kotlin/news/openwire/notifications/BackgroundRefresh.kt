@@ -22,7 +22,7 @@ import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 
 /** A genuinely new headline in an opted-in topic. */
-data class NewHeadline(val title: String, val source: String?, val url: String?)
+data class NewHeadline(val title: String, val source: String?, val url: String?, val key: String? = null, val channel: String? = null)
 
 /** New headlines found for one topic during a background refresh. */
 data class TopicUpdate(val topicId: String, val topicLabel: String, val headlines: List<NewHeadline>)
@@ -50,6 +50,12 @@ interface BackgroundRefresher {
     /** The Activity that notification taps open. */
     fun launchIntent(context: Context, update: TopicUpdate): Intent
 
+    /** The reader's sound and quiet-time choices. */
+    fun alertPrefs(): news.openwire.domain.alerts.AlertPrefs = news.openwire.domain.alerts.AlertPrefs()
+
+    /** "Pause 3 h" from an alert: no alerts until [untilMs]. */
+    fun pauseAlerts(untilMs: Long) {}
+
     interface Provider {
         val backgroundRefresher: BackgroundRefresher
     }
@@ -70,16 +76,20 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
             null
         }
         val breaking = runCatching { refresher.breaking() }.getOrDefault(emptyList())
-        if (refresher.notificationsEnabled() && !onScreen) breaking.take(3).forEach { Notifier.postBreaking(applicationContext, it, refresher.storyIntent(applicationContext, it.headline, null)) }
-        if (updates == null) return if (runAttemptCount < 2) Result.retry() else Result.failure()
-        if (refresher.notificationsEnabled() && !onScreen) {
-            val posted = updates.filter { it.headlines.isNotEmpty() }
-            // Several topics in one refresh: one stack with a single sound, not a burst of alerts.
-            posted.forEachIndexed { i, it ->
-                Notifier.post(applicationContext, it, refresher.storyIntent(applicationContext, it.headlines.first(), it.topicId), refresher.launchIntent(applicationContext, it), quiet = i > 0)
+        val now = System.currentTimeMillis()
+        // Everything found goes through one place: duplicates (any kind, any outlet, 48 h) are
+        // dropped, quiet time is honoured, and the rest arrive one at a time.
+        val found = breaking.take(3).map { b ->
+            news.openwire.domain.alerts.PendingAlert(b.key, b.headline.title, b.headline.source, b.headline.url, breaking = true, foundAt = now, channel = "breaking")
+        } + updates.orEmpty().flatMap { u ->
+            // Two per topic at most per check: the rest are in the app.
+            u.headlines.take(2).map { h ->
+                news.openwire.domain.alerts.PendingAlert(h.key ?: h.url ?: h.title, h.title, h.source, h.url, u.topicId, u.topicLabel, foundAt = now, channel = h.channel ?: "topic:${u.topicId}")
             }
-            if (posted.size > 1) Notifier.postSummary(applicationContext, posted)
         }
+        if (refresher.notificationsEnabled() && !onScreen) AlertCenter.submit(applicationContext, found, now)
+        else AlertCenter.markSeen(applicationContext, found, now)
+        if (updates == null) return if (runAttemptCount < 2) Result.retry() else Result.failure()
         return Result.success()
     }
 
@@ -239,8 +249,42 @@ object Notifier {
         }
     }
 
+    /** One topic story, on its own (several arrive minutes apart, so each pops up and sounds). */
+    fun postStory(context: Context, a: news.openwire.domain.alerts.PendingAlert, storyIntent: Intent, silent: Boolean) {
+        if (!canPost(context)) return
+        ensureChannel(context)
+        val id = a.key.hashCode()
+        val open = PendingIntent.getActivity(context, id, storyIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val source = a.source?.takeIf { it.isNotBlank() } ?: a.topicLabel.orEmpty()
+        val b = NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_openwire)
+            .setContentTitle(source)
+            .setSubText(a.topicLabel)
+            .setContentText(a.title)
+            .setStyle(NotificationCompat.BigTextStyle().setBigContentTitle(source).bigText(a.title))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+            .setGroup(GROUP)
+            .setWhen(System.currentTimeMillis()).setShowWhen(true)
+            .addAction(0, context.getString(R.string.n_pause_3h), AlertPauseReceiver.intent(context, "story", id))
+            .setSilent(silent)
+        try { NotificationManagerCompat.from(context).notify("story", id, b.build()) } catch (e: SecurityException) { }
+        trim(context, "story")
+    }
+
+    private fun trim(context: Context, tag: String) = runCatching {
+        val nm = NotificationManagerCompat.from(context)
+        context.getSystemService(NotificationManager::class.java)?.activeNotifications
+            ?.filter { it.tag == tag }?.sortedByDescending { it.postTime }?.drop(MAX_SHOWN)
+            ?.forEach { nm.cancel(tag, it.id) }
+    }
+
+    private const val MAX_SHOWN = 6
+
     /** A heads-up alert for one breaking story. */
-    fun postBreaking(context: Context, alert: BreakingAlert, intent: Intent) {
+    fun postBreaking(context: Context, alert: BreakingAlert, intent: Intent, silent: Boolean = false) {
         if (!canPost(context)) return
         ensureBreakingChannel(context)
         val h = alert.headline
@@ -253,6 +297,8 @@ object Notifier {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pending)
             .setAutoCancel(true)
+            .addAction(0, context.getString(R.string.n_pause_3h), AlertPauseReceiver.intent(context, "breaking", alert.key.hashCode()))
+            .setSilent(silent)
             .build()
         try {
             val nm = NotificationManagerCompat.from(context)

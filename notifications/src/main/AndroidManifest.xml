@@ -4,5 +4,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application>
         <receiver android:name="news.openwire.notifications.RefreshAlarmReceiver" android:exported="false" />
+        <receiver android:name="news.openwire.notifications.AlertDrainReceiver" android:exported="false" />
+        <receiver android:name="news.openwire.notifications.AlertPauseReceiver" android:exported="false" />
     </application>
 </manifest>

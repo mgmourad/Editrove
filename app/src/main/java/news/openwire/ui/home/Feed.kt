@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.home
 
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.togetherWith
@@ -386,6 +387,12 @@ fun LazyGridScope.feedItems(
     /** Stories that arrived with the last refresh, and when the one before it was. */
     newIds: Set<String> = emptySet(),
     newSince: Long = 0L,
+    /** The tab's news Shorts ("Video moments"), shown after the first few stories. */
+    videos: List<news.openwire.domain.video.ShortVideo> = emptyList(),
+    /** The grid's column count (rows are filled to it). */
+    columns: Int = 2,
+    /** Stories like the ones the reader loved (For You). */
+    forYou: List<Article> = emptyList(),
 ) {
     if (articles.isEmpty()) return
     // New since the last refresh: under a divider at the top, each with the rose "new" dot.
@@ -397,28 +404,37 @@ fun LazyGridScope.feedItems(
     fun state(a: Article) = a.originalUrl?.let { archive[it] }
     if (showTicker) fullRow("ticker") { LiveTicker(ticker ?: articles.drop(1).take(12).map { TickerItem(it, category, category) }, onOpen) }
     if (showTicker && marketWatch) fullRow("markets") { MarketBar() }
-    val hero = articles.first()
-    fullRow("hero-${hero.id}") {
-        Box(Modifier.landing(hero.id)) {
-        if (magazine) LeadStoryCard(
-            article = hero.withArchive(state(hero)),
-            locked = state(hero) == ArchiveState.Locked,
-            category = category,
-            saved = hero.id in savedIds,
-            onOpen = onOpen,
-            onToggleSaved = onToggleSaved,
-        ) else HeroCard(
-            article = hero.withArchive(state(hero)),
-            locked = state(hero) == ArchiveState.Locked,
-            category = category,
-            selected = !compact && selectedId == hero.id,
-            saved = hero.id in savedIds,
-            onOpen = onOpen,
-            onToggleSaved = onToggleSaved,
-        )
+    // The lead: the top four stories as a slideshow (5 s each; a touch holds it for 10 s).
+    val leads = articles.take(LEAD_SLIDES)
+    fullRow("hero-slides") {
+        // The magazine card has its buttons bottom-right: dots go bottom-left, over the photo.
+        LeadSlideshow(leads, dotsAtStart = magazine) { hero ->
+            Box(Modifier.landing(hero.id)) {
+                if (magazine) LeadStoryCard(
+                    article = hero.withArchive(state(hero)),
+                    locked = state(hero) == ArchiveState.Locked,
+                    category = category,
+                    saved = hero.id in savedIds,
+                    onOpen = onOpen,
+                    onToggleSaved = onToggleSaved,
+                    liked = hero.id in likedIds,
+                    onToggleLiked = onToggleLiked,
+                ) else HeroCard(
+                    article = hero.withArchive(state(hero)),
+                    locked = state(hero) == ArchiveState.Locked,
+                    category = category,
+                    selected = !compact && selectedId == hero.id,
+                    saved = hero.id in savedIds,
+                    onOpen = onOpen,
+                    onToggleSaved = onToggleSaved,
+                    liked = hero.id in likedIds,
+                    onToggleLiked = onToggleLiked,
+                    compact = compact,
+                )
+            }
         }
     }
-    val rest = articles.drop(1)
+    val rest = articles.drop(leads.size)
     if (rest.isNotEmpty()) {
         fullRow("bento-header") {
             Row(
@@ -435,24 +451,49 @@ fun LazyGridScope.feedItems(
             }
         }
     }
+    // Highlighted sections between runs of stories, each with a full-width story on either side.
+    val specials = buildList<Pair<Int, String>> {
+        if (videos.isNotEmpty()) add(VIDEOS_AFTER to "videos")
+        if (forYou.size >= 4) add((if (videos.isNotEmpty()) FOR_YOU_AFTER else VIDEOS_AFTER) to "foryou")
+    }.map { (at, k) -> at.coerceAtMost(rest.size) to k }
+    var from = 0
+    specials.forEachIndexed { n, (at, kind) ->
+        if (at > from) bento(rest.subList(from, at), from, compact, magazine, category, selectedId, savedIds, likedIds, ::state, onOpen, onToggleSaved, onToggleLiked,
+            columns, wideFirst = n > 0 || false, wideLast = true)
+        when (kind) {
+            "videos" -> fullRow("videos") { VideoMoments(videos, compact) }
+            else -> fullRow("foryou") { ForYouSection(forYou, compact, savedIds, likedIds, onOpen, onToggleSaved, onToggleLiked) }
+        }
+        from = maxOf(from, at)
+    }
+    if (rest.size > from) bento(rest.drop(from), from, compact, magazine, category, selectedId, savedIds, likedIds, ::state, onOpen, onToggleSaved, onToggleLiked,
+        columns, wideFirst = specials.isNotEmpty())
+}
+
+/** Stories between Video moments and For You. */
+private const val FOR_YOU_AFTER = 12
+
+/** Stories under the lead before the video carousel. */
+private const val VIDEOS_AFTER = 4
+
+private fun LazyGridScope.bento(
+    rest: List<Article>, offset: Int, compact: Boolean, magazine: Boolean, category: String,
+    selectedId: String?, savedIds: Set<String>, likedIds: Set<String>, state: (Article) -> ArchiveState?,
+    onOpen: (Article) -> Unit, onToggleSaved: (Article) -> Unit, onToggleLiked: (Article) -> Unit,
+    columns: Int, wideFirst: Boolean = false, wideLast: Boolean = false,
+) {
+    val spans = BentoLayout.spans(rest.size, columns, offset, compact, magazine, wideFirst, wideLast)
     itemsIndexed(
         rest,
         key = { _, a -> a.id },
-        // Every 7th bento item (starting with the 3rd) spans both columns on the cover screen.
-        span = { index, _ ->
-            when {
-                magazine && index % 5 == 0 && maxLineSpan > 2 -> GridItemSpan(2)
-                compact && index % 7 == 2 -> GridItemSpan(2)
-                else -> GridItemSpan(1)
-            }
-        },
-    ) { index, article ->
+        span = { i0, _ -> GridItemSpan(spans[i0].coerceAtMost(maxLineSpan)) },
+    ) { i0, article ->
         Box(feedItemMotion().landing(article.id)) {
             BentoCard(
                 article = article.withArchive(state(article)),
                 locked = state(article) == ArchiveState.Locked,
                 category = category,
-                wide = (compact && index % 7 == 2) || (magazine && index % 5 == 0),
+                wide = spans[i0] >= 2,
                 selected = !compact && selectedId == article.id,
                 saved = article.id in savedIds,
                 liked = article.id in likedIds,
@@ -461,6 +502,39 @@ fun LazyGridScope.feedItems(
                 onToggleLiked = onToggleLiked,
             )
         }
+    }
+}
+
+/**
+ * How wide each story card is, so rows always fill: the usual rhythm (every 7th wide on the cover
+ * screen, every 5th on the magazine), full-width cards next to the video row, and a card that
+ * would leave a gap (a wide one that doesn't fit, or a lone last one) stretched to fill its row.
+ */
+internal object BentoLayout {
+    fun spans(n: Int, columns: Int, offset: Int, compact: Boolean, magazine: Boolean, wideFirst: Boolean, wideLast: Boolean): IntArray {
+        val out = IntArray(n)
+        var col = 0
+        for (i in 0 until n) {
+            val index = i + offset
+            val forced = (wideFirst && i == 0) || (wideLast && i == n - 1)
+            var w = when {
+                forced -> columns
+                magazine && index % 5 == 0 && columns > 2 -> 2
+                compact && index % 7 == 2 -> columns
+                else -> 1
+            }.coerceAtMost(columns)
+            if (col + w > columns) {
+                // Doesn't fit beside the previous card: that one stretches to close the row.
+                if (i > 0) out[i - 1] += columns - col
+                col = 0
+            }
+            out[i] = w
+            col += w
+            if (col >= columns) col = 0
+        }
+        // A part-filled last row: its last card takes the rest.
+        if (n > 0 && col > 0) out[n - 1] += columns - col
+        return out
     }
 }
 
@@ -627,6 +701,10 @@ fun HeroCard(
     saved: Boolean,
     onOpen: (Article) -> Unit,
     onToggleSaved: (Article) -> Unit,
+    liked: Boolean = false,
+    onToggleLiked: ((Article) -> Unit)? = null,
+    /** Cover screen: the badge sits beside the category; wider: across from the outlet's name. */
+    compact: Boolean = true,
 ) {
     GlassCard(
         onClick = { onOpen(article) },
@@ -651,18 +729,28 @@ fun HeroCard(
                 modifier = Modifier.fillMaxWidth().padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ScrimPill { Text(category.uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.1.em), color = Color.White) }
-                Spacer(Modifier.weight(1f))
-                article.badgeLabel()?.let { badge ->
-                    ScrimPill { Text(badge, style = mono(10.sp), color = Color.White.copy(alpha = 0.9f)) }
+                ScrimPill { Text(category.uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.1.em), color = Color.White, maxLines = 1) }
+                // Cover screen: the badge right beside the category (never squeezed by the buttons).
+                if (compact) article.badgeLabel()?.let { badge ->
+                    Spacer(Modifier.width(6.dp))
+                    ScrimPill { Text(badge, style = mono(9.sp), color = Color.White.copy(alpha = 0.9f), maxLines = 1, softWrap = false) }
+                }
+                Spacer(Modifier.weight(1f).widthIn(min = 4.dp))
+                // Love, share, save: the same 15 dp icons in the same 31 dp circles.
+                onToggleLiked?.let { like ->
+                    SpringToggle(
+                        active = liked, kind = ToggleKind.LIKE, onToggle = { like(article) }, iconSize = 15.dp,
+                        inactiveTint = Color.White, background = Color.Black.copy(alpha = 0.45f), border = Color.White.copy(alpha = 0.20f), padding = 8.dp,
+                    )
                     Spacer(Modifier.width(6.dp))
                 }
-                ShareButton(article, tint = Color.White, background = Color.Black.copy(alpha = 0.45f), border = Color.White.copy(alpha = 0.20f), padding = 8.dp)
+                ShareButton(article, tint = Color.White, background = Color.Black.copy(alpha = 0.45f), border = Color.White.copy(alpha = 0.20f), padding = 8.dp, iconSize = 15.dp)
                 Spacer(Modifier.width(6.dp))
                 SpringToggle(
                     active = saved,
                     kind = ToggleKind.BOOKMARK,
                     onToggle = { onToggleSaved(article) },
+                    iconSize = 15.dp,
                     inactiveTint = Color.White,
                     background = Color.Black.copy(alpha = 0.45f),
                     border = Color.White.copy(alpha = 0.20f),
@@ -684,7 +772,13 @@ fun HeroCard(
                         NewsProcessor.formatRelativeTime(article.publishedAt).uppercase(),
                         style = mono(10.sp, tracking = 0.16.em),
                         color = Color.White.copy(alpha = 0.7f),
+                        maxLines = 1,
                     )
+                    // Wider screens: the badge across from the outlet's name.
+                    if (!compact) article.badgeLabel()?.let { badge ->
+                        Spacer(Modifier.weight(1f).widthIn(min = 8.dp))
+                        ScrimPill { Text(badge, style = mono(9.sp), color = Color.White.copy(alpha = 0.9f), maxLines = 1, softWrap = false) }
+                    }
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -718,6 +812,8 @@ fun LeadStoryCard(
     saved: Boolean,
     onOpen: (Article) -> Unit,
     onToggleSaved: (Article) -> Unit,
+    liked: Boolean = false,
+    onToggleLiked: ((Article) -> Unit)? = null,
 ) {
     val g = Glass
     GlassCard(
@@ -739,7 +835,14 @@ fun LeadStoryCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SourceLogo(article.domain, article.source, size = 18.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text(article.publication(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(article.publication(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    article.badgeLabel()?.let { badge ->
+                        Spacer(Modifier.weight(1f).widthIn(min = 8.dp))
+                        Text(
+                            badge, style = mono(9.5.sp), color = g.textPrimary.copy(alpha = .85f), maxLines = 1, softWrap = false,
+                            modifier = Modifier.clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape).padding(horizontal = 9.dp, vertical = 3.dp),
+                        )
+                    }
                 }
                 // Headline, standfirst and coverage take what's left; the action row always fits.
                 Column(Modifier.weight(1f).clipToBounds()) {
@@ -768,13 +871,17 @@ fun LeadStoryCard(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        NewsProcessor.formatRelativeTime(article.publishedAt) + (article.badgeLabel()?.let { "  ·  $it" } ?: ""),
+                        NewsProcessor.formatRelativeTime(article.publishedAt),
                         style = mono(11.sp, tracking = 0.sp), color = g.textSecondary,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                     )
-                    ShareButton(article, background = g.chipFill, padding = 8.dp)
+                    onToggleLiked?.let { like ->
+                        SpringToggle(liked, ToggleKind.LIKE, { like(article) }, iconSize = 15.dp, background = g.chipFill, padding = 8.dp)
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    ShareButton(article, background = g.chipFill, padding = 8.dp, iconSize = 15.dp)
                     Spacer(Modifier.width(6.dp))
-                    SpringToggle(saved, ToggleKind.BOOKMARK, { onToggleSaved(article) }, background = g.chipFill, padding = 8.dp)
+                    SpringToggle(saved, ToggleKind.BOOKMARK, { onToggleSaved(article) }, iconSize = 15.dp, background = g.chipFill, padding = 8.dp)
                 }
             }
         }
@@ -1060,5 +1167,65 @@ private fun NewStoryCell(a: Article, index: Int, onOpen: (Article) -> Unit, modi
         }
         Spacer(Modifier.height(3.dp))
         Text(a.title, style = serif(14.sp, FontWeight.SemiBold, lineHeight = 18.sp), color = g.textPrimary, maxLines = 3, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** How many top stories the lead slideshow shows. */
+private const val LEAD_SLIDES = 4
+private const val SLIDE_MS = 5_000L
+private const val HOLD_AFTER_TOUCH_MS = 10_000L
+
+/**
+ * The lead card as a slideshow of the top stories: it advances every 5 s; any touch (swiping
+ * through, pressing) holds it for 10 s from the last touch, then it carries on. Dots show the
+ * position; with animations off it doesn't advance on its own.
+ */
+@Composable
+private fun LeadSlideshow(stories: List<Article>, dotsAtStart: Boolean = false, card: @Composable (Article) -> Unit) {
+    if (stories.size <= 1) { stories.firstOrNull()?.let { card(it) }; return }
+    val reduce = news.openwire.ui.theme.rememberReduceMotion()
+    val pager = androidx.compose.foundation.pager.rememberPagerState { stories.size }
+    var lastTouch by remember { mutableStateOf(0L) }
+    val dragged by pager.interactionSource.collectIsDraggedAsState()
+    LaunchedEffect(dragged) { if (dragged) lastTouch = System.currentTimeMillis() }
+    LaunchedEffect(stories.map { it.id }) {
+        if (reduce) return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(SLIDE_MS)
+            val held = System.currentTimeMillis() - lastTouch
+            if (held < HOLD_AFTER_TOUCH_MS) { kotlinx.coroutines.delay(HOLD_AFTER_TOUCH_MS - held); continue }
+            if (!pager.isScrollInProgress) pager.animateScrollToPage((pager.currentPage + 1) % stories.size, animationSpec = tween(650, easing = EmphasizedDecelerate))
+        }
+    }
+    Box(
+        Modifier.pointerInput(Unit) {
+            // Any touch on the card counts (a press, a swipe), without taking it from the card.
+            awaitPointerEventScope {
+                while (true) {
+                    awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    lastTouch = System.currentTimeMillis()
+                }
+            }
+        },
+    ) {
+        androidx.compose.foundation.pager.HorizontalPager(
+            state = pager, pageSpacing = 12.dp, beyondViewportPageCount = 1,
+            key = { stories[it].id },
+        ) { page -> card(stories[page]) }
+        // Position dots inside the card, bottom corner (clear of the headline and the top pills).
+        Row(
+            Modifier.align(if (dotsAtStart) Alignment.BottomStart else Alignment.BottomEnd).padding(start = 16.dp, end = 16.dp, bottom = 14.dp).clip(CircleShape)
+                .background(Color.Black.copy(alpha = .35f)).padding(horizontal = 6.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(stories.size) { i ->
+                val on = pager.currentPage == i
+                val w by androidx.compose.animation.core.animateDpAsState(if (on) 14.dp else 5.dp, tween(300), label = "dot")
+                Box(
+                    Modifier.padding(horizontal = 2.dp).height(5.dp).width(w).clip(CircleShape)
+                        .background(if (on) Color.White else Color.White.copy(alpha = .45f)),
+                )
+            }
+        }
     }
 }

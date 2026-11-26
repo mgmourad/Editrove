@@ -29,6 +29,8 @@ data class UserSettings(
     val customFeeds: List<FeedSource> = emptyList(),
     /** Source keys (feed URL, or "google_news") the user switched off. */
     val disabledSources: Set<String> = emptySet(),
+    /** Built-in sources taken off the list (also switched off). Reset Sources brings them back. */
+    val removedSources: Set<String> = emptySet(),
     val sortMode: SortMode = SortMode.CURATED,
     /** Global master switch for local notifications (default off). */
     val notificationsEnabled: Boolean = false,
@@ -54,6 +56,8 @@ data class UserSettings(
     val breakingOutlets: Set<String> = news.openwire.domain.engine.BreakingNews.DEFAULT_KEYS,
     /** Real-time breaking alerts over a kept-open connection (opt-in, off by default). */
     val realtimeAlerts: Boolean = false,
+    /** Alert sounds, quiet hours and pause. */
+    val alerts: news.openwire.domain.alerts.AlertPrefs = news.openwire.domain.alerts.AlertPrefs(),
     /** Audio briefing voice, speed, length, detail and sound design. */
     val briefing: BriefingPrefs = BriefingPrefs(),
 )

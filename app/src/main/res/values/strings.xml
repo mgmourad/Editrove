@@ -450,7 +450,7 @@
     <string name="rt_running_text">Watching %1$d newsrooms for breaking news</string>
     <string name="rt_connecting">Connecting…</string>
     <string name="rt_turn_off">Turn Off</string>
-    <string name="find_sources_eg">Type a newspaper’s name or website, e.g. Al-Ahram or youm7.com</string>
+    <string name="find_sources_eg">Type a newspaper’s name or website, e.g. BBC or reuters.com</string>
     <string name="find_sources_title">Find “%1$s” on the web</string>
     <string name="find_sources_hint">Every result below was checked just now and has recent stories. Tap Add — no feed addresses needed.</string>
     <string name="find_sources_searching">Searching newspapers and sites…</string>

@@ -429,6 +429,7 @@ fun LazyGridScope.feedItems(
                     onToggleSaved = onToggleSaved,
                     liked = hero.id in likedIds,
                     onToggleLiked = onToggleLiked,
+                    compact = compact,
                 )
             }
         }
@@ -702,6 +703,8 @@ fun HeroCard(
     onToggleSaved: (Article) -> Unit,
     liked: Boolean = false,
     onToggleLiked: ((Article) -> Unit)? = null,
+    /** Cover screen: the badge sits beside the category; wider: across from the outlet's name. */
+    compact: Boolean = true,
 ) {
     GlassCard(
         onClick = { onOpen(article) },
@@ -727,14 +730,12 @@ fun HeroCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 ScrimPill { Text(category.uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.1.em), color = Color.White, maxLines = 1) }
-                Spacer(Modifier.weight(1f).widthIn(min = 4.dp))
-                // The badge gives way first when the card is narrow (the three buttons always fit).
-                article.badgeLabel()?.let { badge ->
-                    Box(Modifier.weight(1f, fill = false)) {
-                        ScrimPill { Text(badge, style = mono(10.sp), color = Color.White.copy(alpha = 0.9f), maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                    }
+                // Cover screen: the badge right beside the category (never squeezed by the buttons).
+                if (compact) article.badgeLabel()?.let { badge ->
                     Spacer(Modifier.width(6.dp))
+                    ScrimPill { Text(badge, style = mono(9.sp), color = Color.White.copy(alpha = 0.9f), maxLines = 1, softWrap = false) }
                 }
+                Spacer(Modifier.weight(1f).widthIn(min = 4.dp))
                 // Love, share, save: the same 15 dp icons in the same 31 dp circles.
                 onToggleLiked?.let { like ->
                     SpringToggle(
@@ -771,7 +772,13 @@ fun HeroCard(
                         NewsProcessor.formatRelativeTime(article.publishedAt).uppercase(),
                         style = mono(10.sp, tracking = 0.16.em),
                         color = Color.White.copy(alpha = 0.7f),
+                        maxLines = 1,
                     )
+                    // Wider screens: the badge across from the outlet's name.
+                    if (!compact) article.badgeLabel()?.let { badge ->
+                        Spacer(Modifier.weight(1f).widthIn(min = 8.dp))
+                        ScrimPill { Text(badge, style = mono(9.sp), color = Color.White.copy(alpha = 0.9f), maxLines = 1, softWrap = false) }
+                    }
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -828,7 +835,14 @@ fun LeadStoryCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SourceLogo(article.domain, article.source, size = 18.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text(article.publication(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(article.publication(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    article.badgeLabel()?.let { badge ->
+                        Spacer(Modifier.weight(1f).widthIn(min = 8.dp))
+                        Text(
+                            badge, style = mono(9.5.sp), color = g.textPrimary.copy(alpha = .85f), maxLines = 1, softWrap = false,
+                            modifier = Modifier.clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape).padding(horizontal = 9.dp, vertical = 3.dp),
+                        )
+                    }
                 }
                 // Headline, standfirst and coverage take what's left; the action row always fits.
                 Column(Modifier.weight(1f).clipToBounds()) {
@@ -857,7 +871,7 @@ fun LeadStoryCard(
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        NewsProcessor.formatRelativeTime(article.publishedAt) + (article.badgeLabel()?.let { "  ·  $it" } ?: ""),
+                        NewsProcessor.formatRelativeTime(article.publishedAt),
                         style = mono(11.sp, tracking = 0.sp), color = g.textSecondary,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                     )

@@ -132,7 +132,7 @@ class RealtimeAlertService : Service() {
         // The same memory, quiet time and pacing as every other alert.
         news.openwire.notifications.AlertCenter.submit(
             this,
-            listOf(news.openwire.domain.alerts.PendingAlert(key, alert.article.title, alert.newsroom.name, alert.article.originalUrl, breaking = true, foundAt = now)),
+            listOf(news.openwire.domain.alerts.PendingAlert(key, alert.article.title, alert.newsroom.name, alert.article.originalUrl, breaking = true, foundAt = now, channel = "realtime")),
             now,
         )
     }

@@ -143,6 +143,15 @@ class HomeViewModel(
     /** Topics whose refresh the reader asked for (only those drive the wire). */
     private val pulled = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
+    /**
+     * Topics with a refresh the reader started that is still waiting on sources. Only these open the
+     * pull band; it closes as soon as every source has answered (link checks carry on unseen), or
+     * after 25 s at most. Automatic refreshes never open it.
+     */
+    private val _userRefreshing = MutableStateFlow<Set<String>>(emptySet())
+    val userRefreshing: StateFlow<Set<String>> = _userRefreshing.asStateFlow()
+    private fun endUserRefresh(topicId: String) = _userRefreshing.update { it - topicId }
+
     /** Stories that arrived with the last refresh the reader asked for, per topic. */
     data class NewStories(val ids: List<String>, val since: Long)
     private val _newStories = MutableStateFlow<Map<String, NewStories>>(emptyMap())
@@ -191,6 +200,8 @@ class HomeViewModel(
                 _ticker.update { t ->
                     if (e is news.openwire.data.repository.RefreshEvent.Started) { if (e.topicId in pulled) t.reduce(e) else t } else t.reduce(e)
                 }
+                val t = _ticker.value
+                if (t.finished || (t.total > 0 && t.returned >= t.total)) endUserRefresh(t.topicId)
             }
         }
         load(currentTopic)
@@ -244,6 +255,8 @@ class HomeViewModel(
         // What was on screen, to tell which stories are new when this refresh lands.
         fun mark(t: Topic) {
             pulled += t.id
+            _userRefreshing.update { it + t.id }
+            viewModelScope.launch { kotlinx.coroutines.delay(25_000); endUserRefresh(t.id) }
             (_feeds.value[t.id] as? FeedResult.Success)?.let { r -> beforeRefresh[t.id] = r.articles.map { news.openwire.domain.motion.NewSince.key(it.title) } to r.updatedAt }
         }
         when (_tab.value) {
@@ -439,6 +452,7 @@ class HomeViewModel(
             } finally {
                 _refreshing.update { it - topic.id }
                 if (pulled.remove(topic.id)) settleNew(topic.id)
+                endUserRefresh(topic.id)
             }
         }
     }

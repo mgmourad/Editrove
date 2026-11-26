@@ -49,4 +49,25 @@
     <string name="for_you">Pour vous</string>
     <string name="for_you_sub">Choisi d’après les articles que vous avez aimés</string>
     <string name="for_you_tag">SUR CE TÉLÉPHONE</string>
+    <string name="msg_source_removed">%1$s retiré de vos sources</string>
+    <string name="src_add_here">Ajouter à %1$s</string>
+    <string name="src_edit_list">Modifier la liste</string>
+    <string name="src_done_editing">Terminé</string>
+    <string name="src_feed_name">Nom</string>
+    <string name="src_feed_url">Adresse du flux RSS</string>
+    <string name="src_search_web">Ou cherchez en ligne</string>
+    <string name="topic_edit_sources">Modifier les sources</string>
+    <string name="topic_sources_title">Sources de %1$s</string>
+    <string name="topic_sources_hint">Désactivez une source pour l’exclure de ce sujet, ou ajoutez le flux d’un autre journal.</string>
+    <string name="hub_title">Centre des notifications</string>
+    <string name="hub_row_sub">Toutes les alertes au même endroit : touchez pour choisir Activé, Silencieux ou Désactivé</string>
+    <string name="hub_hint">Chaque sujet, alerte info, auteur suivi et rappel de briefing, dans une seule liste. Les alertes silencieuses arrivent sans son.</string>
+    <string name="hub_master_off">Les notifications sont désactivées : activez-les dans Notifications et actualisation pour recevoir celles-ci.</string>
+    <string name="hub_all">Toutes</string>
+    <string name="hub_silent">Silencieux</string>
+    <string name="hub_on">Activé</string>
+    <string name="hub_off">Désactivé</string>
+    <string name="hub_none">Rien ici.</string>
+    <string name="hub_group_topics">Sujets</string>
+    <string name="hub_group_following">Auteurs et comptes suivis</string>
 </resources>

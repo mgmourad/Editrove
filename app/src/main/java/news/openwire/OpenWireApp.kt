@@ -109,12 +109,14 @@ class OpenWireApp : Application(), BackgroundRefresher.Provider {
                 val found = ArrayList<NewHeadline>()
                 if (authors.isNotEmpty()) {
                     val cols = src.columns(lang, force = true).map { it.article }
-                    news.openwire.domain.opinion.OpinionCatalog.byAuthors(cols, authors).forEach { a -> found += NewHeadline(a.title, a.author ?: a.source, a.originalUrl) }
+                    news.openwire.domain.opinion.OpinionCatalog.byAuthors(cols, authors).forEach { a ->
+                        found += NewHeadline(a.title, a.author ?: a.source, a.originalUrl, channel = (a.author ?: a.source)?.let { "op:" + news.openwire.opinion.writerKey(it) })
+                    }
                 }
                 if (accounts.isNotEmpty()) {
-                    src.following(accounts, force = true).forEach { p -> found += NewHeadline(p.text.take(160), p.authorName, p.url) }
+                    src.following(accounts, force = true).forEach { p -> found += NewHeadline(p.text.take(160), p.authorName, p.url, channel = "op:" + news.openwire.opinion.accountKey(p.authorHandle)) }
                 }
-                tabs.forEach { t -> src.topicColumns(t, lang, force = true).take(5).forEach { a -> found += NewHeadline(a.title, a.source, a.originalUrl) } }
+                tabs.forEach { t -> src.topicColumns(t, lang, force = true).take(5).forEach { a -> found += NewHeadline(a.title, a.source, a.originalUrl, channel = "op:" + news.openwire.opinion.topicKey(t)) } }
                 val keys = found.mapNotNull { it.url }
                 val seen = container.feedState.seen(OPINION_ID)
                 container.feedState.setSeen(OPINION_ID, (keys + seen.orEmpty()).toSet())

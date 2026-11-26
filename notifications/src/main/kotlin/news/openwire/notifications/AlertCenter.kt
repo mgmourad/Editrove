@@ -73,8 +73,9 @@ object AlertCenter {
         post?.let { a ->
             val headline = NewHeadline(a.title, a.source, a.url)
             val intent = refresher.storyIntent(context, headline, a.topicId)
-            if (a.breaking) Notifier.postBreaking(context, BreakingAlert(a.key, headline), intent, silent = !prefs.breakingSound)
-            else Notifier.postStory(context, a, intent, silent = !prefs.sound)
+            val silent = !prefs.audible(a.channel, a.breaking)
+            if (a.breaking) Notifier.postBreaking(context, BreakingAlert(a.key, headline), intent, silent = silent)
+            else Notifier.postStory(context, a, intent, silent = silent)
         }
         schedule(context, wait)
     }

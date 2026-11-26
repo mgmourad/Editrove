@@ -49,4 +49,25 @@
     <string name="for_you">For You</string>
     <string name="for_you_sub">Picked from the stories you loved</string>
     <string name="for_you_tag">ON THIS PHONE</string>
+    <string name="msg_source_removed">%1$s removed from your sources</string>
+    <string name="src_add_here">Add to %1$s</string>
+    <string name="src_edit_list">Edit list</string>
+    <string name="src_done_editing">Done</string>
+    <string name="src_feed_name">Name</string>
+    <string name="src_feed_url">RSS feed address</string>
+    <string name="src_search_web">Or find one online</string>
+    <string name="topic_edit_sources">Edit Sources</string>
+    <string name="topic_sources_title">Sources of %1$s</string>
+    <string name="topic_sources_hint">Switch a source off to leave it out of this topic, or add another newspaper\'s feed.</string>
+    <string name="hub_title">Notification Hub</string>
+    <string name="hub_row_sub">Every alert in one place: tap to choose On, Silent or Off for each</string>
+    <string name="hub_hint">Each topic, breaking-news alert, writer you follow and briefing reminder, in one list. Silent alerts still arrive, without a sound.</string>
+    <string name="hub_master_off">Notifications are off: turn them on in Notifications &amp; Refresh for any of these to arrive.</string>
+    <string name="hub_all">All</string>
+    <string name="hub_silent">Silent</string>
+    <string name="hub_on">On</string>
+    <string name="hub_off">Off</string>
+    <string name="hub_none">Nothing here.</string>
+    <string name="hub_group_topics">Topics</string>
+    <string name="hub_group_following">Writers and Accounts You Follow</string>
 </resources>

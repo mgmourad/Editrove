@@ -108,7 +108,11 @@ object FeedDiscovery {
      * "Masrawy-اقتصاد" → "Masrawy · اقتصاد", "Tech | The Verge" stays readable.
      */
     fun cleanName(raw: String, site: String?): String {
-        var n = raw.trim().replace(Regex("^(rss|feed|atom)\\s*[-:|–]\\s*", RegexOption.IGNORE_CASE), "")
+        // "CNN.com - RSS Channel - App Tech Section" → "CNN.com – Tech".
+        var n = raw.trim().replace(Regex("\\s*[-–|]\\s*RSS Channel\\s*([-–|]\\s*)?", RegexOption.IGNORE_CASE), " – ")
+            .replace(Regex("\\bApp\\s+(\\w+)\\s+Section\\b", RegexOption.IGNORE_CASE), "$1")
+            .replace(Regex("\\s+Section$", RegexOption.IGNORE_CASE), "")
+        n = n.replace(Regex("^(rss|feed|atom)\\s*[-:|–]\\s*", RegexOption.IGNORE_CASE), "")
             .replace(Regex("\\s*[-–|]\\s*(rss|feed)$", RegexOption.IGNORE_CASE), "").trim()
         n = n.replace(Regex("(?<=\\p{L})-(?=\\p{L}{2,}\\s|\\p{IsArabic})"), " · ")
         val s = site?.trim()?.takeIf { it.isNotBlank() } ?: return n.ifBlank { raw }

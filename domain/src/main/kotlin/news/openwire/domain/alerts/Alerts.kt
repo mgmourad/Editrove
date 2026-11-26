@@ -21,7 +21,13 @@ data class AlertPrefs(
     val quietEnd: Int = 7 * 60,
     /** No alerts until this moment (epoch ms; 0 = not paused). */
     val pausedUntil: Long = 0L,
-)
+    /** Alert channels that arrive without sound (Notification Hub): "topic:ID", "breaking", "realtime", "op:KEY". */
+    val silent: Set<String> = emptySet(),
+) {
+    /** Whether an alert on [channel] (breaking or not) should make a sound. */
+    fun audible(channel: String?, breaking: Boolean): Boolean =
+        (if (breaking) breakingSound else sound) && (channel == null || channel !in silent)
+}
 
 /** Quiet time: the daily window and any pause. Nothing found in it is delivered later. */
 object QuietTime {
@@ -139,6 +145,8 @@ data class PendingAlert(
     val breaking: Boolean = false,
     /** When the story was found (epoch ms). */
     val foundAt: Long,
+    /** What it's an alert for (Notification Hub key): "topic:ID", "breaking", "realtime", "op:KEY". */
+    val channel: String? = null,
 )
 
 /**

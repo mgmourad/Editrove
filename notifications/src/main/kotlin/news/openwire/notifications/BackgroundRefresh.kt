@@ -22,7 +22,7 @@ import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 
 /** A genuinely new headline in an opted-in topic. */
-data class NewHeadline(val title: String, val source: String?, val url: String?, val key: String? = null)
+data class NewHeadline(val title: String, val source: String?, val url: String?, val key: String? = null, val channel: String? = null)
 
 /** New headlines found for one topic during a background refresh. */
 data class TopicUpdate(val topicId: String, val topicLabel: String, val headlines: List<NewHeadline>)
@@ -80,11 +80,11 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         // Everything found goes through one place: duplicates (any kind, any outlet, 48 h) are
         // dropped, quiet time is honoured, and the rest arrive one at a time.
         val found = breaking.take(3).map { b ->
-            news.openwire.domain.alerts.PendingAlert(b.key, b.headline.title, b.headline.source, b.headline.url, breaking = true, foundAt = now)
+            news.openwire.domain.alerts.PendingAlert(b.key, b.headline.title, b.headline.source, b.headline.url, breaking = true, foundAt = now, channel = "breaking")
         } + updates.orEmpty().flatMap { u ->
             // Two per topic at most per check: the rest are in the app.
             u.headlines.take(2).map { h ->
-                news.openwire.domain.alerts.PendingAlert(h.key ?: h.url ?: h.title, h.title, h.source, h.url, u.topicId, u.topicLabel, foundAt = now)
+                news.openwire.domain.alerts.PendingAlert(h.key ?: h.url ?: h.title, h.title, h.source, h.url, u.topicId, u.topicLabel, foundAt = now, channel = h.channel ?: "topic:${u.topicId}")
             }
         }
         if (refresher.notificationsEnabled() && !onScreen) AlertCenter.submit(applicationContext, found, now)

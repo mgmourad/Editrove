@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.ui.settings
 
+import androidx.compose.ui.semantics.contentDescription
 import news.openwire.i18n.tr
 import news.openwire.i18n.text
 import android.Manifest
@@ -149,7 +150,7 @@ import news.openwire.ui.theme.Glass
 private enum class Page(@androidx.annotation.StringRes private val res: Int) {
     HOME(R.string.settings), EDITION(R.string.edition), LANGUAGE(R.string.language), TOPICS(R.string.topics), ADD_TOPIC(R.string.new_topic), EDIT_TOPIC(R.string.edit_topic), SOURCES(R.string.sources),
     ADD_SOURCE(R.string.add_source), RULES(R.string.paywall_rules), NOTIFICATIONS(R.string.notifications_refresh),
-    APPEARANCE(R.string.appearance), BRIEFING(R.string.audio_briefing), BACKUP(R.string.backup_restore), UPDATES(R.string.updates_changelog), GUIDE(R.string.g_title), ABOUT(R.string.about_editrove),
+    APPEARANCE(R.string.appearance), NOTIFY_HUB(R.string.hub_title), BRIEFING(R.string.audio_briefing), BACKUP(R.string.backup_restore), UPDATES(R.string.updates_changelog), GUIDE(R.string.g_title), ABOUT(R.string.about_editrove),
     ;
 
     val title: String get() = tr(res)
@@ -187,6 +188,7 @@ fun SettingsScreen(
             Page.HOME -> { onClose(); Page.HOME }
             Page.ADD_TOPIC, Page.EDIT_TOPIC -> Page.TOPICS
             Page.ADD_SOURCE -> Page.SOURCES
+            Page.NOTIFY_HUB -> Page.NOTIFICATIONS
             else -> Page.HOME
         }
     }
@@ -242,7 +244,8 @@ fun SettingsScreen(
                         Page.SOURCES -> sourcesPage(vm) { page = Page.ADD_SOURCE }
                         Page.ADD_SOURCE -> item { AddSourcePage(vm) { page = Page.SOURCES } }
                         Page.RULES -> rulesPage(vm)
-                        Page.NOTIFICATIONS -> item { NotificationsPage(vm) }
+                        Page.NOTIFICATIONS -> item { NotificationsPage(vm) { page = Page.NOTIFY_HUB } }
+                        Page.NOTIFY_HUB -> item { NotificationHub(vm) }
                         Page.APPEARANCE -> item { AppearancePage(vm, themeMode, onTheme) }
                         Page.BACKUP -> item { BackupPage(vm) }
                         Page.ABOUT -> item { AboutPage() }
@@ -545,6 +548,8 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
         var dragging by remember { mutableStateOf<String?>(null) }
         var renaming by remember { mutableStateOf<news.openwire.domain.model.Topic?>(null) }
         renaming?.let { t -> RenameDialog(t.label, onDismiss = { renaming = null }) { vm.renameTopic(t.id, it); renaming = null } }
+        var sourcesOf by remember { mutableStateOf<news.openwire.domain.model.Topic?>(null) }
+        sourcesOf?.let { t -> TopicSourcesDialog(vm, t) { sourcesOf = null } }
         var dragOffset by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
         val rowHeights = remember { androidx.compose.runtime.mutableStateMapOf<String, Int>() }
         val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -556,10 +561,11 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
                     val elevation by androidx.compose.animation.core.animateDpAsState(if (lifted) 10.dp else 0.dp, label = "lift")
                     // Swipe right: rename / edit (your topics). Swipe left: delete (yours) or hide / show.
                     SwipeActions(
+                        // Built-in topics are never renamed or deleted: their sources can be edited.
                         start = if (t.isCustom) listOf(
                             SwipeAction(tr(R.string.rename_topic), Icons.Outlined.Edit, Glass.indigo) { renaming = t },
                             SwipeAction(tr(R.string.edit_topic_action), Icons.Outlined.Tune, Glass.accent) { onEdit(t) },
-                        ) else emptyList(),
+                        ) else listOf(SwipeAction(tr(R.string.topic_edit_sources), Icons.Outlined.Tune, Glass.accent) { sourcesOf = t }),
                         end = if (t.isCustom) listOf(SwipeAction(tr(R.string.delete_topic_action), Icons.Outlined.Delete, Color(0xFFE5484D)) { vm.deleteTopic(t.id) })
                         else listOf(SwipeAction(tr(if (t.isVisible) R.string.hide_topic_action else R.string.show_topic_action), if (t.isVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, Glass.indigo) { vm.setTopicVisible(t.id, !t.isVisible) }),
                     ) {
@@ -617,6 +623,7 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
                                 style = sans(11.sp), color = Glass.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
                         }
+                        SmallIcon(Icons.Outlined.Tune, tr(R.string.topic_edit_sources)) { if (t.isCustom) onEdit(t) else sourcesOf = t }
                         val notify = t.id in s.notifyTopics
                         SmallIcon(
                             if (notify) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsNone,
@@ -927,6 +934,33 @@ private fun SwipeButton(a: SwipeAction, modifier: Modifier, onClick: () -> Unit)
     }
 }
 
+/** A built-in topic's sources: switch each on or off, or add a feed to it. */
+@Composable
+private fun TopicSourcesDialog(vm: SettingsViewModel, topic: news.openwire.domain.model.Topic, onDismiss: () -> Unit) {
+    val g = Glass
+    val library by vm.library.collectAsState()
+    val list = remember(library, topic.id) { library.filter { src -> src.topics.any { it.equals(topic.id, true) } || (src.isPrimary && topic.liveUrl != null) } }
+    var adding by remember { mutableStateOf(false) }
+    if (adding) AddToSectionDialog(vm, topic.label, onDismiss = { adding = false }, topicId = topic.id)
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            Modifier.padding(16.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = 640.dp).clip(RoundedCornerShape(26.dp))
+                .background(g.deviceBg).border(1.dp, g.hairline, RoundedCornerShape(26.dp)).padding(18.dp),
+        ) {
+            Text(tr(R.string.topic_sources_title, topic.label).uppercase(), style = mono(11.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft)
+            Spacer(Modifier.height(4.dp))
+            Text(tr(R.string.topic_sources_hint), style = sans(12.sp, lineHeight = 17.sp), color = g.textSecondary)
+            Spacer(Modifier.height(10.dp))
+            PrimaryButton(tr(R.string.add_source), Icons.Filled.Add) { adding = true }
+            androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).padding(top = 8.dp)) {
+                items(list.size) { i -> val src = list[i]; SourceRow(src, null, false, vm) }
+            }
+            Spacer(Modifier.height(8.dp))
+            TextButton(tr(R.string.src_done_editing), onClick = onDismiss)
+        }
+    }
+}
+
 /** Rename a topic in place. */
 @Composable
 private fun RenameDialog(current: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
@@ -959,10 +993,21 @@ private fun LazyListScope.sourcesPage(vm: SettingsViewModel, onAdd: () -> Unit) 
             Field(tr(R.string.search_sources), filter, { filter = it }, placeholder = tr(R.string.find_sources_eg))
             // Beyond what's installed: any newspaper or site, found by name or address and checked live.
             if (filter.trim().length >= 3) FindSources(vm, filter.trim())
+            var editing by rememberSaveable { mutableStateOf<String?>(null) }
+            var adding by remember { mutableStateOf<String?>(null) }
+            adding?.let { cat -> AddToSectionDialog(vm, cat, onDismiss = { adding = null }) }
             SourceLibrary.groupSources(library, filter).forEach { group ->
+                val edit = editing == group.category
                 Section {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(group.category.uppercase(), style = mono(11.sp, FontWeight.SemiBold, 0.14.em), color = Glass.accentSoft, modifier = Modifier.weight(1f))
+                        Text(group.category.uppercase(), style = mono(11.sp, FontWeight.SemiBold, 0.14.em), color = Glass.accentSoft)
+                        // (+) adds a feed to this section; the pencil turns the rows into removable ones.
+                        Spacer(Modifier.width(6.dp))
+                        SmallIcon(Icons.Filled.Add, tr(R.string.src_add_here, group.category)) { adding = group.category }
+                        SmallIcon(if (edit) Icons.Filled.Check else Icons.Outlined.Edit, tr(if (edit) R.string.src_done_editing else R.string.src_edit_list)) {
+                            editing = if (edit) null else group.category
+                        }
+                        Spacer(Modifier.weight(1f))
                         Text("${group.all.count { it.enabled }}/${group.all.size}", style = mono(11.sp), color = Glass.textSecondary)
                         Spacer(Modifier.width(8.dp))
                         GlassSwitch(group.all.all { it.enabled }) { vm.setGroupEnabled(group.all, it) }
@@ -971,7 +1016,7 @@ private fun LazyListScope.sourcesPage(vm: SettingsViewModel, onAdd: () -> Unit) 
                         if (list.isEmpty()) return@forEach
                         Spacer(Modifier.height(8.dp))
                         Text(title, style = sans(11.sp, FontWeight.Medium), color = Glass.textSecondary)
-                        list.forEach { src -> SourceRow(src, checks[SourceLibrary.sourceKey(src)], checks.containsKey(SourceLibrary.sourceKey(src)), vm) }
+                        list.forEach { src -> SourceRow(src, checks[SourceLibrary.sourceKey(src)], checks.containsKey(SourceLibrary.sourceKey(src)), vm, removable = edit && !src.isPrimary) }
                     }
                 }
             }
@@ -981,8 +1026,19 @@ private fun LazyListScope.sourcesPage(vm: SettingsViewModel, onAdd: () -> Unit) 
 }
 
 @Composable
-private fun SourceRow(src: FeedSource, check: news.openwire.data.repository.FeedCheck?, checking: Boolean, vm: SettingsViewModel) {
+private fun SourceRow(src: FeedSource, check: news.openwire.data.repository.FeedCheck?, checking: Boolean, vm: SettingsViewModel, removable: Boolean = false) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Edit mode: a red (−) takes the source off the list.
+        androidx.compose.animation.AnimatedVisibility(removable) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(26.dp).clip(CircleShape).background(Color(0xFFE5484D)).clickable { vm.removeSource(src) }
+                        .semantics { this.contentDescription = tr(R.string.cd_remove_source) },
+                    contentAlignment = Alignment.Center,
+                ) { Box(Modifier.width(11.dp).height(2.dp).background(Color.White)) }
+                Spacer(Modifier.width(10.dp))
+            }
+        }
         SourceLogo(src.domain, src.name, size = 22.dp)
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
@@ -998,9 +1054,12 @@ private fun SourceRow(src: FeedSource, check: news.openwire.data.repository.Feed
                 color = when { check?.ok == false -> Glass.accentSoft; check?.stale == true -> Amber400; check?.ok == true -> Emerald400; else -> Glass.textSecondary },
             )
         }
-        if (checking && check == null) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Glass.accent)
-        if (src.isCustom) SmallIcon(Icons.Outlined.Delete, tr(R.string.cd_remove_source)) { vm.deleteSource(src.id) }
-        GlassSwitch(src.enabled) { vm.setSourceEnabled(src, it) }
+        if (checking && check == null) {
+            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Glass.accent)
+            Spacer(Modifier.width(14.dp)) // clear of the switch
+        }
+        if (src.isCustom && !removable) SmallIcon(Icons.Outlined.Delete, tr(R.string.cd_remove_source)) { vm.deleteSource(src.id) }
+        if (!removable) GlassSwitch(src.enabled) { vm.setSourceEnabled(src, it) }
     }
 }
 
@@ -1342,7 +1401,7 @@ private fun StrategyBadge(s: Strategy, custom: Boolean) {
 // ---- Notifications --------------------------------------------------------------------------
 
 @Composable
-private fun NotificationsPage(vm: SettingsViewModel) {
+private fun NotificationsPage(vm: SettingsViewModel, onHub: () -> Unit) {
     val context = LocalContext.current
     val s by vm.settings.collectAsState()
     val topics by vm.allTopics.collectAsState()
@@ -1354,12 +1413,23 @@ private fun NotificationsPage(vm: SettingsViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Hint(tr(R.string.notify_hint))
         Section {
-            SwitchRow(tr(R.string.notifications), tr(R.string.notify_master), s.notificationsEnabled) { on ->
-                if (on && Build.VERSION.SDK_INT >= 33 &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                ) permission.launch(Manifest.permission.POST_NOTIFICATIONS) else {
-                    vm.setNotificationsEnabled(on)
-                    if (on && !news.openwire.delivery.DeliveryCheck.status(context).ok) news.openwire.delivery.DeliveryCheck.showing = true
+            // The row opens the Notification Hub; the switch (past the | ) is the master switch.
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onHub).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(tr(R.string.notifications), style = sans(14.sp, FontWeight.Medium), color = Glass.textPrimary)
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Glass.textSecondary, modifier = Modifier.size(18.dp))
+                    }
+                    Text(tr(R.string.hub_row_sub), style = sans(11.sp, lineHeight = 16.sp), color = Glass.textSecondary)
+                }
+                Box(Modifier.padding(horizontal = 12.dp).width(1.dp).height(30.dp).background(Glass.hairline))
+                GlassSwitch(s.notificationsEnabled) { on ->
+                    if (on && Build.VERSION.SDK_INT >= 33 &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    ) permission.launch(Manifest.permission.POST_NOTIFICATIONS) else {
+                        vm.setNotificationsEnabled(on)
+                        if (on && !news.openwire.delivery.DeliveryCheck.status(context).ok) news.openwire.delivery.DeliveryCheck.showing = true
+                    }
                 }
             }
             Divider()
@@ -1418,6 +1488,105 @@ private fun NotificationsPage(vm: SettingsViewModel) {
                 if (i > 0) Divider()
                 SwitchRow(t.label, null, t.id in s.notifyTopics, enabled = s.notificationsEnabled) { vm.setNotifyTopic(t.id, it) }
             }
+        }
+    }
+}
+
+private enum class HubState { OFF, SILENT, ON }
+
+/** One thing that can notify: its state, and how to change it. */
+private class HubItem(val group: String, val label: String, val state: HubState, val canSilence: Boolean, val set: (HubState) -> Unit)
+
+/**
+ * Notification Hub: every source of notifications in one list (topics, breaking news, real-time
+ * alerts, writers and accounts you follow, briefing reminders), each Off, Silent or On, with a
+ * quick filter by state.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun NotificationHub(vm: SettingsViewModel) {
+    val g = Glass
+    val s by vm.settings.collectAsState()
+    val topics by vm.allTopics.collectAsState()
+    var filter by rememberSaveable { mutableStateOf("ALL") }
+    fun state(on: Boolean, channel: String) = when { !on -> HubState.OFF; channel in s.alerts.silent -> HubState.SILENT; else -> HubState.ON }
+    fun setSilent(channel: String, silent: Boolean) = vm.updateAlerts { a -> a.copy(silent = if (silent) a.silent + channel else a.silent - channel) }
+    val items = buildList {
+        val gTopics = tr(R.string.hub_group_topics)
+        topics.filter { it.isVisible }.forEach { t ->
+            val ch = "topic:${t.id}"
+            add(HubItem(gTopics, t.label, state(t.id in s.notifyTopics, ch), true) { st -> vm.setNotifyTopic(t.id, st != HubState.OFF); setSilent(ch, st == HubState.SILENT) })
+        }
+        val gBreaking = tr(R.string.breaking_news)
+        add(HubItem(gBreaking, tr(R.string.breaking_alerts), state(s.breakingEnabled, "breaking"), true) { st -> vm.setBreakingEnabled(st != HubState.OFF); setSilent("breaking", st == HubState.SILENT) })
+        add(HubItem(gBreaking, tr(R.string.rt_channel), state(s.realtimeAlerts, "realtime"), true) { st ->
+            if (st != HubState.OFF && !s.breakingEnabled) vm.setBreakingEnabled(true)
+            vm.setRealtimeAlerts(st != HubState.OFF); setSilent("realtime", st == HubState.SILENT)
+        })
+        val gOp = tr(R.string.hub_group_following)
+        fun follow(label: String, key: String) {
+            val ch = "op:$key"
+            add(HubItem(gOp, label, state(key !in s.opinionMuted, ch), true) { st ->
+                vm.setOpinionMuted(key, st == HubState.OFF); setSilent(ch, st == HubState.SILENT)
+            })
+        }
+        s.followedAuthors.forEach { follow(it, news.openwire.opinion.writerKey(it)) }
+        s.followedAccounts.forEach { follow("@$it", news.openwire.opinion.accountKey(it)) }
+        s.opinionTabs.forEach { follow(it, news.openwire.opinion.topicKey(it)) }
+        val gBrief = tr(R.string.audio_briefing)
+        s.briefing.slots.forEach { slot ->
+            val label = tr(when (slot.kind) {
+                news.openwire.domain.model.BriefingSlot.Kind.MORNING -> R.string.slot_morning
+                news.openwire.domain.model.BriefingSlot.Kind.AFTERNOON -> R.string.slot_afternoon
+                news.openwire.domain.model.BriefingSlot.Kind.EVENING -> R.string.slot_evening
+            })
+            add(HubItem(gBrief, label, if (slot.enabled) HubState.ON else HubState.OFF, false) { st ->
+                vm.setBriefing { b -> b.copy(slots = b.slots.map { if (it.kind == slot.kind) it.copy(enabled = st != HubState.OFF) else it }) }
+            })
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Hint(tr(R.string.hub_hint))
+        if (!s.notificationsEnabled) Text(tr(R.string.hub_master_off), style = sans(12.sp, FontWeight.Medium, lineHeight = 17.sp), color = Amber400)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("ALL" to R.string.hub_all, "SILENT" to R.string.hub_silent, "ON" to R.string.hub_on, "OFF" to R.string.hub_off).forEach { (k, r) ->
+                val n = if (k == "ALL") items.size else items.count { it.state.name == k }
+                Chip("${tr(r)} · $n", selected = filter == k) { filter = k }
+            }
+        }
+        val shown = if (filter == "ALL") items else items.filter { it.state.name == filter }
+        if (shown.isEmpty()) Hint(tr(R.string.hub_none))
+        shown.groupBy { it.group }.forEach { (group, list) ->
+            Section {
+                Label(group)
+                list.forEachIndexed { i, it ->
+                    if (i > 0) Divider()
+                    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(it.label, style = sans(14.sp, FontWeight.Medium), color = if (it.state == HubState.OFF) g.textMuted else g.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(8.dp))
+                        HubSwitch(it.state, it.canSilence, it.set)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Off · Silent · On (Silent only where the alert can arrive without sound). */
+@Composable
+private fun HubSwitch(state: HubState, canSilence: Boolean, onChange: (HubState) -> Unit) {
+    val g = Glass
+    Row(Modifier.clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape).padding(3.dp)) {
+        HubState.entries.filter { canSilence || it != HubState.SILENT }.forEach { st ->
+            val on = st == state
+            val c = when (st) { HubState.OFF -> g.textSecondary; HubState.SILENT -> Amber400; HubState.ON -> g.accent }
+            Text(
+                tr(when (st) { HubState.OFF -> R.string.hub_off; HubState.SILENT -> R.string.hub_silent; HubState.ON -> R.string.hub_on }),
+                style = sans(11.5.sp, if (on) FontWeight.SemiBold else FontWeight.Medium),
+                color = if (on) Color.White else g.textSecondary,
+                modifier = Modifier.clip(CircleShape).background(if (on) c.copy(alpha = if (st == HubState.OFF) .35f else .9f) else Color.Transparent)
+                    .clickable { onChange(st) }.padding(horizontal = 11.dp, vertical = 7.dp),
+            )
         }
     }
 }
@@ -1833,6 +2002,88 @@ private fun FindSources(vm: SettingsViewModel, query: String) {
                         .padding(horizontal = 16.dp, vertical = 9.dp),
                 )
             }
+        }
+    }
+}
+
+/**
+ * (+) on a source section: add a feed by its address and a name, or search the web for an outlet
+ * and pick any of its feeds (every section of it: World, Business, Tech…). Added feeds join the
+ * section's topic.
+ */
+@Composable
+private fun AddToSectionDialog(vm: SettingsViewModel, category: String, onDismiss: () -> Unit, topicId: String? = null) {
+    val g = Glass
+    val s by vm.settings.collectAsState()
+    val topic = remember(category, topicId) { topicId ?: vm.topicForCategory(category) }
+    var name by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var q by remember { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<news.openwire.data.remote.SourceFinder.Found>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    val lang = news.openwire.domain.engine.Languages.effective(s.language)
+    LaunchedEffect(q) {
+        results = emptyList()
+        if (q.trim().length < 2) { searching = false; return@LaunchedEffect }
+        searching = true
+        kotlinx.coroutines.delay(600)
+        vm.finder?.search(q.trim(), lang, s.edition.country, sections = true)?.collect { results = it }
+        searching = false
+    }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            Modifier.padding(16.dp).widthIn(max = 560.dp).fillMaxWidth().heightIn(max = 640.dp).clip(RoundedCornerShape(26.dp))
+                .background(g.deviceBg).border(1.dp, g.hairline, RoundedCornerShape(26.dp)).padding(18.dp),
+        ) {
+            Text(tr(R.string.src_add_here, category).uppercase(), style = mono(11.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft)
+            Spacer(Modifier.height(10.dp))
+            Field(tr(R.string.src_feed_name), name, { name = it })
+            Spacer(Modifier.height(8.dp))
+            Field(tr(R.string.src_feed_url), url, { url = it }, placeholder = "https://example.com/rss")
+            Spacer(Modifier.height(10.dp))
+            PrimaryButton(if (busy) tr(R.string.checking) else tr(R.string.verify_add)) {
+                if (busy || url.isBlank()) return@PrimaryButton
+                busy = true
+                vm.addSource(name, url, listOf(topic), 8) { ok -> busy = false; if (ok) onDismiss() }
+            }
+            Spacer(Modifier.height(16.dp))
+            Divider()
+            Spacer(Modifier.height(12.dp))
+            Text(tr(R.string.src_search_web).uppercase(), style = mono(11.sp, FontWeight.SemiBold, 0.14.em), color = g.textSecondary)
+            Spacer(Modifier.height(8.dp))
+            Field(tr(R.string.search_sources), q, { q = it }, placeholder = tr(R.string.find_sources_eg))
+            if (searching) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = g.accent)
+                Spacer(Modifier.width(8.dp))
+                Text(tr(R.string.find_sources_searching), style = sans(12.sp), color = g.textSecondary)
+            }
+            androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).padding(top = 6.dp)) {
+                items(results.size) { i ->
+                    val f = results[i]
+                    val added = s.customFeeds.any { it.url == f.url }
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        SourceLogo(f.domain, f.name, size = 26.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(f.name, style = sans(13.5.sp, FontWeight.SemiBold), color = g.textPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                listOfNotNull(f.domain, f.newestAt?.let { tr(R.string.check_newest, NewsProcessor.formatRelativeTime(it)) }, if (f.viaGoogle) tr(R.string.find_via_google) else null).joinToString(" · "),
+                                style = sans(11.sp), color = g.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            tr(if (added) R.string.find_added else R.string.find_add), style = sans(12.5.sp, FontWeight.SemiBold),
+                            color = if (added) g.textPrimary else Color.White,
+                            modifier = Modifier.clip(CircleShape).background(if (added) g.chipFill else g.accent)
+                                .clickable { if (added) vm.removeFound(f.url) else vm.addFoundTo(f, topic) }.padding(horizontal = 14.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            TextButton(tr(R.string.action_cancel), onClick = onDismiss)
         }
     }
 }

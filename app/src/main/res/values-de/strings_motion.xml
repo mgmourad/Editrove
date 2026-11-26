@@ -49,4 +49,25 @@
     <string name="for_you">Für dich</string>
     <string name="for_you_sub">Ausgewählt nach Meldungen, die dir gefallen haben</string>
     <string name="for_you_tag">AUF DIESEM TELEFON</string>
+    <string name="msg_source_removed">%1$s aus deinen Quellen entfernt</string>
+    <string name="src_add_here">Zu %1$s hinzufügen</string>
+    <string name="src_edit_list">Liste bearbeiten</string>
+    <string name="src_done_editing">Fertig</string>
+    <string name="src_feed_name">Name</string>
+    <string name="src_feed_url">RSS-Feed-Adresse</string>
+    <string name="src_search_web">Oder online suchen</string>
+    <string name="topic_edit_sources">Quellen bearbeiten</string>
+    <string name="topic_sources_title">Quellen von %1$s</string>
+    <string name="topic_sources_hint">Schalte eine Quelle aus, um sie aus diesem Thema zu nehmen, oder füge den Feed einer anderen Zeitung hinzu.</string>
+    <string name="hub_title">Benachrichtigungszentrale</string>
+    <string name="hub_row_sub">Alle Hinweise an einem Ort: tippen, um je An, Lautlos oder Aus zu wählen</string>
+    <string name="hub_hint">Jedes Thema, jede Eilmeldung, gefolgte Autoren und Briefing-Erinnerungen in einer Liste. Lautlose Hinweise kommen ohne Ton.</string>
+    <string name="hub_master_off">Benachrichtigungen sind aus: Schalte sie unter Benachrichtigungen &amp; Aktualisierung ein.</string>
+    <string name="hub_all">Alle</string>
+    <string name="hub_silent">Lautlos</string>
+    <string name="hub_on">An</string>
+    <string name="hub_off">Aus</string>
+    <string name="hub_none">Hier ist nichts.</string>
+    <string name="hub_group_topics">Themen</string>
+    <string name="hub_group_following">Gefolgte Autoren und Konten</string>
 </resources>

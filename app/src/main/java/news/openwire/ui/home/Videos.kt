@@ -242,8 +242,15 @@ private fun ShortEmbed(id: String, muted: Boolean, paused: Boolean, modifier: Mo
                     <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
                     <style>html,body{margin:0;height:100%;background:transparent;overflow:hidden}iframe{position:fixed;inset:0;width:100%;height:100%;border:0}</style></head>
                     <body><iframe id="p" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
-                    src="https://www.youtube-nocookie.com/embed/$id?autoplay=1&playsinline=1&controls=0&loop=1&playlist=$id&rel=0&iv_load_policy=3&cc_load_policy=0&disablekb=1&fs=0&enablejsapi=1&mute=${if (muted) 1 else 0}"></iframe>
-                    <script>function cmd(f){var p=document.getElementById('p');p&&p.contentWindow.postMessage(JSON.stringify({event:'command',func:f,args:[]}),'*')}</script>
+                    src="https://www.youtube-nocookie.com/embed/$id?autoplay=1&playsinline=1&controls=0&loop=1&playlist=$id&rel=0&iv_load_policy=3&cc_load_policy=0&cc_lang_pref=zz&hl=en&disablekb=1&fs=0&enablejsapi=1&mute=${if (muted) 1 else 0}"></iframe>
+                    <script>
+                    function send(o){var p=document.getElementById('p');p&&p.contentWindow.postMessage(JSON.stringify(o),'*')}
+                    function cmd(f,a){send({event:'command',func:f,args:a||[]})}
+                    // Captions off: the caption module is unloaded once the player is up (and again in case it loads late).
+                    function noCaptions(){send({event:'listening',id:1,channel:'widget'});cmd('unloadModule',['captions']);cmd('unloadModule',['cc']);cmd('setOption',['captions','track',{}])}
+                    document.getElementById('p').addEventListener('load',function(){[300,1200,2500,5000].forEach(function(t){setTimeout(noCaptions,t)})});
+                    window.addEventListener('message',function(e){try{var d=JSON.parse(e.data);if(d.event==='onReady'||(d.info&&d.info.playerState===1))noCaptions()}catch(x){}});
+                    </script>
                     </body></html>
                 """.trimIndent()
                 // A real https origin (Editrove's own page) so YouTube accepts the embed.

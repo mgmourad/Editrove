@@ -624,10 +624,12 @@ private fun TabFeed(
             return@HorizontalPager
         }
 
+        // Only a refresh the reader started opens the pull band (automatic updates stay out of the way).
+        val userRefreshingIds by vm.userRefreshing.collectAsState()
         val isRefreshing = when (t) {
-            NavTab.DISCOVER -> refreshingIds.isNotEmpty()
+            NavTab.DISCOVER -> userRefreshingIds.isNotEmpty()
             NavTab.SAVED, NavTab.LIVE, NavTab.OPINION -> false
-            else -> topic.id in refreshingIds
+            else -> topic.id in userRefreshingIds
         }
         RuleRefreshBox(
             refreshing = isRefreshing,

@@ -49,4 +49,25 @@
     <string name="for_you">Para ti</string>
     <string name="for_you_sub">Elegido a partir de las noticias que te encantaron</string>
     <string name="for_you_tag">EN ESTE TELÉFONO</string>
+    <string name="msg_source_removed">%1$s quitado de tus fuentes</string>
+    <string name="src_add_here">Añadir a %1$s</string>
+    <string name="src_edit_list">Editar lista</string>
+    <string name="src_done_editing">Listo</string>
+    <string name="src_feed_name">Nombre</string>
+    <string name="src_feed_url">Dirección del feed RSS</string>
+    <string name="src_search_web">O busca en internet</string>
+    <string name="topic_edit_sources">Editar fuentes</string>
+    <string name="topic_sources_title">Fuentes de %1$s</string>
+    <string name="topic_sources_hint">Desactiva una fuente para dejarla fuera de este tema, o añade el feed de otro periódico.</string>
+    <string name="hub_title">Centro de notificaciones</string>
+    <string name="hub_row_sub">Todas las alertas en un sitio: toca para elegir Activado, Silencio o Desactivado</string>
+    <string name="hub_hint">Cada tema, alerta de última hora, autor que sigues y recordatorio de resumen, en una lista. Las alertas en silencio llegan sin sonido.</string>
+    <string name="hub_master_off">Las notificaciones están desactivadas: actívalas en Notificaciones y actualización para recibirlas.</string>
+    <string name="hub_all">Todas</string>
+    <string name="hub_silent">Silencio</string>
+    <string name="hub_on">Activado</string>
+    <string name="hub_off">Desactivado</string>
+    <string name="hub_none">Nada aquí.</string>
+    <string name="hub_group_topics">Temas</string>
+    <string name="hub_group_following">Autores y cuentas que sigues</string>
 </resources>

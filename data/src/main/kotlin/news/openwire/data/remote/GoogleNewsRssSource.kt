@@ -38,13 +38,53 @@ class GoogleNewsRssSource(
         return fetchOnce(u)
     }
 
-    private suspend fun fetchOnce(url: String): ParsedFeed = withContext(Dispatchers.IO) {
+    /**
+     * Some servers reset HTTP/2 streams on feed paths they've retired or rewritten
+     * ("stream was reset: INTERNAL_ERROR"); the same address over HTTP/1.1 often still answers,
+     * and when it doesn't, the site's page usually says where the feed lives now.
+     */
+    private val http1 by lazy { client.newBuilder().protocols(listOf(okhttp3.Protocol.HTTP_1_1)).build() }
+    private val moved = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    private suspend fun fetchOnce(url: String): ParsedFeed {
+        moved[url]?.let { m -> runCatching { return fetchWith(client, m) } }
+        return try {
+            fetchWith(client, url)
+        } catch (e: IOException) {
+            val reset = e is okhttp3.internal.http2.StreamResetException || e.message.orEmpty().contains("stream was reset", true) ||
+                e is java.net.ProtocolException
+            if (reset) runCatching { return fetchWith(http1, url) }
+            // Retired address (reset, 404, 410): look for the feed the site advertises now.
+            if (reset || e.message in GONE) relocate(url)?.let { (u, feed) -> moved[url] = u; return feed }
+            throw e
+        }
+    }
+
+    /** The site's current feed for the same section, read from its own pages' feed links. */
+    private suspend fun relocate(url: String): Pair<String, ParsedFeed>? = withContext(Dispatchers.IO) {
+        val u = runCatching { java.net.URI(url) }.getOrNull() ?: return@withContext null
+        val section = url.trimEnd('/').substringAfterLast('/').substringAfterLast("rss-").lowercase()
+        for (page in listOf("https://${u.host}/", "https://${u.host}${u.path.substringBeforeLast('/')}/")) {
+            val html = runCatching {
+                http1.newCall(Request.Builder().url(page).header("User-Agent", UA).build()).execute().use { r -> if (r.isSuccessful) r.body?.string() else null }
+            }.getOrNull() ?: continue
+            val links = FEED_LINK.findAll(html).map { it.groupValues[1].replace("&amp;", "&") }
+                .map { l -> if (l.startsWith("http")) l else "https://${u.host}/${l.trimStart('/')}" }.distinct().toList()
+            val pick = links.firstOrNull { section.isNotEmpty() && it.lowercase().contains(section) } ?: links.firstOrNull() ?: continue
+            if (pick == url) continue
+            runCatching { return@withContext pick to fetchWith(http1, pick) }
+        }
+        null
+    }
+
+    private suspend fun fetchWith(c: OkHttpClient, url: String): ParsedFeed = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 15) Editrove/0.3 (+https://github.com/mgmourad/Editrove)")
+            // No address in the ID: some CDNs (CBC's) drop any request whose user agent carries a URL.
+            .header("User-Agent", UA)
             .header("Accept", "application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8")
             .build()
-        client.newCall(request).execute().use { response ->
+        c.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
             val body = response.body?.string() ?: throw IOException("Empty body")
             parseFeed(body)
@@ -145,3 +185,7 @@ class GoogleNewsRssSource(
     private fun textOf(parent: Element, tag: String): String? =
         (parent.getElementsByTagName(tag).item(0) as? Element)?.textContent?.trim()?.takeIf { it.isNotEmpty() }
 }
+
+private const val UA = "Mozilla/5.0 (Linux; Android 15) Editrove/0.3"
+private val GONE = setOf("HTTP 404", "HTTP 410", "HTTP 301", "HTTP 308")
+private val FEED_LINK = Regex("<link[^>]+type=[\"']application/(?:rss|atom)\\+xml[\"'][^>]*href=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)

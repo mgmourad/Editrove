@@ -14,7 +14,7 @@ class VideoCatalogTest {
             v("n1", VideoChannel.Kind.NEWS, "ABC", 1), v("n2", VideoChannel.Kind.NEWS, "ABC", 2), v("n3", VideoChannel.Kind.NEWS, "BBC", 3),
             v("s1", VideoChannel.Kind.SPORTS, "ESPN", 1), v("t1", VideoChannel.Kind.TECH, "Verge", 1),
             v("b1", VideoChannel.Kind.BUSINESS, "CNBC", 1), v("e1", VideoChannel.Kind.ENTERTAINMENT, "E!", 1),
-            v("old", VideoChannel.Kind.NEWS, "CNN", 60),
+            v("old", VideoChannel.Kind.NEWS, "CNN", 200),
         )
         val top = VideoCatalog.mix("TOP", all, now)
         assertEquals(listOf("n1", "s1", "t1", "b1", "e1"), top.take(5).map { it.id })

@@ -58,20 +58,24 @@ class SourceFinder(
      * Results as they're confirmed (best first each time). [appLanguage] and [country] set
      * where Google News looks and which languages rank higher.
      */
-    fun search(query: String, appLanguage: String, country: String): Flow<List<Found>> = channelFlow {
+    fun search(query: String, appLanguage: String, country: String, sections: Boolean = false): Flow<List<Found>> = channelFlow {
         val q = query.trim()
         if (q.length < 2) { send(emptyList()); return@channelFlow }
         val found = LinkedHashMap<String, Found>()
         val lock = Mutex()
         suspend fun offer(f: Found?) {
             if (f == null) return
+            // Corporate press rooms and investor pages aren't news; the same name twice is one feed.
+            if (PRESS.containsMatchIn(f.name) || PRESS.containsMatchIn(f.domain)) return
             val list = lock.withLock {
+                if (found.values.any { it.name.equals(f.name, true) && it.domain == f.domain }) return@withLock null
+
                 val key = f.url.removePrefix("https://").removePrefix("http://").removePrefix("www.").trimEnd('/')
                 if (key !in found) found[key] = f
-                // At most three feeds from one site, best first.
-                found.values.sortedByDescending { it.score }.groupBy { it.domain }.flatMap { it.value.take(3) }
-                    .sortedByDescending { it.score }.take(12)
-            }
+                // At most three feeds from one site, best first (every section when asked for).
+                found.values.sortedByDescending { it.score }.groupBy { it.domain }.flatMap { it.value.take(if (sections) 12 else 3) }
+                    .sortedByDescending { it.score }.take(if (sections) 40 else 12)
+            } ?: return
             send(list)
         }
         withTimeoutOrNull(25_000) {
@@ -93,10 +97,20 @@ class SourceFinder(
                 sites.forEach(domains::add)
                 // 3. The sites themselves: the feed a homepage advertises, else the usual addresses,
                 // else (no feed at all) the site's stories through Google News.
-                domains.take(6).forEach { d -> launch { fromSite(q, d, appLanguage, country).forEach { offer(it) } } }
+                domains.take(6).forEach { d -> launch { fromSite(q, d, appLanguage, country, wide = sections).forEach { offer(it) } } }
+                // 4. Every section of the outlets that match the name (World, Business, Tech…).
+                if (sections) sites.take(2).forEach { d -> SECTIONS.forEach { (label, word) ->
+                    launch {
+                        val name = "${siteNames[d] ?: d} – $label"
+                        offer(check(q, TopicRegistry.googleNewsSearchUrl("site:$d $word when:3d", TopicRegistry.country(country)), name, 0, true, d)?.copy(name = name))
+                    }
+                } }
             }
         }
-        lock.withLock { send(found.values.sortedByDescending { it.score }.take(12)) }
+        lock.withLock {
+            send(found.values.sortedByDescending { it.score }.groupBy { it.domain }.flatMap { it.value.take(if (sections) 12 else 3) }
+                .sortedByDescending { it.score }.take(if (sections) 40 else 12))
+        }
     }
 
     /** Outlets Google News lists for [q] whose name or site matches it (else the most frequent two). */
@@ -120,12 +134,12 @@ class SourceFinder(
         return sources.groupingBy { it.first }.eachCount().entries.sortedByDescending { it.value }.take(2).map { it.key }
     }
 
-    private suspend fun fromSite(q: String, domain: String, appLanguage: String, country: String): List<Found> {
+    private suspend fun fromSite(q: String, domain: String, appLanguage: String, country: String, wide: Boolean = false): List<Found> {
         val home = listOf("https://$domain", "https://www.$domain").firstNotNullOfOrNull { url -> get(url, html = true)?.let { url to it } }
         val advertised = home?.let { (base, html) ->
             runCatching {
                 Jsoup.parse(html, base).select("link[rel~=alternate][type~=(rss|atom)], a[href~=(?i)(/feed/?$|/rss|\\.rss$|rss\\.xml|atom\\.xml)]")
-                    .map { it.absUrl("href") }.filter { it.startsWith("http") }.distinct().take(5)
+                    .map { it.absUrl("href") }.filter { it.startsWith("http") }.distinct().take(if (wide) 14 else 5)
             }.getOrDefault(emptyList())
         }.orEmpty()
         val siteName = home?.second?.let { runCatching { Jsoup.parse(it).let { d -> d.selectFirst("meta[property=og:site_name]")?.attr("content")?.takeIf { s -> s.isNotBlank() } ?: d.title().substringBefore(" - ").substringBefore(" | ").take(40) } }.getOrNull() }
@@ -177,5 +191,14 @@ class SourceFinder(
                     .build(),
             ).execute().use { r -> if (r.isSuccessful) r.body?.string()?.take(600_000) else null }
         }.getOrNull()
+    }
+
+    private companion object {
+        /** Sections offered for a matched outlet: label and the word Google News searches for. */
+        val PRESS = Regex("(?i)press ?room|investor|press releases|careers")
+        val SECTIONS = listOf(
+            "World" to "world", "Politics" to "politics", "Business" to "business", "Tech" to "technology",
+            "Science" to "science", "Health" to "health", "Sports" to "sports", "Entertainment" to "entertainment",
+        )
     }
 }

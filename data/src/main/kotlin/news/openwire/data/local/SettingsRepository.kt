@@ -98,6 +98,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
         val briefingPresenter: String? = null,
         val opinionMuted: Set<String> = emptySet(),
         val alerts: news.openwire.domain.alerts.AlertPrefs = news.openwire.domain.alerts.AlertPrefs(),
+        val removedSources: Set<String> = emptySet(),
     ) {
         fun toSettings() = UserSettings(
             edition = LocalEdition(city, region, country),
@@ -111,6 +112,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
             opinionMuted = opinionMuted,
             realtimeAlerts = realtimeAlerts,
             alerts = alerts,
+            removedSources = removedSources,
             customTopics = customTopics.map { Topic(it.id, it.label, liveUrl = it.liveUrl, liveOnly = true, keywords = it.keywords, sources = it.sources, isCustom = true) },
             hiddenTopics = hiddenTopics,
             topicOrder = topicOrder,
@@ -162,6 +164,7 @@ class PrefsSettingsRepository(context: Context) : SettingsRepository {
                 s.briefing.presenter.name,
                 s.opinionMuted,
                 s.alerts,
+                s.removedSources,
             )
         }
     }

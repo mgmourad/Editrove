@@ -87,7 +87,7 @@ data class TourSlide(
 
 object FeatureTour {
     /** Bump to show a redesigned tour to everyone once. */
-    const val VERSION = 1
+    const val VERSION = 2
 
     private val ALL = listOf(
         TourSlide("t_today", R.string.ft_k_start, R.string.ft_today_t, R.string.ft_today_b, glow = Rose),

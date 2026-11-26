@@ -23,9 +23,9 @@ import okhttp3.Request
 class ShortsSource(private val client: OkHttpClient = OkHttpClient()) {
     private val cache = ConcurrentHashMap<String, Pair<Long, List<ShortVideo>>>()
 
-    suspend fun forTopic(topicId: String, now: Long = System.currentTimeMillis()): List<ShortVideo> = coroutineScope {
-        val gate = Semaphore(4)
-        val all = VideoCatalog.channelsFor(topicId).map { ch -> async { gate.withPermit { channel(ch, now) } } }.awaitAll().flatten()
+    suspend fun forTopic(topicId: String, switchedOff: (String) -> Boolean = { false }, now: Long = System.currentTimeMillis()): List<ShortVideo> = coroutineScope {
+        val gate = Semaphore(6)
+        val all = VideoCatalog.channelsFor(topicId, switchedOff).map { ch -> async { gate.withPermit { channel(ch, now) } } }.awaitAll().flatten()
         VideoCatalog.mix(topicId, all, now)
     }
 
@@ -48,7 +48,7 @@ class ShortsSource(private val client: OkHttpClient = OkHttpClient()) {
             val id = VID.find(e)?.groupValues?.get(1) ?: return@mapNotNull null
             val title = TITLE.find(e)?.groupValues?.get(1)?.let(::unescape) ?: return@mapNotNull null
             val at = PUB.find(e)?.groupValues?.get(1)?.let { runCatching { OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull() } ?: return@mapNotNull null
-            ShortVideo(id, title, ch.name, ch.avatar, at, ch.kind)
+            ShortVideo(id, title, ch.name, ch.avatar, at, ch.kind, ch.topics)
         }.toList()
 
     private fun unescape(s: String) = s.replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">")

@@ -43,7 +43,14 @@ class MainActivity : ComponentActivity() {
                     registry = container.domainRegistry,
                     archiveLookup = { container.archiveFor(it) },
                     resolveLink = { container.googleLinks.resolve(it) },
-                    loadVideos = { container.shorts.forTopic(it) },
+                    loadVideos = { topic ->
+                        // Only outlets the reader keeps on: a switched-off source's site brings no videos.
+                        val s = container.settingsRepository.settings.value
+                        val catalog = container.feedCatalog.catalog
+                        val off = catalog.filter { news.openwire.domain.engine.SourceLibrary.sourceKey(it) in s.disabledSources }.map { it.domain }.toSet()
+                        val on = catalog.filter { news.openwire.domain.engine.SourceLibrary.sourceKey(it) !in s.disabledSources }.map { it.domain }.toSet()
+                        container.shorts.forTopic(topic, switchedOff = { d -> d in off && d !in on })
+                    },
                 )
             }
         }

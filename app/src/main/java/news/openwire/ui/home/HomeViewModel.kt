@@ -71,6 +71,36 @@ class HomeViewModel(
     val videos: StateFlow<Map<String, List<news.openwire.domain.video.ShortVideo>>> = _videos.asStateFlow()
     private val videoJobs = HashMap<String, kotlinx.coroutines.Job>()
 
+    private val _forYou = MutableStateFlow<Map<String, List<Article>>>(emptyMap())
+    /** For You per tab: stories like the ones the reader loved. */
+    val forYou: StateFlow<Map<String, List<Article>>> = _forYou.asStateFlow()
+    private val forYouJobs = HashMap<String, kotlinx.coroutines.Job>()
+
+    /**
+     * Rebuilds a tab's For You from what's been loved: Top Stories (and Latest) draw on every
+     * topic, any other tab on its own stories. [shown] are stories already at the top of the page.
+     */
+    fun buildForYou(topicId: String, shown: Set<String>) {
+        forYouJobs[topicId]?.cancel()
+        forYouJobs[topicId] = viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            val loved = library.lovedStories().ifEmpty {
+                // Likes from before headlines were kept: whatever loved stories are still in the feeds.
+                val ids = library.liked.value
+                _feeds.value.values.flatMap { (it as? FeedResult.Success)?.articles.orEmpty() }.filter { it.id in ids }
+                    .map { news.openwire.domain.foryou.ForYou.Loved(it.title, it.domain) }
+            }
+            if (loved.isEmpty()) { _forYou.update { it - topicId }; return@launch }
+            val everywhere = topicId == "TOP" || topicId == "LATEST"
+            val topics = if (everywhere) this@HomeViewModel.topics.filter { it.isVisible } else this@HomeViewModel.topics.filter { it.id == topicId }
+            val candidates = topics.flatMap { t ->
+                val list = (_feeds.value[t.id] as? FeedResult.Success)?.articles ?: runCatching { repository.cachedArticles(t.id) }.getOrDefault(emptyList())
+                list.map { news.openwire.domain.foryou.ForYou.Candidate(t.id, it) }
+            }
+            val picks = news.openwire.domain.foryou.ForYou.recommend(loved, candidates, exclude = shown + library.liked.value)
+            _forYou.update { if (picks.size >= 4) it + (topicId to picks) else it - topicId }
+        }
+    }
+
     /** Loads (or refreshes, with [force]) a tab's video carousel. */
     fun loadVideos(topicId: String, force: Boolean = false) {
         if (!force && (_videos.value.containsKey(topicId) || videoJobs[topicId]?.isActive == true)) return

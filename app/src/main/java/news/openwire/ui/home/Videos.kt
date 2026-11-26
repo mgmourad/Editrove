@@ -85,7 +85,8 @@ fun VideoMoments(videos: List<ShortVideo>, compact: Boolean) {
     if (videos.isEmpty()) return
     val play = LocalPlayVideo.current
     val g = Glass
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    HighlightSection(VideoGlow) {
+    Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
                 Text(tr(R.string.video_moments), style = serif(24.sp, FontWeight.Bold), color = g.textPrimary)
@@ -120,6 +121,7 @@ fun VideoMoments(videos: List<ShortVideo>, compact: Boolean) {
                 }
             }
         }
+    }
     }
 }
 
@@ -180,8 +182,13 @@ fun ShortsPlayer(
                     }
                 }
             }
-            // Back, top left; the source of the stream, top right.
-            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Back, top left; the source of the stream, top right — on a dark band that fades into the
+            // picture, so it reads over any video (and covers YouTube's own title strip).
+            Box(
+                Modifier.fillMaxWidth().background(Brush.verticalGradient(0f to Color.Black.copy(alpha = .85f), .55f to Color.Black.copy(alpha = .55f), 1f to Color.Transparent))
+                    .statusBarsPadding().height(96.dp),
+            )
+            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start = 12.dp, end = 16.dp, top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier.size(44.dp).clip(CircleShape).background(Color.Black.copy(alpha = .35f)).clickable(onClick = onClose),
                     contentAlignment = Alignment.Center,

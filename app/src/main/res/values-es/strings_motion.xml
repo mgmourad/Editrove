@@ -46,4 +46,7 @@
     <string name="video_love">Me encanta</string>
     <string name="video_save">Guardar</string>
     <string name="video_share">Compartir</string>
+    <string name="for_you">Para ti</string>
+    <string name="for_you_sub">Elegido a partir de las noticias que te encantaron</string>
+    <string name="for_you_tag">EN ESTE TELÉFONO</string>
 </resources>

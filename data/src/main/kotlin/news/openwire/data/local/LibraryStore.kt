@@ -19,6 +19,8 @@ interface Library {
     fun toggleLiked(article: Article): Boolean
     /** Outlets of liked and saved stories, one entry per story: the on-device interest signal. */
     fun interestDomains(): List<String>
+    /** Loved stories' headlines and outlets, newest first (For You). On the phone only. */
+    fun lovedStories(): List<news.openwire.domain.foryou.ForYou.Loved> = emptyList()
 }
 
 /** In-memory library for tests. */
@@ -81,8 +83,19 @@ class LibraryStore(context: Context) : Library {
         // Remember the outlet of each like (most recent 200) for Curated tuning.
         val domains = likedDomains().toMutableList()
         article.domain?.takeIf { it.isNotEmpty() }?.let { d -> if (nowLiked) domains += d else domains.remove(d) }
-        prefs.edit().putStringSet(KEY_LIKED, _liked.value).putString(KEY_LIKED_DOMAINS, domains.takeLast(200).joinToString("\n")).apply()
+        // The headline too (For You learns from what was loved, not just where it ran).
+        val loved = lovedLines().filterNot { it.substringBefore('\t') == article.id }.let { l ->
+            if (nowLiked) listOf("${article.id}\t${article.title.replace('\n', ' ').replace('\t', ' ')}\t${article.domain.orEmpty()}") + l else l
+        }.take(300)
+        prefs.edit().putStringSet(KEY_LIKED, _liked.value).putString(KEY_LIKED_DOMAINS, domains.takeLast(200).joinToString("\n"))
+            .putString(KEY_LOVED, loved.joinToString("\n")).apply()
         return nowLiked
+    }
+
+    private fun lovedLines(): List<String> = prefs.getString(KEY_LOVED, null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
+
+    override fun lovedStories(): List<news.openwire.domain.foryou.ForYou.Loved> = lovedLines().mapNotNull { l ->
+        val p = l.split('\t'); if (p.size < 2) null else news.openwire.domain.foryou.ForYou.Loved(p[1], p.getOrNull(2)?.takeIf { it.isNotEmpty() })
     }
 
     private fun likedDomains(): List<String> = prefs.getString(KEY_LIKED_DOMAINS, null)?.split('\n')?.filter { it.isNotEmpty() }.orEmpty()
@@ -134,5 +147,6 @@ class LibraryStore(context: Context) : Library {
         const val KEY_SAVED = "saved_articles"
         const val KEY_LIKED = "liked_ids"
         const val KEY_LIKED_DOMAINS = "liked_domains"
+        const val KEY_LOVED = "loved_stories"
     }
 }

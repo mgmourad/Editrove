@@ -46,4 +46,7 @@
     <string name="video_love">Gefällt mir</string>
     <string name="video_save">Speichern</string>
     <string name="video_share">Teilen</string>
+    <string name="for_you">Für dich</string>
+    <string name="for_you_sub">Ausgewählt nach Meldungen, die dir gefallen haben</string>
+    <string name="for_you_tag">AUF DIESEM TELEFON</string>
 </resources>

@@ -46,4 +46,7 @@
     <string name="video_love">Love</string>
     <string name="video_save">Save</string>
     <string name="video_share">Share</string>
+    <string name="for_you">For You</string>
+    <string name="for_you_sub">Picked from the stories you loved</string>
+    <string name="for_you_tag">ON THIS PHONE</string>
 </resources>

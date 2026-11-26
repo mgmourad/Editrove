@@ -249,7 +249,8 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
                                     ui = FeedUi(savedIds, liked, null),
                                     onOpen = { vm.openArticle(it) },
                                     bottomPadding = 40.dp,
-                                    columns = columns, magazine = true, horizontalPadding = 28.dp,
+                                    columns = columns,
+                                    magazine = true, horizontalPadding = 28.dp,
                                 )
                             }
                             PaneMiniPlayer(briefing, Modifier.align(Alignment.BottomCenter))
@@ -533,6 +534,8 @@ private fun TabFeed(
     val refreshingIds by vm.refreshing.collectAsState()
     val newStoriesMap by vm.newStories.collectAsState()
     val videosMap by vm.videos.collectAsState()
+    val forYouMap by vm.forYou.collectAsState()
+    val likedIds by vm.liked.collectAsState()
 
     val padding = PaddingValues(
         start = horizontalPadding, end = horizontalPadding,
@@ -634,6 +637,11 @@ private fun TabFeed(
         ) {
         val newHere = if (t == NavTab.TODAY) newStoriesMap[topic.id] else null
         if (t == NavTab.TODAY) LaunchedEffect(topic.id) { vm.loadVideos(topic.id) }
+        // For You follows the loves and the stories on screen (the top of the page isn't repeated there).
+        if (t == NavTab.TODAY) {
+            val top = (feeds[topic.id] as? FeedResult.Success)?.articles?.take(12)?.map { it.id }?.toSet().orEmpty()
+            LaunchedEffect(topic.id, likedIds, top) { vm.buildForYou(topic.id, top) }
+        }
         EditorialGrid(stateFor(t), padding, Modifier.fillMaxSize(), columns = columns) {
             fullRow("masthead") {
                 Masthead(userSettings.edition.city, onEdition = { vm.openSettings() }, onSettings = { vm.openSettings() })
@@ -654,6 +662,7 @@ private fun TabFeed(
                 newSince = newHere?.since ?: 0L,
                 videos = if (t == NavTab.TODAY) videosMap[topic.id].orEmpty() else emptyList(),
                 columns = columns,
+                forYou = if (t == NavTab.TODAY) forYouMap[topic.id].orEmpty() else emptyList(),
             )
             when (t) {
                 NavTab.TODAY, NavTab.AUDIO -> {

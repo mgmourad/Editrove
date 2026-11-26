@@ -46,4 +46,7 @@
     <string name="video_love">إعجاب</string>
     <string name="video_save">حفظ</string>
     <string name="video_share">مشاركة</string>
+    <string name="for_you">لك</string>
+    <string name="for_you_sub">مختارة مما أعجبك من أخبار</string>
+    <string name="for_you_tag">على هذا الهاتف</string>
 </resources>

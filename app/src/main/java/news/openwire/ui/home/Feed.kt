@@ -391,6 +391,8 @@ fun LazyGridScope.feedItems(
     videos: List<news.openwire.domain.video.ShortVideo> = emptyList(),
     /** The grid's column count (rows are filled to it). */
     columns: Int = 2,
+    /** Stories like the ones the reader loved (For You). */
+    forYou: List<Article> = emptyList(),
 ) {
     if (articles.isEmpty()) return
     // New since the last refresh: under a divider at the top, each with the rose "new" dot.
@@ -447,13 +449,27 @@ fun LazyGridScope.feedItems(
             }
         }
     }
-    val videosAfter = if (videos.isEmpty()) Int.MAX_VALUE else VIDEOS_AFTER
-    bento(rest.take(videosAfter), 0, compact, magazine, category, selectedId, savedIds, likedIds, ::state, onOpen, onToggleSaved, onToggleLiked,
-        columns, wideLast = videos.isNotEmpty() && rest.size >= videosAfter)
-    if (rest.size >= minOf(videosAfter, rest.size) && videos.isNotEmpty()) fullRow("videos") { VideoMoments(videos, compact) }
-    if (rest.size > videosAfter) bento(rest.drop(videosAfter), videosAfter, compact, magazine, category, selectedId, savedIds, likedIds, ::state, onOpen, onToggleSaved, onToggleLiked,
-        columns, wideFirst = true)
+    // Highlighted sections between runs of stories, each with a full-width story on either side.
+    val specials = buildList<Pair<Int, String>> {
+        if (videos.isNotEmpty()) add(VIDEOS_AFTER to "videos")
+        if (forYou.size >= 4) add((if (videos.isNotEmpty()) FOR_YOU_AFTER else VIDEOS_AFTER) to "foryou")
+    }.map { (at, k) -> at.coerceAtMost(rest.size) to k }
+    var from = 0
+    specials.forEachIndexed { n, (at, kind) ->
+        if (at > from) bento(rest.subList(from, at), from, compact, magazine, category, selectedId, savedIds, likedIds, ::state, onOpen, onToggleSaved, onToggleLiked,
+            columns, wideFirst = n > 0 || false, wideLast = true)
+        when (kind) {
+            "videos" -> fullRow("videos") { VideoMoments(videos, compact) }
+            else -> fullRow("foryou") { ForYouSection(forYou, compact, savedIds, likedIds, onOpen, onToggleSaved, onToggleLiked) }
+        }
+        from = maxOf(from, at)
+    }
+    if (rest.size > from) bento(rest.drop(from), from, compact, magazine, category, selectedId, savedIds, likedIds, ::state, onOpen, onToggleSaved, onToggleLiked,
+        columns, wideFirst = specials.isNotEmpty())
 }
+
+/** Stories between Video moments and For You. */
+private const val FOR_YOU_AFTER = 12
 
 /** Stories under the lead before the video carousel. */
 private const val VIDEOS_AFTER = 4

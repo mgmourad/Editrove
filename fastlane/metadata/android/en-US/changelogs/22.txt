@@ -1,0 +1,8 @@
+Editrove 0.9.4 Beta (112626) — Alerts that respect you, and a livelier Today
+• The same story never alerts you twice within 48 hours, and alerts arrive one at a time.
+• Alert sounds, quiet hours and pause in the app, plus a Notification Hub to set every alert On, Silent or Off.
+• Today: a slideshow of the top four stories, Video Moments (short news videos, swipe up for the next) and For You, picked from the stories you love.
+• A feature tour of everything Editrove does; replay it from Settings › User Guide.
+• Add feeds to any section by address or search, remove them in edit mode, and edit built-in topics' sources.
+• Feeds heal themselves: if a newspaper moves its feed, Editrove finds the new address.
+• Fixes: no stuck refresh bar, CBC feeds load again, no cut-off labels, captions off in videos.

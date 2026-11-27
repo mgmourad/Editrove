@@ -1,0 +1,5 @@
+Editrove 0.9.2.1 — Sharper, photo-first stories
+• Article photos are sharp: the full-page reader uses the publisher's large photo or the page's own, not the feed's small thumbnail.
+• Every article leads with its main photo at the top, even when the feed had none.
+• The headline sets in smoothly and the article cascades in, section by section.
+• New stories since your last refresh show as a compact 2 × 2 grid with Show More.

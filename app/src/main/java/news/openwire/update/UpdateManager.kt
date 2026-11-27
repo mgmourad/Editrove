@@ -184,12 +184,13 @@ class Changelog(private val context: Context) {
 
     /**
      * The entry to show once on the first run of each version: after an update and on a fresh
-     * install alike. A version without its own notes shows the newest notes before it.
+     * install alike. Only this version's own notes: a version without notes shows nothing
+     * (never an older version's, which read as if nothing had changed).
      */
     fun pendingWhatsNew(): Entry? {
         val current = BuildConfig.VERSION_CODE
         if (prefs.getInt(KEY_SEEN, -1) >= current) return null
-        return entries.firstOrNull { it.versionCode <= current }
+        return entries.firstOrNull { it.versionCode == current }
     }
 
     fun markSeen() = prefs.edit().putInt(KEY_SEEN, BuildConfig.VERSION_CODE).apply()

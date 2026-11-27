@@ -1,0 +1,6 @@
+Editrove 0.9.3 Beta (112426) — Every story opens the same way
+• The photo develops in on every story, and the publisher's logo does too when there's no photo.
+• Article text waits for the summary, then settles in as you scroll down to it.
+• Closing a story lets the page free-fall back into the feed.
+• Stories from sites that turn readers away (like Reuters) open anyway, from other newsrooms' reports.
+• Live: channel thumbnails with each broadcaster's own art, a LIVE STREAM sticker and a play button.

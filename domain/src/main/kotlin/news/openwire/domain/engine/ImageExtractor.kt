@@ -112,7 +112,17 @@ object ImageExtractor {
         return out.toList()
     }
 
-    fun fromHtml(html: String?, baseUrl: String?): String? = candidatesFromHtml(html, baseUrl).firstOrNull()
+    /**
+     * The page's photo. Share cards with the publisher's banner printed on (The Guardian's
+     * "overlay-base64" social images) come last: the same photo without the banner wins.
+     */
+    fun fromHtml(html: String?, baseUrl: String?): String? {
+        val all = candidatesFromHtml(html, baseUrl)
+        return all.firstOrNull { !isBrandedCard(it) } ?: all.firstOrNull()
+    }
+
+    /** A social card with the publisher's branding drawn over the photo. */
+    fun isBrandedCard(url: String): Boolean = BRANDED.containsMatchIn(url)
 
     /** First editorial `<img src>` inside RSS description markup. */
     fun fromDescription(markup: String?, baseUrl: String?): String? {
@@ -147,6 +157,7 @@ private val META_IMAGE: List<Regex> = listOf("(?:og:image|og:image:url|og:image:
     )
 }
 
+private val BRANDED = Regex("[?&]overlay-(?:base64|align|width)=|/branded_news/", RegexOption.IGNORE_CASE)
 private val SIGNED = Regex("[?&](s|sig|signature|token|hash)=", RegexOption.IGNORE_CASE)
 private val BBC = Regex("(ichef\\.bbci\\.co\\.uk/(?:ace/(?:standard|ws)|news))/(\\d{2,4})/")
 private val NYT = Regex("-(?:thumbStandard|thumbLarge|thumbWide|articleInline|mediumThreeByTwo\\d+|mediumSquare\\d+|threeByTwoSmallAt2X|blog\\d+|videoSixteenByNine\\d+)\\.(?=jpg|jpeg|png|webp)")

@@ -14,4 +14,10 @@
     <string name="op_edition">Die Meinungsseiten von Editrove</string>
     <string name="op_lead">Der Leitartikel</string>
     <string name="op_by">Von %1$s</string>
+    <string name="topics_reset_title">Themen &amp; Ausgabe zurücksetzen?</string>
+    <string name="topics_reset_body">Reihenfolge, ausgeblendete und eigene Themen sowie die Ausgabe werden auf die Standardwerte zurückgesetzt.</string>
+    <string name="sources_reset_title">Quellen zurücksetzen?</string>
+    <string name="sources_reset_body">Alle Quellen werden wieder eingeschaltet und hinzugefügte Feeds entfernt.</string>
+    <string name="rules_reset_title">Alle Paywall-Regeln zurücksetzen?</string>
+    <string name="rules_reset_body">Jeder Verlag erhält wieder die eingebaute Regel von Editrove; deine Änderungen werden entfernt.</string>
 </resources>

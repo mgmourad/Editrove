@@ -14,4 +14,10 @@
     <string name="op_edition">Les pages Débats d\'Editrove</string>
     <string name="op_lead">La tribune à la une</string>
     <string name="op_by">Par %1$s</string>
+    <string name="topics_reset_title">Réinitialiser sujets et édition ?</string>
+    <string name="topics_reset_body">L\'ordre des sujets, les sujets masqués, vos propres sujets et l\'édition reviennent aux réglages par défaut.</string>
+    <string name="sources_reset_title">Réinitialiser les sources ?</string>
+    <string name="sources_reset_body">Toutes les sources sont réactivées et les flux ajoutés sont supprimés.</string>
+    <string name="rules_reset_title">Réinitialiser toutes les règles de paywall ?</string>
+    <string name="rules_reset_body">Chaque éditeur retrouve la règle intégrée d\'Editrove ; vos modifications sont supprimées.</string>
 </resources>

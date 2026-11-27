@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Audio briefing: a refresh button stops a playing or paused briefing, fetches the latest stories and says what changed; it never starts playing by itself.
 - Unfolded: a card beside a wide card is as tall as it, so rows end level.
 - Topics: dragging to reorder glides; neighbours slide out of the way and the row settles into place. "Edit Sources" no longer cut off.
+- Opinion page: always opens with the lead column; two-across briefs; short columns run on with the article's own text so no box is left half-empty. Page photos skip publisher-branded share cards (The Guardian's banner) for the clean photo.
+- Every reset (topics, sources, paywall rules, everything) asks first in a warning popup.
 - Settings buttons: the "(!)" text links are proper outlined buttons; Pause Alerts' "Paused until" line lays out on one row; Reset Everything is a red Danger Zone button with a warning popup.
 
 ### 0.9.4.1

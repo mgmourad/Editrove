@@ -14,4 +14,10 @@
     <string name="op_edition">The Editrove Comment Pages</string>
     <string name="op_lead">The Lead Column</string>
     <string name="op_by">By %1$s</string>
+    <string name="topics_reset_title">Reset Topics &amp; Edition?</string>
+    <string name="topics_reset_body">Your topic order, hidden topics, your own topics and the edition go back to the defaults.</string>
+    <string name="sources_reset_title">Reset Sources?</string>
+    <string name="sources_reset_body">Every source is switched back on and the feeds you added are removed.</string>
+    <string name="rules_reset_title">Reset All Paywall Rules?</string>
+    <string name="rules_reset_body">Every publisher goes back to Editrove\'s built-in rule; your changes are removed.</string>
 </resources>

@@ -678,7 +678,11 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
             }
         }
     }
-    item { OutlineButton(tr(R.string.topics_reset)) { vm.resetTopics() } }
+    item {
+        var ask by remember { mutableStateOf(false) }
+        OutlineButton(tr(R.string.topics_reset)) { ask = true }
+        if (ask) ConfirmResetDialog(tr(R.string.topics_reset_title), tr(R.string.topics_reset_body), tr(R.string.reset), { ask = false }) { vm.resetTopics(); ask = false }
+    }
 }
 
 /**
@@ -1067,7 +1071,11 @@ private fun LazyListScope.sourcesPage(vm: SettingsViewModel, onAdd: () -> Unit) 
             }
         }
     }
-    item { OutlineButton(tr(R.string.sources_reset)) { vm.resetSources() } }
+    item {
+        var ask by remember { mutableStateOf(false) }
+        OutlineButton(tr(R.string.sources_reset)) { ask = true }
+        if (ask) ConfirmResetDialog(tr(R.string.sources_reset_title), tr(R.string.sources_reset_body), tr(R.string.reset), { ask = false }) { vm.resetSources(); ask = false }
+    }
 }
 
 @Composable
@@ -1418,7 +1426,11 @@ private fun LazyListScope.rulesPage(vm: SettingsViewModel) {
             }
         }
     }
-    item { OutlineButton(tr(R.string.rules_reset_all)) { vm.resetAllRules() } }
+    item {
+        var ask by remember { mutableStateOf(false) }
+        OutlineButton(tr(R.string.rules_reset_all)) { ask = true }
+        if (ask) ConfirmResetDialog(tr(R.string.rules_reset_title), tr(R.string.rules_reset_body), tr(R.string.reset), { ask = false }) { vm.resetAllRules(); ask = false }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -2003,7 +2015,12 @@ private fun DangerButton(text: String, onClick: () -> Unit) {
 
 /** A warning popup before Reset Everything. */
 @Composable
-private fun ResetEverythingDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
+private fun ResetEverythingDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) =
+    ConfirmResetDialog(tr(R.string.reset_everything_title), tr(R.string.reset_confirm), tr(R.string.reset_everything_confirm), onDismiss, onConfirm)
+
+/** The warning popup every reset goes through: what it resets, that it can't be undone, a red confirm. */
+@Composable
+private fun ConfirmResetDialog(title: String, body: String, confirm: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     val g = Glass
     val red = Color(0xFFE5484D)
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
@@ -2016,16 +2033,16 @@ private fun ResetEverythingDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) 
                 Icon(Icons.Outlined.WarningAmber, null, tint = Color(0xFFFF6B6F), modifier = Modifier.size(30.dp))
             }
             Spacer(Modifier.height(14.dp))
-            Text(tr(R.string.reset_everything_title), style = serif(22.sp, FontWeight.SemiBold), color = g.textPrimary, textAlign = TextAlign.Center)
+            Text(title, style = serif(22.sp, FontWeight.SemiBold), color = g.textPrimary, textAlign = TextAlign.Center)
             Spacer(Modifier.height(8.dp))
-            Text(tr(R.string.reset_confirm), style = sans(13.5.sp, lineHeight = 20.sp), color = g.textSecondary, textAlign = TextAlign.Center)
+            Text(body, style = sans(13.5.sp, lineHeight = 20.sp), color = g.textSecondary, textAlign = TextAlign.Center)
             Spacer(Modifier.height(6.dp))
             Text(tr(R.string.reset_everything_undo), style = sans(12.5.sp, FontWeight.SemiBold), color = Color(0xFFFF6B6F), textAlign = TextAlign.Center)
             Spacer(Modifier.height(18.dp))
             Row(
                 Modifier.fillMaxWidth().clip(CircleShape).background(red).clickable(onClick = onConfirm).padding(vertical = 13.dp),
                 horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-            ) { Text(tr(R.string.reset_everything_confirm), style = sans(13.5.sp, FontWeight.Bold), color = Color.White) }
+            ) { Text(confirm, style = sans(13.5.sp, FontWeight.Bold), color = Color.White) }
             Spacer(Modifier.height(10.dp))
             SecondaryButton(tr(R.string.action_cancel), onClick = onDismiss)
         }

@@ -14,4 +14,10 @@
     <string name="op_edition">صفحات الرأي في Editrove</string>
     <string name="op_lead">مقال الصدارة</string>
     <string name="op_by">بقلم %1$s</string>
+    <string name="topics_reset_title">إعادة ضبط المواضيع والنسخة؟</string>
+    <string name="topics_reset_body">يعود ترتيب المواضيع والمواضيع المخفية ومواضيعك الخاصة والنسخة إلى الإعدادات الافتراضية.</string>
+    <string name="sources_reset_title">إعادة ضبط المصادر؟</string>
+    <string name="sources_reset_body">تُعاد كل المصادر إلى التشغيل وتُحذف الخلاصات التي أضفتها.</string>
+    <string name="rules_reset_title">إعادة ضبط كل قواعد جدار الدفع؟</string>
+    <string name="rules_reset_body">يعود كل ناشر إلى القاعدة المدمجة في Editrove، وتُحذف تعديلاتك.</string>
 </resources>

@@ -352,7 +352,7 @@ private fun LazyListScope.columnItems(c: OpEdPalette, prefix: String, list: List
 }
 
 /** One block of the page: a ruled, square box holding one to three stories in a fixed arrangement. */
-private enum class ModuleKind { LEAD, THREE, FEATURE, QUOTES }
+private enum class ModuleKind { LEAD, THREE, PAIR, FEATURE, QUOTES }
 private class PageModule(val kind: ModuleKind, val stories: List<Article>)
 
 /**
@@ -362,8 +362,15 @@ private class PageModule(val kind: ModuleKind, val stories: List<Article>)
  */
 private fun pageModules(list: List<Article>): List<PageModule> {
     val out = mutableListOf<PageModule>()
-    val cycle = listOf(ModuleKind.LEAD to 3, ModuleKind.THREE to 3, ModuleKind.FEATURE to 1, ModuleKind.QUOTES to 2, ModuleKind.THREE to 3, ModuleKind.FEATURE to 1)
-    var i = 0
+    if (list.isEmpty()) return out
+    // The front always opens with the lead column (with its side column when there are stories for it).
+    val lead = minOf(3, list.size)
+    out += PageModule(ModuleKind.LEAD, list.subList(0, lead))
+    val cycle = listOf(
+        ModuleKind.PAIR to 2, ModuleKind.PAIR to 2, ModuleKind.THREE to 3, ModuleKind.FEATURE to 1,
+        ModuleKind.PAIR to 2, ModuleKind.QUOTES to 2, ModuleKind.THREE to 3, ModuleKind.PAIR to 2,
+    )
+    var i = lead
     var k = 0
     while (i < list.size) {
         val (kind, n) = cycle[k % cycle.size]
@@ -371,7 +378,7 @@ private fun pageModules(list: List<Article>): List<PageModule> {
         val chosen = list.subList(i, i + take)
         out += when {
             take == 1 -> PageModule(ModuleKind.FEATURE, chosen)
-            take == 2 -> PageModule(ModuleKind.QUOTES, chosen)
+            take == 2 && kind == ModuleKind.THREE -> PageModule(ModuleKind.PAIR, chosen)
             else -> PageModule(kind, chosen)
         }
         i += take; k++
@@ -389,12 +396,14 @@ private fun ModuleView(c: OpEdPalette, m: PageModule, followedKeys: Set<String>,
             Box(Modifier.fillMaxWidth().height(3.dp).background(c.text))
             val st = m.stories
             when (m.kind) {
-                ModuleKind.LEAD -> if (wide) Cells {
+                ModuleKind.LEAD -> if (st.size == 1) Box(Modifier.padding(14.dp)) { StoryLead(c, st[0], follows(st[0]), actions) }
+                else if (wide) Cells {
                     Cell(c, 0, Modifier.weight(2f)) { StoryLead(c, st[0], follows(st[0]), actions) }
                     Column(Modifier.weight(1f).fillMaxHeight().drawBehind { drawLine(c.rule, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(0f, size.height), 1.dp.toPx()) }) {
                         st.drop(1).forEachIndexed { j, a ->
                             if (j > 0) HRule(c)
-                            Box(Modifier.padding(14.dp)) { StoryBrief(c, a, follows(a), actions, photo = true) }
+                            // Each brief takes its share of the column; the article's text fills what's left.
+                            Box(Modifier.weight(1f).fillMaxWidth().padding(14.dp)) { StoryBrief(c, a, follows(a), actions, photo = true) }
                         }
                     }
                 } else Column {
@@ -410,6 +419,12 @@ private fun ModuleView(c: OpEdPalette, m: PageModule, followedKeys: Set<String>,
                     Cells { st.take(2).forEachIndexed { j, a -> Cell(c, j, Modifier.weight(1f)) { StoryColumn(c, a, follows(a), actions) } } }
                     HRule(c)
                     Box(Modifier.padding(14.dp)) { StoryBrief(c, st[2], follows(st[2]), actions, photo = true) }
+                }
+                // Two briefs side by side, photo to the right of each headline (one under the other on a phone).
+                ModuleKind.PAIR -> if (wide) Cells {
+                    st.forEachIndexed { j, a -> Cell(c, j, Modifier.weight(1f)) { StoryBrief(c, a, follows(a), actions, photo = true, big = true) } }
+                } else Column {
+                    st.forEachIndexed { j, a -> if (j > 0) HRule(c); Box(Modifier.padding(14.dp)) { StoryBrief(c, a, follows(a), actions, photo = true) } }
                 }
                 ModuleKind.FEATURE -> Box(Modifier.padding(14.dp)) { StoryFeature(c, st[0], follows(st[0]), actions, sideBySide = wide) }
                 ModuleKind.QUOTES -> Cells { st.forEachIndexed { j, a -> Cell(c, j, Modifier.weight(1f)) { StoryQuote(c, a, follows(a), actions) } } }
@@ -453,6 +468,50 @@ private fun SmallByline(c: OpEdPalette, a: Article, followed: Boolean, actions: 
             }
         }
     }
+}
+
+/**
+ * Fills the space a short story leaves in its box with the article's opening text (as many
+ * whole lines as fit, ending "…"). It never makes the box taller: it reports no height of its
+ * own, so the row is as tall as its longest story and the shorter ones are filled out.
+ */
+@Composable
+private fun FillText(c: OpEdPalette, a: Article, modifier: Modifier) {
+    val loader = news.openwire.ui.home.LocalArticlePreview.current
+    val text by produceState<String?>(null, a.id) {
+        value = loader?.let { runCatching { it(a) }.getOrNull() }
+            ?.let { t -> a.summary?.trim()?.takeIf { it.isNotEmpty() && t.startsWith(it) }?.let { t.removePrefix(it).trim() } ?: t }
+            ?.takeIf { it.length > 40 && it != a.summary && it != a.title }
+    }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    androidx.compose.ui.layout.Layout(
+        modifier = modifier.fillMaxWidth(),
+        content = {
+            val t = text
+            if (t != null) androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val linePx = with(density) { 20.sp.toPx() }
+                val gapPx = with(density) { 8.dp.toPx() }
+                val lines = ((constraints.maxHeight - gapPx) / linePx).toInt()
+                if (constraints.hasBoundedHeight && lines >= 2) Text(
+                    t, style = serif(14.sp, FontWeight.Normal, lineHeight = 20.sp), color = c.text.copy(alpha = 0.72f),
+                    maxLines = lines, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        },
+        measurePolicy = object : androidx.compose.ui.layout.MeasurePolicy {
+            override fun androidx.compose.ui.layout.MeasureScope.measure(
+                measurables: List<androidx.compose.ui.layout.Measurable>, constraints: androidx.compose.ui.unit.Constraints,
+            ): androidx.compose.ui.layout.MeasureResult {
+                val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
+                val placeables = measurables.map { it.measure(constraints.copy(minHeight = 0, maxHeight = h)) }
+                return layout(constraints.maxWidth, maxOf(constraints.minHeight, if (constraints.hasBoundedHeight) h else 0)) { placeables.forEach { it.place(0, 0) } }
+            }
+            override fun androidx.compose.ui.layout.IntrinsicMeasureScope.minIntrinsicHeight(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, width: Int) = 0
+            override fun androidx.compose.ui.layout.IntrinsicMeasureScope.maxIntrinsicHeight(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, width: Int) = 0
+            override fun androidx.compose.ui.layout.IntrinsicMeasureScope.minIntrinsicWidth(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, height: Int) = 0
+            override fun androidx.compose.ui.layout.IntrinsicMeasureScope.maxIntrinsicWidth(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, height: Int) = 0
+        },
+    )
 }
 
 /** Newsprint photos: colour held back, so the page reads like paper. */
@@ -509,19 +568,24 @@ private fun StoryLead(c: OpEdPalette, a: Article, followed: Boolean, actions: Op
 }
 
 @Composable
-private fun StoryBrief(c: OpEdPalette, a: Article, followed: Boolean, actions: OpinionActions, photo: Boolean) {
-    Column(Modifier.fillMaxWidth().clickable { actions.openArticle(a) }) {
+private fun StoryBrief(c: OpEdPalette, a: Article, followed: Boolean, actions: OpinionActions, photo: Boolean, big: Boolean = false) {
+    Column(Modifier.fillMaxSize().clickable { actions.openArticle(a) }) {
         Kicker(c, (a.source ?: a.domain).orEmpty())
         Spacer(Modifier.height(4.dp))
         Row {
-            Text(a.title, style = serif(17.sp, FontWeight.Bold, lineHeight = 22.sp), color = c.text, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            if (photo && a.imageUrl != null) { Spacer(Modifier.width(10.dp)); Photo(c, a, Modifier.size(64.dp), large = false) }
+            Text(
+                a.title, style = if (big) serif(21.sp, FontWeight.Bold, lineHeight = 27.sp) else serif(17.sp, FontWeight.Bold, lineHeight = 22.sp),
+                color = c.text, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+            )
+            if (photo && a.imageUrl != null) { Spacer(Modifier.width(12.dp)); Photo(c, a, Modifier.size(if (big) 96.dp else 64.dp), large = big) }
         }
         a.summary?.takeIf { it.isNotBlank() && it != a.title }?.let {
-            Spacer(Modifier.height(4.dp))
-            Text(it, style = serif(13.5.sp, FontWeight.Normal, lineHeight = 19.sp), color = c.dim, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(6.dp))
+            Text(it, style = serif(if (big) 15.sp else 13.5.sp, FontWeight.SemiBold, lineHeight = if (big) 21.sp else 19.sp), color = c.dim, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
-        Spacer(Modifier.height(8.dp))
+        // The article's own text runs on into any space left; bylines sit level along the bottom.
+        FillText(c, a, Modifier.weight(1f))
+        Spacer(Modifier.height(10.dp))
         SmallByline(c, a, followed, actions)
     }
 }
@@ -537,8 +601,8 @@ private fun StoryColumn(c: OpEdPalette, a: Article, followed: Boolean, actions: 
             Spacer(Modifier.height(6.dp))
             Text(it, style = serif(13.5.sp, FontWeight.Normal, lineHeight = 19.sp), color = c.dim, maxLines = 5, overflow = TextOverflow.Ellipsis)
         }
-        // The byline sits on the box's bottom line, level across the row.
-        Spacer(Modifier.weight(1f))
+        // The article's own text runs on into any space left; the byline sits on the box's bottom line.
+        FillText(c, a, Modifier.weight(1f))
         Spacer(Modifier.height(10.dp))
         SmallByline(c, a, followed, actions)
     }

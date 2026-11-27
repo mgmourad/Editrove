@@ -20,4 +20,6 @@
     <string name="sources_reset_body">Toutes les sources sont réactivées et les flux ajoutés sont supprimés.</string>
     <string name="rules_reset_title">Réinitialiser toutes les règles de paywall ?</string>
     <string name="rules_reset_body">Chaque éditeur retrouve la règle intégrée d\'Editrove ; vos modifications sont supprimées.</string>
+    <string name="op_more_from">Plus de %1$s</string>
+    <string name="op_also_in">Aussi dans Opinions</string>
 </resources>

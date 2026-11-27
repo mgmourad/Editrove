@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Topics: dragging to reorder glides; neighbours slide out of the way and the row settles into place. "Edit Sources" no longer cut off.
 - Opinion page: always opens with the lead column; two-across briefs; short columns run on with the article's own text so no box is left half-empty. Page photos skip publisher-branded share cards (The Guardian's banner) for the clean photo.
 - Every reset (topics, sources, paywall rules, everything) asks first in a warning popup.
+- Opinion columns never leave a box half-empty: a short column runs on with several paragraphs of the article (read through archives when the site has a paywall), or, until that arrives or when the site can't be read, a "More from …" index of other headlines that fits the space exactly.
 - Settings buttons: the "(!)" text links are proper outlined buttons; Pause Alerts' "Paused until" line lays out on one row; Reset Everything is a red Danger Zone button with a warning popup.
 
 ### 0.9.4.1

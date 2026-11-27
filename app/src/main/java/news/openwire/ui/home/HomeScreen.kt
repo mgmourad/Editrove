@@ -216,7 +216,10 @@ fun HomeScreen(vm: HomeViewModel, settingsVm: news.openwire.ui.settings.Settings
     val previewLoader: suspend (Article) -> String? = remember {
         { a -> (a.originalUrl ?: a.targetUrl)?.let { app.container.articleTextExtractor.preview(it, a.title) } }
     }
-    CompositionLocalProvider(LocalTextScale provides userSettings.textScale, LocalArticlePreview provides previewLoader, LocalImageResolver provides app.container.imageResolver, LocalLogoResolver provides app.container.logoResolver, LocalMarkets provides app.container.markets, LocalBriefingPlayer provides briefing) {
+    val excerptLoader: suspend (Article) -> String? = remember {
+        { a -> (a.originalUrl ?: a.targetUrl)?.let { app.container.articleTextExtractor.excerpt(it, a.title, a.summary) } }
+    }
+    CompositionLocalProvider(LocalTextScale provides userSettings.textScale, LocalArticlePreview provides previewLoader, LocalArticleExcerpt provides excerptLoader, LocalImageResolver provides app.container.imageResolver, LocalLogoResolver provides app.container.logoResolver, LocalMarkets provides app.container.markets, LocalBriefingPlayer provides briefing) {
     // The full-screen video player (Video moments).
     var playing by remember { mutableStateOf<Pair<List<news.openwire.domain.video.ShortVideo>, Int>?>(null) }
     val savedNow by vm.saved.collectAsState()

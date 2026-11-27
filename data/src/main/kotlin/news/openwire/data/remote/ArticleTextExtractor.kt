@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package news.openwire.data.remote
 
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -335,6 +336,33 @@ class ArticleTextExtractor(
     }
 
     private val previews = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val excerpts = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val excerptPermits = kotlinx.coroutines.sync.Semaphore(4)
+
+    /**
+     * Several paragraphs from the story, for filling out a column on a page of cards: the
+     * plain page first; when that is only a teaser (paywalls), the reader's full route
+     * (archives, other copies). [skip] (the card's own standfirst) and the headline are left
+     * out, as is anything not about the headline. Null when nothing readable was found.
+     */
+    suspend fun excerpt(link: String, title: String, skip: String? = null, chars: Int = 1_400): String? {
+        excerpts[link]?.let { return it.ifEmpty { null } }
+        val text = excerptPermits.withPermit {
+            val url = if (news.openwire.domain.engine.GoogleNewsUrls.isGoogleNewsUrl(link)) resolveLink(link) ?: return@withPermit null else link
+            fun body(c: ArticleContent?): String? {
+                val paras = c?.paragraphs.orEmpty().map { it.trim() }
+                    .filter { p -> p.length > 40 && !isBoilerplate(p) && news.openwire.domain.engine.FeedWeaver.calculateTitleSimilarity(p, title) < 0.7 && (skip == null || news.openwire.domain.engine.FeedWeaver.calculateTitleSimilarity(p, skip) < 0.7) }
+                if (paras.isEmpty() || !aboutTitle(paras.take(3).joinToString(" "), title)) return null
+                val out = StringBuilder()
+                for (p in paras) { if (out.length >= chars) break; if (out.isNotEmpty()) out.append("\n"); out.append(p) }
+                return out.toString().takeIf { it.length >= 120 }
+            }
+            body(withTimeoutOrNull(6_000) { extractFrom(url) })
+                ?: body(withTimeoutOrNull(12_000) { extract(url, title) })
+        }
+        excerpts[link] = text.orEmpty()
+        return text
+    }
 
     /**
      * A short opening for a feed card: the publisher's standfirst, else the story's first

@@ -20,4 +20,6 @@
     <string name="sources_reset_body">Every source is switched back on and the feeds you added are removed.</string>
     <string name="rules_reset_title">Reset All Paywall Rules?</string>
     <string name="rules_reset_body">Every publisher goes back to Editrove\'s built-in rule; your changes are removed.</string>
+    <string name="op_more_from">More from %1$s</string>
+    <string name="op_also_in">Also in Opinion</string>
 </resources>

@@ -1000,6 +1000,8 @@ fun BentoCard(
 /** Resolves missing lead photos from the article page (js/imageService.js). */
 /** Loads a story's opening lines for cards whose feed gave no excerpt. */
 val LocalArticlePreview = androidx.compose.runtime.staticCompositionLocalOf<(suspend (Article) -> String?)?> { null }
+/** Several paragraphs of a story (for filling out a newspaper column); null when unreadable. */
+val LocalArticleExcerpt = androidx.compose.runtime.staticCompositionLocalOf<(suspend (Article) -> String?)?> { null }
 
 val LocalImageResolver = androidx.compose.runtime.staticCompositionLocalOf<news.openwire.data.remote.ImageResolver?> { null }
 

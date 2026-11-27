@@ -20,4 +20,6 @@
     <string name="sources_reset_body">Alle Quellen werden wieder eingeschaltet und hinzugefügte Feeds entfernt.</string>
     <string name="rules_reset_title">Alle Paywall-Regeln zurücksetzen?</string>
     <string name="rules_reset_body">Jeder Verlag erhält wieder die eingebaute Regel von Editrove; deine Änderungen werden entfernt.</string>
+    <string name="op_more_from">Mehr von %1$s</string>
+    <string name="op_also_in">Außerdem in Meinung</string>
 </resources>

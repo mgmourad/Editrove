@@ -20,4 +20,6 @@
     <string name="sources_reset_body">Todas las fuentes se vuelven a activar y se eliminan los feeds que añadiste.</string>
     <string name="rules_reset_title">¿Restablecer todas las reglas de muro de pago?</string>
     <string name="rules_reset_body">Cada medio vuelve a la regla integrada de Editrove; se eliminan tus cambios.</string>
+    <string name="op_more_from">Más de %1$s</string>
+    <string name="op_also_in">También en Opinión</string>
 </resources>

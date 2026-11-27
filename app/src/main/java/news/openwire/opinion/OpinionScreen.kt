@@ -49,6 +49,8 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +84,7 @@ import news.openwire.domain.opinion.Trending
 import news.openwire.domain.opinion.Voice
 import news.openwire.i18n.tr
 import news.openwire.ui.home.SourceLogo
+import news.openwire.ui.home.LocalArticleExcerpt
 import news.openwire.ui.home.mono
 import news.openwire.ui.home.sans
 import news.openwire.ui.home.serif
@@ -125,6 +128,9 @@ internal fun topicKey(topic: String) = "t:" + topic.trim().lowercase()
 private class Bells(val authors: Set<String>, val accounts: Set<String>, val tabs: List<String>, val muted: Set<String>)
 private val LocalBells = androidx.compose.runtime.staticCompositionLocalOf { Bells(emptySet(), emptySet(), emptyList(), emptySet()) }
 
+/** Every story on the page, for "More from …" indexes in columns whose text can't be read. */
+private val LocalPageStories = androidx.compose.runtime.staticCompositionLocalOf<List<Article>> { emptyList() }
+
 private const val FOLLOWING = "\u0000following"
 private const val ALL = "\u0000all"
 private const val ANALYSIS = "\u0000analysis"
@@ -153,13 +159,27 @@ fun OpinionScreen(
         value = source.columns(appLanguage, force = refresh > 0)
         refreshing = false
     }
+    // Start reading the stories' text as soon as the columns arrive, so short columns are filled
+    // by the time they're scrolled to (three at a time; results are kept for the session).
+    val excerpt = LocalArticleExcerpt.current
+    LaunchedEffect(columns) {
+        val list = columns ?: return@LaunchedEffect
+        if (excerpt == null) return@LaunchedEffect
+        list.filter { it.language == appLanguage || it.language == "en" }.take(30).forEach { col ->
+            launch { runCatching { excerpt(col.article) } }
+        }
+    }
     // Suggestions in the page's own script (an English headline doesn't suggest a tab on an Arabic page).
     val trending = remember(news, appLanguage) {
         Trending.topics(news, max = 12).filter { t -> tabs.none { it.equals(t, true) } }
             .filter { t -> (appLanguage == "ar") == t.any { it in '\u0600'..'\u06FF' } }.take(10)
     }
 
-    androidx.compose.runtime.CompositionLocalProvider(LocalBells provides Bells(followedAuthors.map(OpinionCatalog::authorKey).toSet(), followedAccounts, tabs, muted)) {
+    val pageStories = remember(columns) { columns.orEmpty().map { it.article } }
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalBells provides Bells(followedAuthors.map(OpinionCatalog::authorKey).toSet(), followedAccounts, tabs, muted),
+        LocalPageStories provides pageStories,
+    ) {
     Box(Modifier.fillMaxSize().background(c.bg)) {
         LazyColumn(contentPadding = padding, modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             item("head") { Column(Modifier.widthIn(max = 1100.dp).fillMaxWidth()) { Header(c, refreshing, onDiscover = { discover = true }) { refresh++ } } }
@@ -476,42 +496,89 @@ private fun SmallByline(c: OpEdPalette, a: Article, followed: Boolean, actions: 
  * own, so the row is as tall as its longest story and the shorter ones are filled out.
  */
 @Composable
-private fun FillText(c: OpEdPalette, a: Article, modifier: Modifier) {
-    val loader = news.openwire.ui.home.LocalArticlePreview.current
-    val text by produceState<String?>(null, a.id) {
+private fun FillText(c: OpEdPalette, a: Article, modifier: Modifier, actions: OpinionActions) {
+    val loader = LocalArticleExcerpt.current
+    // null = still reading the article; "" = nothing readable found.
+    val text by produceState<String?>(if (loader == null) "" else null, a.id) {
         value = loader?.let { runCatching { it(a) }.getOrNull() }
             ?.let { t -> a.summary?.trim()?.takeIf { it.isNotEmpty() && t.startsWith(it) }?.let { t.removePrefix(it).trim() } ?: t }
+            ?.replace("\n", " ")
             ?.takeIf { it.length > 40 && it != a.summary && it != a.title }
+            .orEmpty()
     }
     val density = androidx.compose.ui.platform.LocalDensity.current
     androidx.compose.ui.layout.Layout(
         modifier = modifier.fillMaxWidth(),
         content = {
-            val t = text
-            if (t != null) androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val linePx = with(density) { 20.sp.toPx() }
                 val gapPx = with(density) { 8.dp.toPx() }
-                val lines = ((constraints.maxHeight - gapPx) / linePx).toInt()
-                if (constraints.hasBoundedHeight && lines >= 2) Text(
-                    t, style = serif(14.sp, FontWeight.Normal, lineHeight = 20.sp), color = c.text.copy(alpha = 0.72f),
-                    maxLines = lines, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp),
-                )
+                val lines = if (constraints.hasBoundedHeight) ((constraints.maxHeight - gapPx) / linePx).toInt() else 0
+                val t = text
+                // Until (or unless) the article's own text is in, an index of more from the same
+                // pages fills the space; the text fades in over it when it arrives.
+                if (lines >= 2) androidx.compose.animation.Crossfade(!t.isNullOrEmpty(), label = "fill") { hasText ->
+                    if (hasText) Text(
+                        t.orEmpty(), style = serif(14.sp, FontWeight.Normal, lineHeight = 20.sp), color = c.text.copy(alpha = 0.72f),
+                        maxLines = lines, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp),
+                    ) else MoreFrom(c, a, constraints.maxHeight, actions)
+                }
             }
         },
-        measurePolicy = object : androidx.compose.ui.layout.MeasurePolicy {
-            override fun androidx.compose.ui.layout.MeasureScope.measure(
-                measurables: List<androidx.compose.ui.layout.Measurable>, constraints: androidx.compose.ui.unit.Constraints,
-            ): androidx.compose.ui.layout.MeasureResult {
-                val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
-                val placeables = measurables.map { it.measure(constraints.copy(minHeight = 0, maxHeight = h)) }
-                return layout(constraints.maxWidth, maxOf(constraints.minHeight, if (constraints.hasBoundedHeight) h else 0)) { placeables.forEach { it.place(0, 0) } }
-            }
-            override fun androidx.compose.ui.layout.IntrinsicMeasureScope.minIntrinsicHeight(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, width: Int) = 0
-            override fun androidx.compose.ui.layout.IntrinsicMeasureScope.maxIntrinsicHeight(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, width: Int) = 0
-            override fun androidx.compose.ui.layout.IntrinsicMeasureScope.minIntrinsicWidth(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, height: Int) = 0
-            override fun androidx.compose.ui.layout.IntrinsicMeasureScope.maxIntrinsicWidth(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, height: Int) = 0
-        },
+        measurePolicy = ZeroIntrinsicsPolicy,
     )
+}
+
+/** "More from Washington Post Opinions": other headlines, as many as fit, each opening its story. */
+@Composable
+private fun MoreFrom(c: OpEdPalette, a: Article, @Suppress("UNUSED_PARAMETER") heightPx: Int, actions: OpinionActions) {
+    val all = LocalPageStories.current
+    val src = a.source ?: a.domain
+    val same = all.filter { it.id != a.id && (it.source ?: it.domain) == src }
+    val list = same.ifEmpty { all.filter { it.id != a.id } }
+    if (list.isEmpty()) return
+    // Places the rule, the label and then as many whole headlines as the space holds (none if
+    // not even one fits under the label).
+    androidx.compose.ui.layout.Layout(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), content = {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.rule))
+        Text(
+            (if (same.isNotEmpty() && src != null) tr(R.string.op_more_from, src) else tr(R.string.op_also_in)).uppercase(),
+            style = mono(9.sp, FontWeight.Bold, 0.16.em), color = c.dim, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
+        )
+        list.take(12).forEach { o ->
+            Row(Modifier.fillMaxWidth().clickable { actions.openArticle(o) }.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
+                Text("›", style = serif(15.sp, FontWeight.Bold, lineHeight = 19.sp), color = c.accent, modifier = Modifier.padding(end = 8.dp))
+                Text(o.title, style = serif(14.5.sp, FontWeight.SemiBold, lineHeight = 19.sp), color = c.text.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }) { measurables, constraints ->
+        val loose = constraints.copy(minHeight = 0, maxHeight = androidx.compose.ui.unit.Constraints.Infinity)
+        val placeables = measurables.map { it.measure(loose) }
+        var y = 0
+        var n = 0
+        for (pl in placeables) { if (y + pl.height > constraints.maxHeight) break; y += pl.height; n++ }
+        // Rule + label alone (no headline) would look like a stray caption: show nothing then.
+        if (n < 3) n = 0
+        layout(constraints.maxWidth, if (n == 0) 0 else y) {
+            var yy = 0
+            placeables.take(n).forEach { it.place(0, yy); yy += it.height }
+        }
+    }
+}
+/** Takes the space it's given but never asks for any: rows size to their real content. */
+private object ZeroIntrinsicsPolicy : androidx.compose.ui.layout.MeasurePolicy {
+    override fun androidx.compose.ui.layout.MeasureScope.measure(
+        measurables: List<androidx.compose.ui.layout.Measurable>, constraints: androidx.compose.ui.unit.Constraints,
+    ): androidx.compose.ui.layout.MeasureResult {
+        val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
+        val placeables = measurables.map { it.measure(constraints.copy(minHeight = 0, maxHeight = h)) }
+        return layout(constraints.maxWidth, maxOf(constraints.minHeight, h)) { placeables.forEach { it.place(0, 0) } }
+    }
+    override fun androidx.compose.ui.layout.IntrinsicMeasureScope.minIntrinsicHeight(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, width: Int) = 0
+    override fun androidx.compose.ui.layout.IntrinsicMeasureScope.maxIntrinsicHeight(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, width: Int) = 0
+    override fun androidx.compose.ui.layout.IntrinsicMeasureScope.minIntrinsicWidth(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, height: Int) = 0
+    override fun androidx.compose.ui.layout.IntrinsicMeasureScope.maxIntrinsicWidth(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, height: Int) = 0
 }
 
 /** Newsprint photos: colour held back, so the page reads like paper. */
@@ -584,7 +651,7 @@ private fun StoryBrief(c: OpEdPalette, a: Article, followed: Boolean, actions: O
             Text(it, style = serif(if (big) 15.sp else 13.5.sp, FontWeight.SemiBold, lineHeight = if (big) 21.sp else 19.sp), color = c.dim, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         // The article's own text runs on into any space left; bylines sit level along the bottom.
-        FillText(c, a, Modifier.weight(1f))
+        FillText(c, a, Modifier.weight(1f), actions)
         Spacer(Modifier.height(10.dp))
         SmallByline(c, a, followed, actions)
     }
@@ -602,7 +669,7 @@ private fun StoryColumn(c: OpEdPalette, a: Article, followed: Boolean, actions: 
             Text(it, style = serif(13.5.sp, FontWeight.Normal, lineHeight = 19.sp), color = c.dim, maxLines = 5, overflow = TextOverflow.Ellipsis)
         }
         // The article's own text runs on into any space left; the byline sits on the box's bottom line.
-        FillText(c, a, Modifier.weight(1f))
+        FillText(c, a, Modifier.weight(1f), actions)
         Spacer(Modifier.height(10.dp))
         SmallByline(c, a, followed, actions)
     }
@@ -619,6 +686,8 @@ private fun StoryFeature(c: OpEdPalette, a: Article, followed: Boolean, actions:
                 Spacer(Modifier.height(8.dp))
                 Text(it, style = serif(15.sp, FontWeight.Normal, lineHeight = 22.sp), color = c.text.copy(alpha = 0.85f), maxLines = 6, overflow = TextOverflow.Ellipsis)
             }
+            // Beside a photo, the article's text runs on to the photo's foot.
+            FillText(c, a, Modifier.weight(1f), actions)
             Spacer(Modifier.height(10.dp))
             SmallByline(c, a, followed, actions)
         }
@@ -627,7 +696,7 @@ private fun StoryFeature(c: OpEdPalette, a: Article, followed: Boolean, actions:
         Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min).clickable { actions.openArticle(a) }) {
             Photo(c, a, Modifier.weight(1f).fillMaxHeight().heightIn(min = 200.dp))
             Spacer(Modifier.width(16.dp))
-            text(Modifier.weight(1f))
+            text(Modifier.weight(1f).fillMaxHeight())
         }
     } else Column(Modifier.fillMaxWidth().clickable { actions.openArticle(a) }) {
         Photo(c, a, Modifier.padding(bottom = 10.dp).fillMaxWidth().height(190.dp))
@@ -641,7 +710,7 @@ private fun StoryQuote(c: OpEdPalette, a: Article, followed: Boolean, actions: O
     Column(Modifier.fillMaxSize().clickable { actions.openArticle(a) }) {
         Text("“", style = serif(54.sp, FontWeight.Bold, lineHeight = 54.sp), color = c.accent, modifier = Modifier.height(34.dp))
         Text(a.title, style = serif(19.sp, FontWeight.SemiBold, lineHeight = 25.sp).copy(fontStyle = FontStyle.Italic), color = c.text, maxLines = 6, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.weight(1f))
+        FillText(c, a, Modifier.weight(1f), actions)
         Spacer(Modifier.height(10.dp))
         Box(Modifier.width(36.dp).height(2.dp).background(c.accent))
         Spacer(Modifier.height(6.dp))

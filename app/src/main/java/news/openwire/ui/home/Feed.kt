@@ -13,6 +13,7 @@ import news.openwire.i18n.tr
 import news.openwire.i18n.text
 import news.openwire.R
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.animation.animateColorAsState
@@ -758,7 +759,7 @@ fun HeroCard(
                 )
             }
             Column(modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         article.publication(),
                         style = mono(10.sp, FontWeight.SemiBold, 0.16.em),
@@ -821,7 +822,7 @@ fun LeadStoryCard(
         modifier = Modifier.fillMaxWidth().lockedLook(locked),
         contentPadding = PaddingValues(12.dp),
     ) {
-        Row(Modifier.fillMaxWidth().height(360.dp)) {
+        Row(Modifier.fillMaxWidth().height(370.dp)) {
             Box(Modifier.weight(0.6f).fillMaxHeight().clip(RoundedCornerShape(InnerRadius + 4.dp))) {
                 ArticleImage(
                     article,
@@ -831,13 +832,14 @@ fun LeadStoryCard(
                 )
                 ScrimPill(Modifier.padding(14.dp)) { Text(category.uppercase(), style = mono(10.sp, FontWeight.SemiBold, 0.1.em), color = Color.White) }
             }
-            Column(Modifier.weight(0.4f).fillMaxHeight().padding(start = 22.dp, end = 10.dp, top = 10.dp, bottom = 6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(0.4f).fillMaxHeight().padding(start = 22.dp, end = 10.dp, top = 10.dp)) {
+                // Full width, so the badge sits flush right, on the same edge as the bookmark below.
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     SourceLogo(article.domain, article.source, size = 18.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text(article.publication(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    Text(article.publication(), style = mono(10.sp, FontWeight.SemiBold, 0.14.em), color = g.accentSoft, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     article.badgeLabel()?.let { badge ->
-                        Spacer(Modifier.weight(1f).widthIn(min = 8.dp))
+                        Spacer(Modifier.width(8.dp))
                         Text(
                             badge, style = mono(9.5.sp), color = g.textPrimary.copy(alpha = .85f), maxLines = 1, softWrap = false,
                             modifier = Modifier.clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape).padding(horizontal = 9.dp, vertical = 3.dp),
@@ -869,6 +871,8 @@ fun LeadStoryCard(
                         Text(it, style = sans(12.sp, FontWeight.Medium), color = g.accentSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
+                // The buttons sit at the very foot of the card, with a little air above them.
+                Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         NewsProcessor.formatRelativeTime(article.publishedAt),
@@ -934,20 +938,18 @@ fun BentoCard(
         Column(Modifier.padding(horizontal = 4.dp)) {
             Text(
                 article.publication(),
-                style = mono(9.sp, tracking = 0.1.em),
+                style = mono(if (wide) 10.sp else 9.sp, tracking = 0.1.em),
                 color = g.textPrimary.copy(alpha = 0.6f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(2.dp))
-            Text(
+            // The headline fills its box: a short one is set larger instead of leaving lines empty.
+            FitHeadline(
                 article.title,
-                style = serif(14.5.sp, FontWeight.SemiBold, lineHeight = 19.sp),
                 color = if (selected) g.accentSoft else g.textPrimary,
-                minLines = 3,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
+                boxHeight = if (wide) 86.dp else 80.dp,
+                minSize = 14.5f, maxSize = if (wide) 30f else 21f,
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -1227,5 +1229,42 @@ private fun LeadSlideshow(stories: List<Article>, dotsAtStart: Boolean = false, 
                 )
             }
         }
+    }
+}
+
+/**
+ * A headline set as large as fits its box ([minSize]–[maxSize] sp, in half-point steps), so a
+ * short headline fills the space a long one would. The box height never changes, so cards in a
+ * row stay level. A first guess is measured up front; the real layout then steps it down if
+ * the rendered text still overflows (fonts and merged styles can differ slightly).
+ */
+@Composable
+private fun FitHeadline(text: String, color: Color, boxHeight: Dp, minSize: Float, maxSize: Float) {
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer(cacheSize = 8)
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().height(boxHeight).clipToBounds()) {
+        val widthPx = constraints.maxWidth
+        val heightPx = with(density) { boxHeight.toPx() }
+        fun styleAt(size: Float) = serif(size.sp, FontWeight.SemiBold, lineHeight = (size * 1.28f).sp, tracking = if (size > 20f) (-0.01).em else 0.sp)
+        val guess = remember(text, widthPx, heightPx, minSize, maxSize) {
+            var s = maxSize
+            while (s > minSize) {
+                val r = measurer.measure(text, styleAt(s), constraints = androidx.compose.ui.unit.Constraints(maxWidth = widthPx))
+                if (r.size.height <= heightPx) break
+                s -= 0.5f
+            }
+            s.coerceAtLeast(minSize)
+        }
+        var size by remember(text, widthPx, heightPx, minSize, maxSize) { mutableStateOf(guess) }
+        val atFloor = size <= minSize
+        Text(
+            text,
+            style = styleAt(size),
+            color = color,
+            maxLines = if (atFloor) with(density) { (heightPx / (size * 1.28f).sp.toPx()).toInt().coerceAtLeast(1) } else Int.MAX_VALUE,
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { r -> if (!atFloor && (r.size.height > heightPx || r.hasVisualOverflow)) size = (size - 0.5f).coerceAtLeast(minSize) },
+            modifier = Modifier.fillMaxWidth().wrapContentHeight(Alignment.Top, unbounded = true),
+        )
     }
 }

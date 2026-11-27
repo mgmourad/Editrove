@@ -13,8 +13,8 @@ android {
         applicationId = "news.editrove"
         minSdk = 26
         targetSdk = 37
-        versionCode = 22
-        versionName = "0.9.4-beta.112626"
+        versionCode = 23
+        versionName = "0.9.4.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Editrove's built-in voices (sherpa-onnx) ship native code for ARM phones and tablets.
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }

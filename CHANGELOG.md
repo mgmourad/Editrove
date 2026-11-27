@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.9.4.1
+
+- What's new shows the running version's own notes (0.9.4 showed 0.9.2's).
+- Headlines on Bento cards fit their box: set as large as fits (14.5–21sp regular, up to 30sp wide), so short headlines fill the space and long ones show in full. The badge on the lead and split-view cards sits flush right; the lead card's buttons sit lower, leaving room for long outlet names.
+
 ### 0.9.4 beta 112626
 
 - Alerts: one memory for every alert (the same story never alerts twice in 48 hours, from any

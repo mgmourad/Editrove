@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Next
+
+- Analysis & Opinion is laid out like a newspaper: a masthead with dateline, a section strip, and ruled square boxes (a lead column with a drop cap beside a side column, three columns across, a photo feature, pull-quote boxes), newsprint-toned photos, sharp (the publisher's full-size photo when the feed only has a thumbnail).
+- Audio briefing: a refresh button stops a playing or paused briefing, fetches the latest stories and says what changed; it never starts playing by itself.
+- Unfolded: a card beside a wide card is as tall as it, so rows end level.
+- Topics: dragging to reorder glides; neighbours slide out of the way and the row settles into place. "Edit Sources" no longer cut off.
+- Settings buttons: the "(!)" text links are proper outlined buttons; Pause Alerts' "Paused until" line lays out on one row; Reset Everything is a red Danger Zone button with a warning popup.
+
 ### 0.9.4.1
 
 - What's new shows the running version's own notes (0.9.4 showed 0.9.2's).

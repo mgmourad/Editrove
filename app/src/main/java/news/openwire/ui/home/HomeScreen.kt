@@ -61,6 +61,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -684,7 +690,7 @@ private fun TabFeed(
                                 )
                             }
                             val ordered = news.openwire.domain.engine.FeedOrdering.apply(r.articles, userSettings.sortMode)
-                            if (t == NavTab.AUDIO) fullRow("briefing-${topic.id}") { HeadlineBriefingCard(topic.label, ordered, userSettings.briefing, onSettings = { vm.openSettingsAt("briefing") }, fresh = { vm.freshStories(topic) }) }
+                            if (t == NavTab.AUDIO) fullRow("briefing-${topic.id}") { HeadlineBriefingCard(topic.label, ordered, userSettings.briefing, onSettings = { vm.openSettingsAt("briefing") }, fresh = { force -> vm.freshStories(topic, force) }) }
                             feed(ordered, topic.label, ticker = t == NavTab.TODAY, title = if (t == NavTab.AUDIO) tr(R.string.feed_listen_next) else tr(R.string.feed_bento))
                         }
                         is FeedResult.Error -> fullRow("err-${topic.id}") {
@@ -758,16 +764,41 @@ private fun HeadlineBriefingCard(
     articles: List<Article>,
     prefs: news.openwire.domain.model.BriefingPrefs,
     onSettings: () -> Unit,
-    fresh: suspend () -> List<Article>,
+    fresh: suspend (force: Boolean) -> List<Article>,
 ) {
     val g = Glass
     val haptics = LocalHapticFeedback.current
     val player = LocalBriefingPlayer.current ?: return
     val scope = rememberCoroutineScope()
     var updating by remember { mutableStateOf(false) }
+    // Refresh: what the briefing will read next, and what changed (shown, never auto-played).
+    var refreshed by remember(topicLabel) { mutableStateOf<List<Article>?>(null) }
+    var refreshNote by remember(topicLabel) { mutableStateOf<Pair<String, Boolean>?>(null) }
+    var refreshing by remember { mutableStateOf(false) }
+    val stories = refreshed ?: articles
     val mine = player.title == tr(R.string.briefing_title, topicLabel)
     val playing = mine && player.playing
-    val count = minOf(prefs.count, articles.size)
+    val count = minOf(prefs.count, stories.size)
+    val msgNew = { n: Int -> if (n == 1) tr(R.string.briefing_refresh_one) else tr(R.string.briefing_refresh_n, n) }
+    val msgSame = tr(R.string.briefing_refresh_same)
+    val msgFail = tr(R.string.briefing_refresh_failed)
+    LaunchedEffect(refreshNote) { if (refreshNote != null) { kotlinx.coroutines.delay(8_000); refreshNote = null } }
+    fun refresh() {
+        if (refreshing || updating) return
+        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        // Stop a playing or paused briefing; the new one waits for the reader to press Play.
+        if (mine) player.stop()
+        val before = stories.take(prefs.count).map { it.id }.toSet()
+        scope.launch {
+            refreshing = true
+            val latest = runCatching { fresh(true) }.getOrNull()
+            refreshing = false
+            if (latest.isNullOrEmpty()) { refreshNote = msgFail to false; return@launch }
+            refreshed = latest
+            val added = latest.take(prefs.count).count { it.id !in before }
+            refreshNote = (if (added > 0) msgNew(added) else msgSame) to true
+        }
+    }
     GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), contentPadding = PaddingValues(18.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(tr(R.string.audio_briefing_kicker), style = mono(10.sp, FontWeight.SemiBold, 0.16.sp), color = g.accentSoft, modifier = Modifier.weight(1f))
@@ -778,6 +809,22 @@ private fun HeadlineBriefingCard(
                 Icon(androidx.compose.material.icons.Icons.Outlined.Tune, null, tint = g.textSecondary, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("${prefs.detail.text} · ${"%.2g".format(prefs.speed).trimEnd('0').trimEnd('.')}×", style = sans(11.sp, FontWeight.Medium), color = g.textSecondary)
+            }
+            Spacer(Modifier.width(8.dp))
+            // Refresh to the latest news: spins while it works.
+            val spin = androidx.compose.animation.core.rememberInfiniteTransition(label = "refreshSpin")
+            val angle by spin.animateFloat(0f, 360f, androidx.compose.animation.core.infiniteRepeatable(tween(900, easing = androidx.compose.animation.core.LinearEasing)), label = "angle")
+            Box(
+                Modifier.size(30.dp).clip(CircleShape).background(g.chipFill).border(1.dp, g.hairline, CircleShape)
+                    .clickable(enabled = !refreshing && !updating, onClickLabel = tr(R.string.briefing_refresh)) { refresh() }
+                    .then(Modifier.semantics { contentDescription = tr(R.string.briefing_refresh) }),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Refresh, null,
+                    tint = if (refreshing) g.accent else g.textSecondary,
+                    modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = if (refreshing) angle else 0f },
+                )
             }
         }
         Spacer(Modifier.height(6.dp))
@@ -805,7 +852,7 @@ private fun HeadlineBriefingCard(
                         else scope.launch {
                             // Never brief from stale stories: refetch first if they're more than a few minutes old.
                             updating = true
-                            val latest = runCatching { fresh() }.getOrNull()?.takeIf { it.isNotEmpty() } ?: articles
+                            val latest = refreshed?.also { refreshed = null } ?: runCatching { fresh(false) }.getOrNull()?.takeIf { it.isNotEmpty() } ?: articles
                             updating = false
                             player.play(topicLabel, latest)
                         }
@@ -827,8 +874,19 @@ private fun HeadlineBriefingCard(
             Box(Modifier.weight(1f).height(16.dp)) { Waveform(playing) }
         }
         // Something is on its way: the latest stories, the voice, or the next story's text.
-        androidx.compose.animation.AnimatedVisibility(updating || (mine && player.loading)) {
+        androidx.compose.animation.AnimatedVisibility(updating || refreshing || (mine && player.loading)) {
             SweepBar(Modifier.padding(top = 14.dp))
+        }
+        androidx.compose.animation.AnimatedVisibility(refreshNote != null && !refreshing) {
+            val note = refreshNote
+            Row(Modifier.padding(top = 12.dp).clip(RoundedCornerShape(12.dp)).background(g.chipFill).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    if (note?.second == false) Icons.Outlined.CloudOff else Icons.Filled.CheckCircle,
+                    null, tint = if (note?.second == false) g.textSecondary else g.accent, modifier = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(note?.first.orEmpty(), style = sans(12.sp, FontWeight.Medium), color = g.textPrimary)
+            }
         }
         if (mine && player.storyTitle != null) {
             Spacer(Modifier.height(10.dp))

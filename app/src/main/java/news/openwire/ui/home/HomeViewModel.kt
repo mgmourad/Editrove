@@ -417,8 +417,9 @@ class HomeViewModel(
      * The freshest stories for [topic], for an audio briefing: refetched first when they
      * are more than a few minutes old (waits at most ~8 s, else uses what it has).
      */
-    suspend fun freshStories(topic: Topic): List<Article> {
-        if (isStale(topic.id) || _feeds.value[topic.id] !is FeedResult.Success) {
+    /** The topic's stories, refetched first when stale (or always, with [force]). Null when a forced refetch failed. */
+    suspend fun freshStories(topic: Topic, force: Boolean = false): List<Article> {
+        if (force || isStale(topic.id) || _feeds.value[topic.id] !is FeedResult.Success) {
             load(topic, force = true, silent = true)
             kotlinx.coroutines.withTimeoutOrNull(8_000) { loadJobs[topic.id]?.join() }
         }

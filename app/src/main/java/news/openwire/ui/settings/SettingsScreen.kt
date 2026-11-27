@@ -38,6 +38,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -79,7 +81,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material.icons.outlined.NotificationsPaused
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.LocationOn
@@ -553,12 +558,39 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
         var dragOffset by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
         val rowHeights = remember { androidx.compose.runtime.mutableStateMapOf<String, Int>() }
         val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+        val scope = rememberCoroutineScope()
+        // On release the lifted row glides into its slot instead of snapping.
+        val settle = remember { androidx.compose.animation.core.Animatable(0f) }
+        var settlingId by remember { mutableStateOf<String?>(null) }
         Section {
             topics.forEachIndexed { i, t ->
                 androidx.compose.runtime.key(t.id) {
                     if (i > 0) Divider()
                     val lifted = dragging == t.id
-                    val elevation by androidx.compose.animation.core.animateDpAsState(if (lifted) 10.dp else 0.dp, label = "lift")
+                    val elevation by androidx.compose.animation.core.animateDpAsState(if (lifted) 12.dp else 0.dp, androidx.compose.animation.core.spring(stiffness = 500f), label = "lift")
+                    val lift by androidx.compose.animation.core.animateFloatAsState(if (lifted) 1.03f else 1f, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 500f), label = "liftScale")
+                    // A neighbour that swaps places slides to its new slot (from where it was) rather than jumping.
+                    val shift = remember { androidx.compose.animation.core.Animatable(0f) }
+                    var lastY by remember { mutableStateOf<Float?>(null) }
+                    // Moved outside the swipe row's clip, so the lifted row can float over its neighbours.
+                    Box(Modifier
+                        .zIndex(if (lifted || settlingId == t.id) 1f else 0f)
+                        .graphicsLayer {
+                            translationY = when { lifted -> dragOffset; settlingId == t.id -> settle.value; else -> shift.value }
+                            scaleX = lift; scaleY = lift
+                        }
+                        .shadow(elevation, RoundedCornerShape(14.dp))
+                        .onPlaced { c ->
+                        val y = c.positionInParent().y
+                        val before = lastY
+                        lastY = y
+                        if (before != null && before != y && dragging != t.id && settlingId != t.id) {
+                            scope.launch {
+                                shift.snapTo(shift.value + (before - y))
+                                shift.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 420f))
+                            }
+                        }
+                    }) {
                     // Swipe right: rename / edit (your topics). Swipe left: delete (yours) or hide / show.
                     SwipeActions(
                         // Built-in topics are never renamed or deleted: their sources can be edited.
@@ -572,10 +604,7 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
                     Row(
                         Modifier.fillMaxWidth()
                             .onGloballyPositioned { rowHeights[t.id] = it.size.height }
-                            .zIndex(if (lifted) 1f else 0f)
-                            .graphicsLayer { translationY = if (lifted) dragOffset else 0f; scaleX = if (lifted) 1.02f else 1f; scaleY = if (lifted) 1.02f else 1f }
-                            .shadow(elevation, RoundedCornerShape(14.dp))
-                            .background(if (lifted) Glass.deviceBg else Color.Transparent, RoundedCornerShape(14.dp))
+                            .background(if (lifted || settlingId == t.id) Glass.deviceBg else Color.Transparent, RoundedCornerShape(14.dp))
                             .semantics {
                                 customActions = listOf(
                                     androidx.compose.ui.semantics.CustomAccessibilityAction(tr(R.string.cd_move_up)) { vm.moveTopic(t.id, up = true); true },
@@ -591,8 +620,20 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
                             modifier = Modifier.size(28.dp).padding(2.dp).pointerInput(t.id) {
                                 detectDragGestures(
                                     onDragStart = { dragging = t.id; dragOffset = 0f; haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) },
-                                    onDragEnd = { dragging = null; dragOffset = 0f },
-                                    onDragCancel = { dragging = null; dragOffset = 0f },
+                                    onDragEnd = {
+                                        val from = dragOffset
+                                        settlingId = t.id; dragging = null; dragOffset = 0f
+                                        scope.launch {
+                                            settle.snapTo(from)
+                                            settle.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.72f, stiffness = 380f))
+                                            if (settlingId == t.id) settlingId = null
+                                        }
+                                    },
+                                    onDragCancel = {
+                                        val from = dragOffset
+                                        settlingId = t.id; dragging = null; dragOffset = 0f
+                                        scope.launch { settle.snapTo(from); settle.animateTo(0f, androidx.compose.animation.core.spring(stiffness = 400f)); if (settlingId == t.id) settlingId = null }
+                                    },
                                     onDrag = { change, amount ->
                                         change.consume()
                                         dragOffset += amount.y
@@ -632,11 +673,12 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
                         GlassSwitch(t.isVisible) { vm.setTopicVisible(t.id, it) }
                     }
                     }
+                    }
                 }
             }
         }
     }
-    item { TextButton(tr(R.string.topics_reset)) { vm.resetTopics() } }
+    item { OutlineButton(tr(R.string.topics_reset)) { vm.resetTopics() } }
 }
 
 /**
@@ -879,7 +921,7 @@ private class SwipeAction(val label: String, val icon: androidx.compose.ui.graph
 private fun SwipeActions(start: List<SwipeAction>, end: List<SwipeAction>, content: @Composable () -> Unit) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
-    val actionPx = with(density) { 76.dp.toPx() }
+    val actionPx = with(density) { SwipeActionWidth.toPx() }
     val startW = actionPx * start.size
     val endW = actionPx * end.size
     val offset = remember { androidx.compose.animation.core.Animatable(0f) }
@@ -888,9 +930,9 @@ private fun SwipeActions(start: List<SwipeAction>, end: List<SwipeAction>, conte
     Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))) {
         // Actions behind the row.
         Row(Modifier.matchParentSize(), verticalAlignment = Alignment.CenterVertically) {
-            start.forEach { a -> SwipeButton(a, Modifier.width(76.dp).fillMaxHeight()) { a.onClick(); close() } }
+            start.forEach { a -> SwipeButton(a, Modifier.width(SwipeActionWidth).fillMaxHeight()) { a.onClick(); close() } }
             Spacer(Modifier.weight(1f))
-            end.forEach { a -> SwipeButton(a, Modifier.width(76.dp).fillMaxHeight()) { a.onClick(); close() } }
+            end.forEach { a -> SwipeButton(a, Modifier.width(SwipeActionWidth).fillMaxHeight()) { a.onClick(); close() } }
         }
         Box(
             Modifier.fillMaxWidth()
@@ -921,6 +963,9 @@ private fun SwipeActions(start: List<SwipeAction>, end: List<SwipeAction>, conte
     }
 }
 
+/** Wide enough for a two-word label ("Edit Sources") in every language we ship. */
+private val SwipeActionWidth = 100.dp
+
 @Composable
 private fun SwipeButton(a: SwipeAction, modifier: Modifier, onClick: () -> Unit) {
     Column(
@@ -930,7 +975,7 @@ private fun SwipeButton(a: SwipeAction, modifier: Modifier, onClick: () -> Unit)
     ) {
         Icon(a.icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
         Spacer(Modifier.height(4.dp))
-        Text(a.label, style = sans(11.sp, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(a.label, style = sans(11.sp, FontWeight.SemiBold, lineHeight = 13.sp), color = Color.White, maxLines = 2, textAlign = TextAlign.Center)
     }
 }
 
@@ -956,7 +1001,7 @@ private fun TopicSourcesDialog(vm: SettingsViewModel, topic: news.openwire.domai
                 items(list.size) { i -> val src = list[i]; SourceRow(src, null, false, vm) }
             }
             Spacer(Modifier.height(8.dp))
-            TextButton(tr(R.string.src_done_editing), onClick = onDismiss)
+            OutlineButton(tr(R.string.src_done_editing), icon = Icons.Filled.Check, accent = false, onClick = onDismiss)
         }
     }
 }
@@ -1022,7 +1067,7 @@ private fun LazyListScope.sourcesPage(vm: SettingsViewModel, onAdd: () -> Unit) 
             }
         }
     }
-    item { TextButton(tr(R.string.sources_reset)) { vm.resetSources() } }
+    item { OutlineButton(tr(R.string.sources_reset)) { vm.resetSources() } }
 }
 
 @Composable
@@ -1365,7 +1410,7 @@ private fun LazyListScope.rulesPage(vm: SettingsViewModel) {
                         AnimatedVisibility(editing == r.domain, enter = expandVertically(springTween(300)) + fadeIn(), exit = shrinkVertically(springTween(250)) + fadeOut()) {
                             Column(Modifier.padding(top = 10.dp)) {
                                 StrategyPicker(r.strategy) { vm.setRule(r.domain, it) }
-                                if (r.isCustom) { Spacer(Modifier.height(8.dp)); TextButton(tr(R.string.rule_reset)) { vm.resetRule(r.domain) } }
+                                if (r.isCustom) { Spacer(Modifier.height(8.dp)); OutlineButton(tr(R.string.rule_reset), compact = true) { vm.resetRule(r.domain) } }
                             }
                         }
                     }
@@ -1373,7 +1418,7 @@ private fun LazyListScope.rulesPage(vm: SettingsViewModel) {
             }
         }
     }
-    item { TextButton(tr(R.string.rules_reset_all)) { vm.resetAllRules() } }
+    item { OutlineButton(tr(R.string.rules_reset_all)) { vm.resetAllRules() } }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -1611,9 +1656,12 @@ private fun AlertsQuietSection(vm: SettingsViewModel, s: news.openwire.domain.mo
         Spacer(Modifier.height(8.dp))
         Label(tr(R.string.alerts_pause))
         if (a.pausedUntil > now) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(tr(R.string.alerts_paused_until, clock(a.pausedUntil)), style = sans(13.sp, FontWeight.Medium), color = Glass.accentSoft, modifier = Modifier.weight(1f))
-                TextButton(tr(R.string.alerts_resume)) { vm.updateAlerts { it.copy(pausedUntil = 0L) } }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.NotificationsPaused, null, tint = Glass.accentSoft, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(tr(R.string.alerts_paused_until, clock(a.pausedUntil)), style = sans(13.5.sp, FontWeight.SemiBold), color = Glass.accentSoft, modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(10.dp))
+                OutlineButton(tr(R.string.alerts_resume), icon = Icons.Filled.PlayArrow, compact = true) { vm.updateAlerts { it.copy(pausedUntil = 0L) } }
             }
         } else {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1669,7 +1717,7 @@ private fun AppearancePage(vm: SettingsViewModel, themeMode: ThemeMode, onTheme:
                     Text("${(s.textScale * 100).toInt()}%", style = mono(12.sp, FontWeight.SemiBold), color = Glass.textSecondary)
                     if (s.textScale != 1f) {
                         Spacer(Modifier.weight(1f))
-                        TextButton(tr(R.string.reset)) { vm.setTextScale(1f) }
+                        OutlineButton(tr(R.string.reset), compact = true) { vm.setTextScale(1f) }
                     }
                 }
             }
@@ -1748,14 +1796,11 @@ private fun BackupPage(vm: SettingsViewModel) {
             news.openwire.onboarding.OnboardingGate.showing = true
         }
         Spacer(Modifier.height(8.dp))
-        if (!confirmReset) TextButton(tr(R.string.reset_everything)) { confirmReset = true }
-        else Section {
-            Text(tr(R.string.reset_confirm), style = sans(13.sp, lineHeight = 19.sp), color = Glass.textPrimary)
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.weight(1f)) { SecondaryButton(tr(R.string.action_cancel)) { confirmReset = false } }
-                Box(Modifier.weight(1f)) { PrimaryButton(tr(R.string.reset)) { vm.resetEverything(); confirmReset = false } }
-            }
+        Label(tr(R.string.danger_zone))
+        DangerButton(tr(R.string.reset_everything)) { confirmReset = true }
+        if (confirmReset) ResetEverythingDialog(onDismiss = { confirmReset = false }) {
+            vm.resetEverything(); confirmReset = false
+            Toast.makeText(context, tr(R.string.reset_everything_done), Toast.LENGTH_SHORT).show()
         }
     }
 }
@@ -1921,12 +1966,69 @@ private fun SecondaryButton(text: String, onClick: () -> Unit) {
     ) { Text(text, style = sans(13.sp, FontWeight.SemiBold), color = g.textPrimary, maxLines = 1) }
 }
 
+/**
+ * A quiet outlined pill: resets (accent outline, restart icon) and dismissals (neutral, no
+ * icon). [compact] wraps its text for use inside a row; otherwise it spans the width.
+ */
 @Composable
-private fun TextButton(text: String, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(CircleShape).clickable(onClick = onClick).padding(vertical = 12.dp), horizontalArrangement = Arrangement.Center) {
-        Icon(Icons.Outlined.ErrorOutline, null, tint = Glass.accentSoft, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(text, style = sans(13.sp, FontWeight.Medium), color = Glass.accentSoft)
+private fun OutlineButton(text: String, icon: ImageVector? = Icons.Outlined.RestartAlt, accent: Boolean = icon != null, compact: Boolean = false, onClick: () -> Unit) {
+    val g = Glass
+    val tint = if (accent) g.accentSoft else g.textPrimary
+    Row(
+        (if (compact) Modifier else Modifier.fillMaxWidth()).clip(CircleShape)
+            .background(if (accent) g.accent.copy(alpha = 0.08f) else g.chipFill)
+            .border(1.dp, if (accent) g.accent.copy(alpha = 0.45f) else g.hairline, CircleShape)
+            .clickable(onClick = onClick).padding(horizontal = if (compact) 16.dp else 20.dp, vertical = if (compact) 9.dp else 12.dp),
+        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+    ) {
+        icon?.let { Icon(it, null, tint = tint, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(7.dp)) }
+        Text(text, style = sans(13.sp, FontWeight.SemiBold), color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** The one destructive button: red, filled with a warning tint, unmistakably not a casual link. */
+@Composable
+private fun DangerButton(text: String, onClick: () -> Unit) {
+    val red = Color(0xFFE5484D)
+    Row(
+        Modifier.fillMaxWidth().clip(CircleShape).background(red.copy(alpha = 0.14f)).border(1.5.dp, red.copy(alpha = 0.75f), CircleShape)
+            .clickable(onClick = onClick).padding(vertical = 13.dp),
+        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.WarningAmber, null, tint = Color(0xFFFF6B6F), modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(text, style = sans(13.sp, FontWeight.Bold), color = Color(0xFFFF6B6F), maxLines = 1)
+    }
+}
+
+/** A warning popup before Reset Everything. */
+@Composable
+private fun ResetEverythingDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    val g = Glass
+    val red = Color(0xFFE5484D)
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.widthIn(max = 420.dp).fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(g.deviceBg)
+                .border(1.dp, red.copy(alpha = 0.5f), RoundedCornerShape(26.dp)).padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(Modifier.size(56.dp).clip(CircleShape).background(red.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Outlined.WarningAmber, null, tint = Color(0xFFFF6B6F), modifier = Modifier.size(30.dp))
+            }
+            Spacer(Modifier.height(14.dp))
+            Text(tr(R.string.reset_everything_title), style = serif(22.sp, FontWeight.SemiBold), color = g.textPrimary, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(8.dp))
+            Text(tr(R.string.reset_confirm), style = sans(13.5.sp, lineHeight = 20.sp), color = g.textSecondary, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(6.dp))
+            Text(tr(R.string.reset_everything_undo), style = sans(12.5.sp, FontWeight.SemiBold), color = Color(0xFFFF6B6F), textAlign = TextAlign.Center)
+            Spacer(Modifier.height(18.dp))
+            Row(
+                Modifier.fillMaxWidth().clip(CircleShape).background(red).clickable(onClick = onConfirm).padding(vertical = 13.dp),
+                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+            ) { Text(tr(R.string.reset_everything_confirm), style = sans(13.5.sp, FontWeight.Bold), color = Color.White) }
+            Spacer(Modifier.height(10.dp))
+            SecondaryButton(tr(R.string.action_cancel), onClick = onDismiss)
+        }
     }
 }
 
@@ -2083,7 +2185,7 @@ private fun AddToSectionDialog(vm: SettingsViewModel, category: String, onDismis
                 }
             }
             Spacer(Modifier.height(8.dp))
-            TextButton(tr(R.string.action_cancel), onClick = onDismiss)
+            OutlineButton(tr(R.string.action_cancel), icon = null, onClick = onDismiss)
         }
     }
 }

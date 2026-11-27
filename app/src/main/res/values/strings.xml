@@ -68,6 +68,11 @@
     <string name="action_pause">Pause</string>
     <string name="action_resume">Resume</string>
     <string name="briefing_play">Play Briefing</string>
+    <string name="briefing_refresh">Refresh briefing</string>
+    <string name="briefing_refresh_one">Updated: 1 new story. Press Play when you\'re ready.</string>
+    <string name="briefing_refresh_n">Updated: %1$d new stories. Press Play when you\'re ready.</string>
+    <string name="briefing_refresh_same">Up to date: no new stories since the last update.</string>
+    <string name="briefing_refresh_failed">Couldn\'t refresh. Check your connection and try again.</string>
     <string name="previous_story">Previous Story</string>
     <string name="next_story">Next Story</string>
     <string name="briefing_now">Now: %1$s</string>
@@ -268,6 +273,11 @@
     <string name="export_settings">Export Settings</string>
     <string name="import_settings">Import Settings</string>
     <string name="reset_everything">Reset Everything to Defaults</string>
+    <string name="danger_zone">Danger Zone</string>
+    <string name="reset_everything_title">Reset Everything?</string>
+    <string name="reset_everything_undo">This can\'t be undone. Export your settings first if you may want them back.</string>
+    <string name="reset_everything_confirm">Yes, Reset Everything</string>
+    <string name="reset_everything_done">Editrove is back to its defaults</string>
     <string name="reset_confirm">Reset topics, edition, sources, paywall rules and preferences? Saved stories are kept.</string>
     <string name="reset">Reset</string>
     <string name="version">Version %1$s</string>
@@ -412,6 +422,9 @@
     <string name="op_kicker">ANALYSIS &amp; OPINION</string>
     <string name="op_title">Analysis &amp; Opinion</string>
     <string name="op_sub">Columns, essays and the conversation around the news.</string>
+    <string name="op_edition">The Editrove Comment Pages</string>
+    <string name="op_lead">The Lead Column</string>
+    <string name="op_by">By %1$s</string>
     <string name="op_following">Following</string>
     <string name="op_all">Opinion</string>
     <string name="op_analysis">Analysis</string>

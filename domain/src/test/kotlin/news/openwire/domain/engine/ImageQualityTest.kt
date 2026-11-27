@@ -16,4 +16,15 @@ class ImageQualityTest {
         // Signed addresses would break if changed.
         assertEquals("https://i.guim.co.uk/img/x.jpg?width=140&s=abc", ImageExtractor.highRes("https://i.guim.co.uk/img/x.jpg?width=140&s=abc"))
     }
+
+    @Test fun pagePhotoSkipsBrandedShareCards() {
+        val html = """
+            <meta property="og:image" content="https://i.guim.co.uk/img/media/abc/master/2000.jpg?width=1200&height=630&overlay-align=bottom%2Cleft&overlay-width=100p&overlay-base64=L2ltZw&s=sig1">
+            <figure><picture><img src="https://i.guim.co.uk/img/media/abc/master/2000.jpg?width=1300&dpr=2&s=none&crop=none" width="1300" height="780"></picture></figure>
+        """
+        assertEquals("https://i.guim.co.uk/img/media/abc/master/2000.jpg?width=1300&dpr=2&s=none&crop=none", ImageExtractor.fromHtml(html, "https://www.theguardian.com/x"))
+        // The branded card is still used when it is the only photo.
+        val only = """<meta property="og:image" content="https://i.guim.co.uk/img/media/abc/master/2000.jpg?width=1200&overlay-base64=L2ltZw&s=sig1">"""
+        assertEquals("https://i.guim.co.uk/img/media/abc/master/2000.jpg?width=1200&overlay-base64=L2ltZw&s=sig1", ImageExtractor.fromHtml(only, "https://www.theguardian.com/x"))
+    }
 }

@@ -484,6 +484,7 @@ private fun LazyGridScope.bento(
     columns: Int, wideFirst: Boolean = false, wideLast: Boolean = false,
 ) {
     val spans = BentoLayout.spans(rest.size, columns, offset, compact, magazine, wideFirst, wideLast)
+    val tall = BentoLayout.tallRows(spans, columns)
     itemsIndexed(
         rest,
         key = { _, a -> a.id },
@@ -495,6 +496,7 @@ private fun LazyGridScope.bento(
                 locked = state(article) == ArchiveState.Locked,
                 category = category,
                 wide = spans[i0] >= 2,
+                tall = tall[i0],
                 selected = !compact && selectedId == article.id,
                 saved = article.id in savedIds,
                 liked = article.id in likedIds,
@@ -535,6 +537,26 @@ internal object BentoLayout {
         }
         // A part-filled last row: its last card takes the rest.
         if (n > 0 && col > 0) out[n - 1] += columns - col
+        return out
+    }
+
+    /**
+     * Cards that share a row with a wide card: they take the wide card's height (taller photo,
+     * taller headline box) so the row ends level, with no gap under the narrow one.
+     */
+    fun tallRows(spans: IntArray, columns: Int): BooleanArray {
+        val out = BooleanArray(spans.size)
+        var start = 0
+        var col = 0
+        for (i in spans.indices) {
+            col += spans[i]
+            if (col >= columns || i == spans.lastIndex) {
+                val row = start..i
+                val mixed = row.any { spans[it] >= 2 } && row.count() > 1
+                if (mixed) row.forEach { out[it] = true }
+                start = i + 1; col = 0
+            }
+        }
         return out
     }
 }
@@ -906,8 +928,11 @@ fun BentoCard(
     onOpen: (Article) -> Unit,
     onToggleSaved: (Article) -> Unit,
     onToggleLiked: (Article) -> Unit,
+    /** Shares a row with a wide card: as tall as it, so the row is level. */
+    tall: Boolean = wide,
 ) {
     val g = Glass
+    val big = wide || tall
     GlassCard(
         onClick = { onOpen(article) },
         modifier = Modifier.fillMaxWidth().lockedLook(locked),
@@ -915,7 +940,7 @@ fun BentoCard(
         selected = selected,
     ) {
         // Concentric 18dp inner thumbnail
-        Box(modifier = Modifier.fillMaxWidth().height(if (wide) 150.dp else 112.dp).clip(RoundedCornerShape(InnerRadius))) {
+        Box(modifier = Modifier.fillMaxWidth().height(if (big) 150.dp else 112.dp).clip(RoundedCornerShape(InnerRadius))) {
             ArticleImage(
                 article,
                 Modifier.fillMaxSize().sharedArticleImage(article.id, article.imageUrl != null, InnerRadius),
@@ -938,7 +963,7 @@ fun BentoCard(
         Column(Modifier.padding(horizontal = 4.dp)) {
             Text(
                 article.publication(),
-                style = mono(if (wide) 10.sp else 9.sp, tracking = 0.1.em),
+                style = mono(if (big) 10.sp else 9.sp, tracking = 0.1.em),
                 color = g.textPrimary.copy(alpha = 0.6f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -948,7 +973,7 @@ fun BentoCard(
             FitHeadline(
                 article.title,
                 color = if (selected) g.accentSoft else g.textPrimary,
-                boxHeight = if (wide) 86.dp else 80.dp,
+                boxHeight = if (big) 86.dp else 80.dp,
                 minSize = 14.5f, maxSize = if (wide) 30f else 21f,
             )
         }
@@ -975,6 +1000,8 @@ fun BentoCard(
 /** Resolves missing lead photos from the article page (js/imageService.js). */
 /** Loads a story's opening lines for cards whose feed gave no excerpt. */
 val LocalArticlePreview = androidx.compose.runtime.staticCompositionLocalOf<(suspend (Article) -> String?)?> { null }
+/** Several paragraphs of a story (for filling out a newspaper column); null when unreadable. */
+val LocalArticleExcerpt = androidx.compose.runtime.staticCompositionLocalOf<(suspend (Article) -> String?)?> { null }
 
 val LocalImageResolver = androidx.compose.runtime.staticCompositionLocalOf<news.openwire.data.remote.ImageResolver?> { null }
 

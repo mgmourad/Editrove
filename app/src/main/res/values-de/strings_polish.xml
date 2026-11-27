@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="briefing_refresh">Briefing aktualisieren</string>
+    <string name="briefing_refresh_one">Aktualisiert: 1 neue Meldung. Tippe auf Abspielen, wenn du bereit bist.</string>
+    <string name="briefing_refresh_n">Aktualisiert: %1$d neue Meldungen. Tippe auf Abspielen, wenn du bereit bist.</string>
+    <string name="briefing_refresh_same">Aktuell: keine neuen Meldungen seit der letzten Aktualisierung.</string>
+    <string name="briefing_refresh_failed">Aktualisieren fehlgeschlagen. Prüfe deine Verbindung und versuche es erneut.</string>
+    <string name="danger_zone">Gefahrenzone</string>
+    <string name="reset_everything_title">Alles zurücksetzen?</string>
+    <string name="reset_everything_undo">Das lässt sich nicht rückgängig machen. Exportiere vorher deine Einstellungen, falls du sie zurückhaben möchtest.</string>
+    <string name="reset_everything_confirm">Ja, alles zurücksetzen</string>
+    <string name="reset_everything_done">Editrove ist auf die Standardwerte zurückgesetzt</string>
+    <string name="op_edition">Die Meinungsseiten von Editrove</string>
+    <string name="op_lead">Der Leitartikel</string>
+    <string name="op_by">Von %1$s</string>
+    <string name="topics_reset_title">Themen &amp; Ausgabe zurücksetzen?</string>
+    <string name="topics_reset_body">Reihenfolge, ausgeblendete und eigene Themen sowie die Ausgabe werden auf die Standardwerte zurückgesetzt.</string>
+    <string name="sources_reset_title">Quellen zurücksetzen?</string>
+    <string name="sources_reset_body">Alle Quellen werden wieder eingeschaltet und hinzugefügte Feeds entfernt.</string>
+    <string name="rules_reset_title">Alle Paywall-Regeln zurücksetzen?</string>
+    <string name="rules_reset_body">Jeder Verlag erhält wieder die eingebaute Regel von Editrove; deine Änderungen werden entfernt.</string>
+    <string name="op_more_from">Mehr von %1$s</string>
+    <string name="op_also_in">Außerdem in Meinung</string>
+</resources>

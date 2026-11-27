@@ -20,6 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -45,6 +49,8 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -78,6 +84,7 @@ import news.openwire.domain.opinion.Trending
 import news.openwire.domain.opinion.Voice
 import news.openwire.i18n.tr
 import news.openwire.ui.home.SourceLogo
+import news.openwire.ui.home.LocalArticleExcerpt
 import news.openwire.ui.home.mono
 import news.openwire.ui.home.sans
 import news.openwire.ui.home.serif
@@ -121,6 +128,9 @@ internal fun topicKey(topic: String) = "t:" + topic.trim().lowercase()
 private class Bells(val authors: Set<String>, val accounts: Set<String>, val tabs: List<String>, val muted: Set<String>)
 private val LocalBells = androidx.compose.runtime.staticCompositionLocalOf { Bells(emptySet(), emptySet(), emptyList(), emptySet()) }
 
+/** Every story on the page, for "More from …" indexes in columns whose text can't be read. */
+private val LocalPageStories = androidx.compose.runtime.staticCompositionLocalOf<List<Article>> { emptyList() }
+
 private const val FOLLOWING = "\u0000following"
 private const val ALL = "\u0000all"
 private const val ANALYSIS = "\u0000analysis"
@@ -149,24 +159,39 @@ fun OpinionScreen(
         value = source.columns(appLanguage, force = refresh > 0)
         refreshing = false
     }
+    // Start reading the stories' text as soon as the columns arrive, so short columns are filled
+    // by the time they're scrolled to (three at a time; results are kept for the session).
+    val excerpt = LocalArticleExcerpt.current
+    LaunchedEffect(columns) {
+        val list = columns ?: return@LaunchedEffect
+        if (excerpt == null) return@LaunchedEffect
+        list.filter { it.language == appLanguage || it.language == "en" }.take(30).forEach { col ->
+            launch { runCatching { excerpt(col.article) } }
+        }
+    }
     // Suggestions in the page's own script (an English headline doesn't suggest a tab on an Arabic page).
     val trending = remember(news, appLanguage) {
         Trending.topics(news, max = 12).filter { t -> tabs.none { it.equals(t, true) } }
             .filter { t -> (appLanguage == "ar") == t.any { it in '\u0600'..'\u06FF' } }.take(10)
     }
 
-    androidx.compose.runtime.CompositionLocalProvider(LocalBells provides Bells(followedAuthors.map(OpinionCatalog::authorKey).toSet(), followedAccounts, tabs, muted)) {
+    val pageStories = remember(columns) { columns.orEmpty().map { it.article } }
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalBells provides Bells(followedAuthors.map(OpinionCatalog::authorKey).toSet(), followedAccounts, tabs, muted),
+        LocalPageStories provides pageStories,
+    ) {
     Box(Modifier.fillMaxSize().background(c.bg)) {
         LazyColumn(contentPadding = padding, modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-            item("head") { Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) { Header(c, refreshing, onDiscover = { discover = true }) { refresh++ } } }
+            item("head") { Column(Modifier.widthIn(max = 1100.dp).fillMaxWidth()) { Header(c, refreshing, onDiscover = { discover = true }) { refresh++ } } }
             item("tabs") {
-                Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
-                    Row(Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.widthIn(max = 1100.dp).fillMaxWidth()) {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         TabChip(c, tr(R.string.op_following), tab == FOLLOWING) { tab = FOLLOWING }
                         TabChip(c, tr(R.string.op_all), tab == ALL) { tab = ALL }
                         TabChip(c, tr(R.string.op_analysis), tab == ANALYSIS) { tab = ANALYSIS }
                         tabs.forEach { t -> TabChip(c, t, tab == t, onRemove = { actions.removeTab(t); if (tab == t) tab = ALL }) { tab = t } }
                     }
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(c.rule))
                     // Results fill in as you type: writers, columns, a live search, accounts.
                     SearchField(c, query, { query = it }) { q -> if (q.isNotBlank()) { actions.addTab(q.trim()); tab = q.trim(); query = "" } }
                     if (query.isBlank() && trending.isNotEmpty() && (tab == ALL || tab == FOLLOWING)) {
@@ -198,7 +223,7 @@ fun OpinionScreen(
             }
             item("note") {
                 Text(tr(R.string.op_social_note), style = sans(11.sp, lineHeight = 16.sp), color = c.dim,
-                    modifier = Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(vertical = 16.dp))
+                    modifier = Modifier.widthIn(max = 1100.dp).fillMaxWidth().padding(vertical = 16.dp))
             }
         }
         // Writers, columns, voices and trending topics to follow: a page of their own.
@@ -221,14 +246,14 @@ private fun DiscoverSheet(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 item("d-head") {
-                    Row(Modifier.widthIn(max = 760.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.widthIn(max = 1100.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(tr(R.string.op_discover_title), style = serif(28.sp, FontWeight.Bold), color = c.text, modifier = Modifier.weight(1f))
                         Icon(Icons.Filled.Close, tr(R.string.action_close), tint = c.text, modifier = Modifier.clip(CircleShape).clickable(onClick = onClose).padding(8.dp).size(22.dp))
                     }
-                    Text(tr(R.string.op_discover_sub), style = serif(15.sp, lineHeight = 21.sp).copy(fontStyle = FontStyle.Italic), color = c.dim, modifier = Modifier.widthIn(max = 760.dp).fillMaxWidth())
+                    Text(tr(R.string.op_discover_sub), style = serif(15.sp, lineHeight = 21.sp).copy(fontStyle = FontStyle.Italic), color = c.dim, modifier = Modifier.widthIn(max = 1100.dp).fillMaxWidth())
                 }
                 if (trending.isNotEmpty()) item("d-trend") {
-                    Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) { Trending(c, trending) { t -> actions.addTab(t); onTab(t); onClose() } }
+                    Column(Modifier.widthIn(max = 1100.dp).fillMaxWidth()) { Trending(c, trending) { t -> actions.addTab(t); onTab(t); onClose() } }
                 }
                 val writers = columnists(columns.orEmpty(), appLanguage, authors)
                 if (columns == null) item("d-load") { Status(c, tr(R.string.op_loading)) }
@@ -268,14 +293,14 @@ private fun LazyListScope.followingTab(
 ) {
     val byWriters = OpinionCatalog.byAuthors(columns.orEmpty().map { it.article }, authors)
     if (authors.isEmpty() && accounts.isEmpty()) item("f-empty") {
-        Column(Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(vertical = 18.dp)) {
+        Column(Modifier.widthIn(max = 1100.dp).fillMaxWidth().padding(vertical = 18.dp)) {
             Text("“", style = serif(64.sp, FontWeight.Bold, lineHeight = 50.sp), color = c.accent)
             Text(tr(R.string.op_follow_empty), style = serif(19.sp, lineHeight = 27.sp).copy(fontStyle = FontStyle.Italic), color = c.text)
         }
     }
     item("f-discover") {
         Row(
-            Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, c.rule, RoundedCornerShape(12.dp))
+            Modifier.widthIn(max = 1100.dp).fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, c.rule, RoundedCornerShape(12.dp))
                 .clickable(onClick = onDiscover).padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -292,7 +317,7 @@ private fun LazyListScope.followingTab(
         item("fa") { Rule(c, tr(R.string.op_from_accounts)) }
         item("fa-list") {
             val posts by produceState<List<SocialPost>?>(null, accounts, refresh) { value = source.following(accounts, force = refresh > 0) }
-            Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
+            Column(Modifier.widthIn(max = 1100.dp).fillMaxWidth()) {
                 when {
                     posts == null -> Status(c, tr(R.string.op_loading))
                     posts!!.isEmpty() -> Status(c, tr(R.string.op_nothing))
@@ -313,7 +338,7 @@ private fun LazyListScope.topicTab(
             columns.orEmpty().map { it.article }.filter { a -> a.title.contains(topic, true) || a.summary?.contains(topic, true) == true }
         }
         val list = (matching + searched.orEmpty()).distinctBy { it.title.lowercase() }.take(30)
-        Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
+        Column(Modifier.widthIn(max = 1100.dp).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f)) { Rule(c, tr(R.string.op_on_topic, topic)) }
                 CardBell(c, topicKey(topic), followed = true, onFollow = {}) { actions.toggleMute(topicKey(topic)) }
@@ -321,13 +346,13 @@ private fun LazyListScope.topicTab(
             when {
                 searched == null && matching.isEmpty() -> Status(c, tr(R.string.op_loading))
                 list.isEmpty() -> Status(c, tr(R.string.op_nothing))
-                else -> list.forEach { ColumnCard(c, it, it.author?.let { a -> OpinionCatalog.authorKey(a) in authors.map(OpinionCatalog::authorKey) } == true, actions) }
+                else -> { val keys = authors.map(OpinionCatalog::authorKey).toSet(); pageModules(list).forEach { ModuleView(c, it, keys, actions) } }
             }
         }
     }
     item("t-posts") {
         val posts by produceState<List<SocialPost>?>(null, topic, appLanguage, refresh) { value = source.about(topic, appLanguage, force = refresh > 0) }
-        Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
+        Column(Modifier.widthIn(max = 1100.dp).fillMaxWidth()) {
             Rule(c, tr(R.string.op_conversation))
             when {
                 posts == null -> Status(c, tr(R.string.op_loading))
@@ -340,10 +365,386 @@ private fun LazyListScope.topicTab(
 
 private fun LazyListScope.columnItems(c: OpEdPalette, prefix: String, list: List<Article>, authors: Set<String>, actions: OpinionActions) {
     val keys = authors.map(OpinionCatalog::authorKey).toSet()
-    items(list.take(60), key = { prefix + it.id }) { a ->
-        Box(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
-            ColumnCard(c, a, a.author?.let { OpinionCatalog.authorKey(it) in keys } == true, actions)
+    val mods = pageModules(list.take(60))
+    items(mods.size, key = { i -> prefix + "mod-" + mods[i].stories.joinToString("|") { it.id } }) { i ->
+        Box(Modifier.widthIn(max = 1100.dp).fillMaxWidth()) { ModuleView(c, mods[i], keys, actions) }
+    }
+}
+
+/** One block of the page: a ruled, square box holding one to three stories in a fixed arrangement. */
+private enum class ModuleKind { LEAD, THREE, PAIR, FEATURE, QUOTES }
+private class PageModule(val kind: ModuleKind, val stories: List<Article>)
+
+/**
+ * Lays the stories out the way a comment page is made up: a lead with a side column, three
+ * columns across, a photo feature, a box of pull-quotes, and round again. Leftovers at the
+ * end go into the smaller blocks.
+ */
+private fun pageModules(list: List<Article>): List<PageModule> {
+    val out = mutableListOf<PageModule>()
+    if (list.isEmpty()) return out
+    // The front always opens with the lead column (with its side column when there are stories for it).
+    val lead = minOf(3, list.size)
+    out += PageModule(ModuleKind.LEAD, list.subList(0, lead))
+    val cycle = listOf(
+        ModuleKind.PAIR to 2, ModuleKind.PAIR to 2, ModuleKind.THREE to 3, ModuleKind.FEATURE to 1,
+        ModuleKind.PAIR to 2, ModuleKind.QUOTES to 2, ModuleKind.THREE to 3, ModuleKind.PAIR to 2,
+    )
+    var i = lead
+    var k = 0
+    while (i < list.size) {
+        val (kind, n) = cycle[k % cycle.size]
+        val take = minOf(n, list.size - i)
+        val chosen = list.subList(i, i + take)
+        out += when {
+            take == 1 -> PageModule(ModuleKind.FEATURE, chosen)
+            take == 2 && kind == ModuleKind.THREE -> PageModule(ModuleKind.PAIR, chosen)
+            else -> PageModule(kind, chosen)
         }
+        i += take; k++
+    }
+    return out
+}
+
+@Composable
+private fun ModuleView(c: OpEdPalette, m: PageModule, followedKeys: Set<String>, actions: OpinionActions) {
+    fun follows(a: Article) = a.author?.let { OpinionCatalog.authorKey(it) in followedKeys } == true
+    // A square box: heavy rule on top, hairlines round the rest, column rules between cells.
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 14.dp)) {
+        val wide = maxWidth >= 600.dp
+        Column(Modifier.fillMaxWidth().border(1.dp, c.rule)) {
+            Box(Modifier.fillMaxWidth().height(3.dp).background(c.text))
+            val st = m.stories
+            when (m.kind) {
+                ModuleKind.LEAD -> if (st.size == 1) Box(Modifier.padding(14.dp)) { StoryLead(c, st[0], follows(st[0]), actions) }
+                else if (wide) Cells {
+                    Cell(c, 0, Modifier.weight(2f)) { StoryLead(c, st[0], follows(st[0]), actions) }
+                    Column(Modifier.weight(1f).fillMaxHeight().drawBehind { drawLine(c.rule, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(0f, size.height), 1.dp.toPx()) }) {
+                        st.drop(1).forEachIndexed { j, a ->
+                            if (j > 0) HRule(c)
+                            // Each brief takes its share of the column; the article's text fills what's left.
+                            Box(Modifier.weight(1f).fillMaxWidth().padding(14.dp)) { StoryBrief(c, a, follows(a), actions, photo = true) }
+                        }
+                    }
+                } else Column {
+                    Box(Modifier.padding(14.dp)) { StoryLead(c, st[0], follows(st[0]), actions) }
+                    if (st.size > 1) {
+                        HRule(c)
+                        Cells { st.drop(1).forEachIndexed { j, a -> Cell(c, j, Modifier.weight(1f)) { StoryColumn(c, a, follows(a), actions) } } }
+                    }
+                }
+                ModuleKind.THREE -> if (wide || st.size < 3) Cells {
+                    st.forEachIndexed { j, a -> Cell(c, j, Modifier.weight(1f)) { StoryColumn(c, a, follows(a), actions) } }
+                } else Column {
+                    Cells { st.take(2).forEachIndexed { j, a -> Cell(c, j, Modifier.weight(1f)) { StoryColumn(c, a, follows(a), actions) } } }
+                    HRule(c)
+                    Box(Modifier.padding(14.dp)) { StoryBrief(c, st[2], follows(st[2]), actions, photo = true) }
+                }
+                // Two briefs side by side, photo to the right of each headline (one under the other on a phone).
+                ModuleKind.PAIR -> if (wide) Cells {
+                    st.forEachIndexed { j, a -> Cell(c, j, Modifier.weight(1f)) { StoryBrief(c, a, follows(a), actions, photo = true, big = true) } }
+                } else Column {
+                    st.forEachIndexed { j, a -> if (j > 0) HRule(c); Box(Modifier.padding(14.dp)) { StoryBrief(c, a, follows(a), actions, photo = true) } }
+                }
+                ModuleKind.FEATURE -> Box(Modifier.padding(14.dp)) { StoryFeature(c, st[0], follows(st[0]), actions, sideBySide = wide) }
+                ModuleKind.QUOTES -> Cells { st.forEachIndexed { j, a -> Cell(c, j, Modifier.weight(1f)) { StoryQuote(c, a, follows(a), actions) } } }
+            }
+        }
+    }
+}
+
+/** Cells side by side, all as tall as the tallest. */
+@Composable
+private fun Cells(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) =
+    Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Max), content = content)
+
+/** One cell of a box; every cell after the first draws the column rule down its leading edge. */
+@Composable
+private fun Cell(c: OpEdPalette, index: Int, modifier: Modifier, content: @Composable () -> Unit) {
+    Box(
+        modifier.fillMaxHeight()
+            .drawBehind { if (index > 0) drawLine(c.rule, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(0f, size.height), 1.dp.toPx()) }
+            .padding(14.dp),
+    ) { content() }
+}
+
+@Composable
+private fun HRule(c: OpEdPalette) = Box(Modifier.fillMaxWidth().height(1.dp).background(c.rule))
+
+@Composable
+private fun Kicker(c: OpEdPalette, text: String) =
+    Text(text.uppercase(), style = mono(9.5.sp, FontWeight.Bold, 0.16.em), color = c.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+/** "By NAME" over "time · Follow · bell": the name is never squeezed by the buttons. */
+@Composable
+private fun SmallByline(c: OpEdPalette, a: Article, followed: Boolean, actions: OpinionActions) {
+    Column(Modifier.fillMaxWidth()) {
+        a.author?.let { Text(tr(R.string.op_by, it).uppercase(), style = mono(9.5.sp, FontWeight.SemiBold, 0.08.em), color = c.text, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+        Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(NewsProcessor.formatRelativeTime(a.publishedAt), style = mono(9.5.sp, tracking = 0.04.em), color = c.dim, maxLines = 1, modifier = Modifier.weight(1f))
+            a.author?.let { name ->
+                FollowChip(c, followed) { actions.toggleAuthor(name) }
+                CardBell(c, writerKey(name), followed, onFollow = { actions.toggleAuthor(name) }) { actions.toggleMute(writerKey(name)) }
+            }
+        }
+    }
+}
+
+/**
+ * Fills the space a short story leaves in its box with the article's opening text (as many
+ * whole lines as fit, ending "…"). It never makes the box taller: it reports no height of its
+ * own, so the row is as tall as its longest story and the shorter ones are filled out.
+ */
+@Composable
+private fun FillText(c: OpEdPalette, a: Article, modifier: Modifier, actions: OpinionActions) {
+    val loader = LocalArticleExcerpt.current
+    // null = still reading the article; "" = nothing readable found.
+    val text by produceState<String?>(if (loader == null) "" else null, a.id) {
+        value = loader?.let { runCatching { it(a) }.getOrNull() }
+            ?.let { t -> a.summary?.trim()?.takeIf { it.isNotEmpty() && t.startsWith(it) }?.let { t.removePrefix(it).trim() } ?: t }
+            ?.replace("\n", " ")
+            ?.takeIf { it.length > 40 && it != a.summary && it != a.title }
+            .orEmpty()
+    }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    androidx.compose.ui.layout.Layout(
+        modifier = modifier.fillMaxWidth(),
+        content = {
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val linePx = with(density) { 20.sp.toPx() }
+                val gapPx = with(density) { 8.dp.toPx() }
+                val lines = if (constraints.hasBoundedHeight) ((constraints.maxHeight - gapPx) / linePx).toInt() else 0
+                val t = text
+                // Until (or unless) the article's own text is in, an index of more from the same
+                // pages fills the space; the text fades in over it when it arrives.
+                if (lines >= 2) androidx.compose.animation.Crossfade(!t.isNullOrEmpty(), label = "fill") { hasText ->
+                    if (hasText) Text(
+                        t.orEmpty(), style = serif(14.sp, FontWeight.Normal, lineHeight = 20.sp), color = c.text.copy(alpha = 0.72f),
+                        maxLines = lines, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp),
+                    ) else MoreFrom(c, a, constraints.maxHeight, actions)
+                }
+            }
+        },
+        measurePolicy = ZeroIntrinsicsPolicy,
+    )
+}
+
+/** "More from Washington Post Opinions": other headlines, as many as fit, each opening its story. */
+@Composable
+private fun MoreFrom(c: OpEdPalette, a: Article, @Suppress("UNUSED_PARAMETER") heightPx: Int, actions: OpinionActions) {
+    val all = LocalPageStories.current
+    val src = a.source ?: a.domain
+    val same = all.filter { it.id != a.id && (it.source ?: it.domain) == src }
+    val list = same.ifEmpty { all.filter { it.id != a.id } }
+    if (list.isEmpty()) return
+    // Places the rule, the label and then as many whole headlines as the space holds (none if
+    // not even one fits under the label).
+    androidx.compose.ui.layout.Layout(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), content = {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.rule))
+        Text(
+            (if (same.isNotEmpty() && src != null) tr(R.string.op_more_from, src) else tr(R.string.op_also_in)).uppercase(),
+            style = mono(9.sp, FontWeight.Bold, 0.16.em), color = c.dim, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
+        )
+        list.take(12).forEach { o ->
+            Row(Modifier.fillMaxWidth().clickable { actions.openArticle(o) }.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
+                Text("›", style = serif(15.sp, FontWeight.Bold, lineHeight = 19.sp), color = c.accent, modifier = Modifier.padding(end = 8.dp))
+                Text(o.title, style = serif(14.5.sp, FontWeight.SemiBold, lineHeight = 19.sp), color = c.text.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }) { measurables, constraints ->
+        val loose = constraints.copy(minHeight = 0, maxHeight = androidx.compose.ui.unit.Constraints.Infinity)
+        val placeables = measurables.map { it.measure(loose) }
+        var y = 0
+        var n = 0
+        for (pl in placeables) { if (y + pl.height > constraints.maxHeight) break; y += pl.height; n++ }
+        // Rule + label alone (no headline) would look like a stray caption: show nothing then.
+        if (n < 3) n = 0
+        layout(constraints.maxWidth, if (n == 0) 0 else y) {
+            var yy = 0
+            placeables.take(n).forEach { it.place(0, yy); yy += it.height }
+        }
+    }
+}
+/** Takes the space it's given but never asks for any: rows size to their real content. */
+private object ZeroIntrinsicsPolicy : androidx.compose.ui.layout.MeasurePolicy {
+    override fun androidx.compose.ui.layout.MeasureScope.measure(
+        measurables: List<androidx.compose.ui.layout.Measurable>, constraints: androidx.compose.ui.unit.Constraints,
+    ): androidx.compose.ui.layout.MeasureResult {
+        val h = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
+        val placeables = measurables.map { it.measure(constraints.copy(minHeight = 0, maxHeight = h)) }
+        return layout(constraints.maxWidth, maxOf(constraints.minHeight, h)) { placeables.forEach { it.place(0, 0) } }
+    }
+    override fun androidx.compose.ui.layout.IntrinsicMeasureScope.minIntrinsicHeight(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, width: Int) = 0
+    override fun androidx.compose.ui.layout.IntrinsicMeasureScope.maxIntrinsicHeight(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, width: Int) = 0
+    override fun androidx.compose.ui.layout.IntrinsicMeasureScope.minIntrinsicWidth(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, height: Int) = 0
+    override fun androidx.compose.ui.layout.IntrinsicMeasureScope.maxIntrinsicWidth(measurables: List<androidx.compose.ui.layout.IntrinsicMeasurable>, height: Int) = 0
+}
+
+/** Newsprint photos: colour held back, so the page reads like paper. */
+private val Newsprint = androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0.25f) })
+
+/**
+ * A story's photo, sharp: the image service's large size where it has one; otherwise (feeds
+ * often carry a ~140 px signed thumbnail) the publisher page's own full-size photo, swapped in
+ * when found. Small thumbnails ([large] = false) skip the page lookup.
+ */
+@Composable
+private fun Photo(c: OpEdPalette, a: Article, modifier: Modifier, large: Boolean = true) {
+    val feed = a.imageUrl?.takeIf { it.startsWith("http") } ?: return
+    val upgraded = remember(feed) { news.openwire.domain.engine.ImageExtractor.highRes(feed) ?: feed }
+    val resolver = news.openwire.ui.home.LocalImageResolver.current
+    val page by produceState<String?>(null, feed, large) {
+        value = if (large && upgraded == feed && resolver != null)
+            runCatching { resolver.resolve(a.originalUrl ?: a.targetUrl) }.getOrNull()?.takeIf { it.startsWith("http") && it != feed }
+                ?.let { news.openwire.domain.engine.ImageExtractor.highRes(it) ?: it }
+        else null
+    }
+    var failed by remember(upgraded, page) { mutableStateOf(false) }
+    val model = when {
+        page != null && !failed -> page
+        upgraded != feed && !failed -> upgraded
+        else -> feed
+    }
+    coil.compose.AsyncImage(
+        coil.request.ImageRequest.Builder(LocalContext.current).data(model).crossfade(250).build(),
+        null, contentScale = ContentScale.Crop, colorFilter = Newsprint,
+        onError = { if (model != feed) failed = true },
+        modifier = modifier.background(c.surface).border(1.dp, c.rule),
+    )
+}
+
+@Composable
+private fun StoryLead(c: OpEdPalette, a: Article, followed: Boolean, actions: OpinionActions) {
+    Column(Modifier.fillMaxWidth().clickable { actions.openArticle(a) }) {
+        Kicker(c, tr(R.string.op_lead))
+        Spacer(Modifier.height(6.dp))
+        Text(a.title, style = serif(28.sp, FontWeight.Bold, lineHeight = 33.sp, tracking = (-0.01).em), color = c.text, maxLines = 5, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(8.dp))
+        Byline(c, a, followed, actions)
+        Photo(c, a, Modifier.padding(top = 10.dp).fillMaxWidth().height(210.dp))
+        a.summary?.takeIf { it.isNotBlank() && it != a.title }?.let { body ->
+            Spacer(Modifier.height(10.dp))
+            // A drop cap: the first letter set large in the accent, the paragraph beside it.
+            Row {
+                Text(body.first().uppercase(), style = serif(50.sp, FontWeight.Bold, lineHeight = 48.sp), color = c.accent, modifier = Modifier.padding(end = 8.dp))
+                Text(body.drop(1), style = serif(15.5.sp, FontWeight.Normal, lineHeight = 23.sp), color = c.text, maxLines = 6, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun StoryBrief(c: OpEdPalette, a: Article, followed: Boolean, actions: OpinionActions, photo: Boolean, big: Boolean = false) {
+    Column(Modifier.fillMaxSize().clickable { actions.openArticle(a) }) {
+        Kicker(c, (a.source ?: a.domain).orEmpty())
+        Spacer(Modifier.height(4.dp))
+        Row {
+            Text(
+                a.title, style = if (big) serif(21.sp, FontWeight.Bold, lineHeight = 27.sp) else serif(17.sp, FontWeight.Bold, lineHeight = 22.sp),
+                color = c.text, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+            )
+            if (photo && a.imageUrl != null) { Spacer(Modifier.width(12.dp)); Photo(c, a, Modifier.size(if (big) 96.dp else 64.dp), large = big) }
+        }
+        a.summary?.takeIf { it.isNotBlank() && it != a.title }?.let {
+            Spacer(Modifier.height(6.dp))
+            Text(it, style = serif(if (big) 15.sp else 13.5.sp, FontWeight.SemiBold, lineHeight = if (big) 21.sp else 19.sp), color = c.dim, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
+        // The article's own text runs on into any space left; bylines sit level along the bottom.
+        FillText(c, a, Modifier.weight(1f), actions)
+        Spacer(Modifier.height(10.dp))
+        SmallByline(c, a, followed, actions)
+    }
+}
+
+@Composable
+private fun StoryColumn(c: OpEdPalette, a: Article, followed: Boolean, actions: OpinionActions) {
+    Column(Modifier.fillMaxSize().clickable { actions.openArticle(a) }) {
+        Photo(c, a, Modifier.padding(bottom = 10.dp).fillMaxWidth().aspectRatio(4f / 3f))
+        Kicker(c, (a.source ?: a.domain).orEmpty())
+        Spacer(Modifier.height(4.dp))
+        Text(a.title, style = serif(18.sp, FontWeight.Bold, lineHeight = 23.sp), color = c.text, maxLines = 5, overflow = TextOverflow.Ellipsis)
+        a.summary?.takeIf { it.isNotBlank() && it != a.title }?.let {
+            Spacer(Modifier.height(6.dp))
+            Text(it, style = serif(13.5.sp, FontWeight.Normal, lineHeight = 19.sp), color = c.dim, maxLines = 5, overflow = TextOverflow.Ellipsis)
+        }
+        // The article's own text runs on into any space left; the byline sits on the box's bottom line.
+        FillText(c, a, Modifier.weight(1f), actions)
+        Spacer(Modifier.height(10.dp))
+        SmallByline(c, a, followed, actions)
+    }
+}
+
+@Composable
+private fun StoryFeature(c: OpEdPalette, a: Article, followed: Boolean, actions: OpinionActions, sideBySide: Boolean) {
+    val text: @Composable (Modifier) -> Unit = { m ->
+        Column(m) {
+            Kicker(c, (a.source ?: a.domain).orEmpty())
+            Spacer(Modifier.height(6.dp))
+            Text(a.title, style = serif(24.sp, FontWeight.Bold, lineHeight = 29.sp), color = c.text, maxLines = 5, overflow = TextOverflow.Ellipsis)
+            a.summary?.takeIf { it.isNotBlank() && it != a.title }?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = serif(15.sp, FontWeight.Normal, lineHeight = 22.sp), color = c.text.copy(alpha = 0.85f), maxLines = 6, overflow = TextOverflow.Ellipsis)
+            }
+            // Beside a photo, the article's text runs on to the photo's foot.
+            FillText(c, a, Modifier.weight(1f), actions)
+            Spacer(Modifier.height(10.dp))
+            SmallByline(c, a, followed, actions)
+        }
+    }
+    if (sideBySide && a.imageUrl != null) {
+        Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min).clickable { actions.openArticle(a) }) {
+            Photo(c, a, Modifier.weight(1f).fillMaxHeight().heightIn(min = 200.dp))
+            Spacer(Modifier.width(16.dp))
+            text(Modifier.weight(1f).fillMaxHeight())
+        }
+    } else Column(Modifier.fillMaxWidth().clickable { actions.openArticle(a) }) {
+        Photo(c, a, Modifier.padding(bottom = 10.dp).fillMaxWidth().height(190.dp))
+        text(Modifier.fillMaxWidth())
+    }
+}
+
+/** A pull-quote box: the headline set as a quotation, attributed. */
+@Composable
+private fun StoryQuote(c: OpEdPalette, a: Article, followed: Boolean, actions: OpinionActions) {
+    Column(Modifier.fillMaxSize().clickable { actions.openArticle(a) }) {
+        Text("“", style = serif(54.sp, FontWeight.Bold, lineHeight = 54.sp), color = c.accent, modifier = Modifier.height(34.dp))
+        Text(a.title, style = serif(19.sp, FontWeight.SemiBold, lineHeight = 25.sp).copy(fontStyle = FontStyle.Italic), color = c.text, maxLines = 6, overflow = TextOverflow.Ellipsis)
+        FillText(c, a, Modifier.weight(1f), actions)
+        Spacer(Modifier.height(10.dp))
+        Box(Modifier.width(36.dp).height(2.dp).background(c.accent))
+        Spacer(Modifier.height(6.dp))
+        Text((a.source ?: a.domain).orEmpty().uppercase(), style = mono(9.5.sp, FontWeight.Bold, 0.14.em), color = c.dim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        SmallByline(c, a, followed, actions)
+    }
+}
+
+/** "By NAME · Source" with Follow and the bell. */
+@Composable
+private fun Byline(c: OpEdPalette, a: Article, followed: Boolean, actions: OpinionActions) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        SourceLogo(a.domain, a.source, size = 16.dp)
+        Spacer(Modifier.width(6.dp))
+        Text(
+            (a.author?.let { tr(R.string.op_by, it) } ?: a.source.orEmpty()).uppercase(),
+            style = mono(10.5.sp, FontWeight.SemiBold, 0.1.em), color = c.text,
+            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+        )
+        a.author?.let { name ->
+            Spacer(Modifier.width(8.dp))
+            FollowChip(c, followed) { actions.toggleAuthor(name) }
+            CardBell(c, writerKey(name), followed, onFollow = { actions.toggleAuthor(name) }) { actions.toggleMute(writerKey(name)) }
+        }
+    }
+}
+
+/** A newspaper's heavy-then-hairline rule. */
+@Composable
+private fun DoubleRule(c: OpEdPalette) {
+    Column(Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().height(3.dp).background(c.text))
+        Spacer(Modifier.height(2.dp))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.text))
     }
 }
 
@@ -352,42 +753,62 @@ private fun Header(c: OpEdPalette, refreshing: Boolean, onDiscover: () -> Unit, 
     // Spins while the pages reload.
     val spin = androidx.compose.animation.core.rememberInfiniteTransition(label = "spin")
     val angle by spin.animateFloat(0f, 360f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.LinearEasing)), label = "angle")
-    Column(Modifier.padding(bottom = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(tr(R.string.op_kicker), style = mono(11.sp, FontWeight.SemiBold, 0.2.em), color = c.accent, modifier = Modifier.weight(1f))
+    val today = remember {
+        java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.FULL).format(java.time.LocalDate.now())
+    }
+    Column(Modifier.padding(bottom = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        // The ears: refresh on one side, discover on the other, the edition line between.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 Icons.Filled.Refresh, tr(R.string.action_refresh), tint = if (refreshing) c.accent else c.dim,
-                modifier = Modifier.clip(CircleShape).clickable(enabled = !refreshing, onClick = onRefresh).padding(8.dp).size(22.dp)
+                modifier = Modifier.clip(CircleShape).clickable(enabled = !refreshing, onClick = onRefresh).padding(8.dp).size(20.dp)
                     .graphicsLayer { rotationZ = if (refreshing) angle else 0f },
             )
-            // Writers, columns and voices to follow.
+            Text(
+                tr(R.string.op_edition).uppercase(), style = mono(9.5.sp, FontWeight.SemiBold, 0.24.em), color = c.dim,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 1, modifier = Modifier.weight(1f),
+            )
             Icon(
                 Icons.Filled.Add, tr(R.string.op_discover_title), tint = c.onAccent,
-                modifier = Modifier.padding(start = 4.dp).clip(CircleShape).background(c.accent).clickable(onClick = onDiscover).padding(5.dp).size(18.dp),
+                modifier = Modifier.padding(4.dp).clip(CircleShape).background(c.accent).clickable(onClick = onDiscover).padding(5.dp).size(18.dp),
             )
         }
-        Spacer(Modifier.height(6.dp))
-        Box(Modifier.fillMaxWidth().height(3.dp).background(c.text))
+        Spacer(Modifier.height(4.dp))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.text))
         Spacer(Modifier.height(10.dp))
-        Text(tr(R.string.op_title), style = serif(40.sp, FontWeight.Bold, lineHeight = 44.sp), color = c.text)
-        Text(tr(R.string.op_sub), style = serif(16.sp, lineHeight = 22.sp).copy(fontStyle = FontStyle.Italic), color = c.dim)
-        Spacer(Modifier.height(12.dp))
-        Box(Modifier.fillMaxWidth().height(1.dp).background(c.rule))
+        // The nameplate.
+        Text(
+            tr(R.string.op_title), style = serif(42.sp, FontWeight.Black, lineHeight = 46.sp, tracking = (-0.02).em), color = c.text,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+        DoubleRule(c)
+        // The dateline strip between the rules.
+        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(today.uppercase(), style = mono(9.5.sp, FontWeight.SemiBold, 0.12.em), color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(tr(R.string.op_kicker), style = mono(9.5.sp, FontWeight.Bold, 0.12.em), color = c.accent, maxLines = 1)
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.text))
+        Spacer(Modifier.height(10.dp))
+        Text(
+            tr(R.string.op_sub), style = serif(15.sp, lineHeight = 21.sp).copy(fontStyle = FontStyle.Italic), color = c.dim,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
 @Composable
 private fun TabChip(c: OpEdPalette, label: String, on: Boolean, onRemove: (() -> Unit)? = null, onClick: () -> Unit) {
-    Row(
-        Modifier.clip(CircleShape).background(if (on) c.text else Color.Transparent).border(1.dp, if (on) c.text else c.rule, CircleShape)
-            .clickable(onClick = onClick).padding(start = 14.dp, end = if (onRemove != null) 6.dp else 14.dp, top = 7.dp, bottom = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = sans(13.sp, if (on) FontWeight.SemiBold else FontWeight.Medium), color = if (on) c.bg else c.text, maxLines = 1)
-        if (onRemove != null) Icon(
-            Icons.Filled.Close, tr(R.string.op_remove_tab), tint = if (on) c.bg else c.dim,
-            modifier = Modifier.padding(start = 4.dp).clip(CircleShape).clickable(onClick = onRemove).padding(2.dp).size(14.dp),
-        )
+    // A section name on the paper's index strip: small capitals, the open one underlined in the accent.
+    Column(Modifier.clickable(onClick = onClick).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(Modifier.padding(top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(label.uppercase(), style = mono(11.sp, if (on) FontWeight.Bold else FontWeight.Medium, 0.14.em), color = if (on) c.text else c.dim, maxLines = 1)
+            if (onRemove != null) Icon(
+                Icons.Filled.Close, tr(R.string.op_remove_tab), tint = c.dim,
+                modifier = Modifier.padding(start = 4.dp).clip(CircleShape).clickable(onClick = onRemove).padding(2.dp).size(13.dp),
+            )
+        }
+        Box(Modifier.height(3.dp).fillMaxWidth().background(if (on) c.accent else Color.Transparent))
     }
 }
 
@@ -439,9 +860,13 @@ private fun SearchField(c: OpEdPalette, text: String, onChange: (String) -> Unit
 
 @Composable
 private fun Rule(c: OpEdPalette, title: String) {
-    Column(Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(top = 18.dp, bottom = 6.dp)) {
-        Text(title.uppercase(), style = mono(11.sp, FontWeight.SemiBold, 0.16.em), color = c.accent)
-        Spacer(Modifier.height(6.dp))
+    // A section head: heavy rule, the name centred in small capitals, hairline beneath.
+    Column(Modifier.widthIn(max = 1100.dp).fillMaxWidth().padding(top = 20.dp, bottom = 4.dp)) {
+        Box(Modifier.fillMaxWidth().height(3.dp).background(c.text))
+        Text(
+            title.uppercase(), style = serif(13.sp, FontWeight.Bold, tracking = 0.18.em), color = c.text,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+        )
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.rule))
     }
 }
@@ -462,58 +887,55 @@ private fun FollowChip(c: OpEdPalette, followed: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ColumnCard(c: OpEdPalette, a: Article, followed: Boolean, actions: OpinionActions) {
-    Column(Modifier.fillMaxWidth().clickable { actions.openArticle(a) }.padding(vertical = 16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("“", style = serif(30.sp, FontWeight.Bold, lineHeight = 24.sp), color = c.accent)
-            Spacer(Modifier.width(6.dp))
-            Text(
-                a.author ?: a.source.orEmpty(),
-                style = serif(15.sp, FontWeight.SemiBold).copy(fontStyle = FontStyle.Italic), color = c.text,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
-            )
-            a.author?.let { name -> Spacer(Modifier.width(10.dp)); FollowChip(c, followed) { actions.toggleAuthor(name) } }
-        }
-        Spacer(Modifier.height(8.dp))
+private fun ColumnCard(c: OpEdPalette, a: Article, followed: Boolean, actions: OpinionActions, rule: Boolean = true) {
+    // A brief: kicker, headline, a line of standfirst, a small newsprint photo, the byline.
+    Column(Modifier.fillMaxWidth().clickable { actions.openArticle(a) }.padding(vertical = 14.dp)) {
         Row {
             Column(Modifier.weight(1f)) {
-                Text(a.title, style = serif(21.sp, FontWeight.Bold, lineHeight = 27.sp), color = c.text, maxLines = 4, overflow = TextOverflow.Ellipsis)
-                a.summary?.takeIf { it.isNotBlank() && it != a.title }?.let {
-                    Spacer(Modifier.height(6.dp))
-                    Text(it, style = sans(13.5.sp, lineHeight = 20.sp), color = c.dim, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            a.imageUrl?.let { img ->
-                Spacer(Modifier.width(14.dp))
-                coil.compose.AsyncImage(
-                    img, null, contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(84.dp).clip(RoundedCornerShape(6.dp)).background(c.surface),
+                Text(
+                    (a.source ?: a.domain).orEmpty().uppercase(), style = mono(9.5.sp, FontWeight.Bold, 0.16.em), color = c.accent,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
+                Spacer(Modifier.height(4.dp))
+                Text(a.title, style = serif(19.sp, FontWeight.Bold, lineHeight = 24.sp), color = c.text, maxLines = 4, overflow = TextOverflow.Ellipsis)
             }
+            if (a.imageUrl != null) {
+                Spacer(Modifier.width(12.dp))
+                Photo(c, a, Modifier.padding(top = 2.dp).size(78.dp), large = false)
+            }
+        }
+        a.summary?.takeIf { it.isNotBlank() && it != a.title }?.let {
+            Spacer(Modifier.height(6.dp))
+            Text(it, style = serif(14.sp, lineHeight = 20.sp), color = c.dim, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SourceLogo(a.domain, a.source, size = 16.dp)
-            Spacer(Modifier.width(6.dp))
             Text(
-                listOfNotNull(a.source, NewsProcessor.formatRelativeTime(a.publishedAt).ifBlank { null }).joinToString("  ·  "),
-                style = mono(10.sp, tracking = 0.04.em), color = c.dim, maxLines = 1,
+                (a.author?.let { tr(R.string.op_by, it) } ?: "").uppercase(),
+                style = mono(9.5.sp, FontWeight.SemiBold, 0.08.em), color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
+            Text(
+                (if (a.author != null) "  ·  " else "") + NewsProcessor.formatRelativeTime(a.publishedAt),
+                style = mono(9.5.sp, tracking = 0.04.em), color = c.dim, maxLines = 1,
+            )
+            Spacer(Modifier.weight(1f))
             a.author?.let { name ->
-                Spacer(Modifier.width(4.dp))
+                FollowChip(c, followed) { actions.toggleAuthor(name) }
                 CardBell(c, writerKey(name), followed, onFollow = { actions.toggleAuthor(name) }) { actions.toggleMute(writerKey(name)) }
             }
         }
     }
-    Box(Modifier.fillMaxWidth().height(1.dp).background(c.rule))
+    if (rule) Box(Modifier.fillMaxWidth().height(1.dp).background(c.rule))
 }
 
 @Composable
 private fun PostCard(c: OpEdPalette, p: SocialPost, followed: Boolean, actions: OpinionActions) {
     val context = LocalContext.current
     Column(
-        Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(12.dp)).background(c.surface)
-            .border(1.dp, c.rule, RoundedCornerShape(12.dp))
+        // Letters to the editor: a ruled box, square like a page, not an app card.
+        Modifier.fillMaxWidth().padding(vertical = 8.dp).background(c.surface)
+            .border(1.dp, c.rule)
             .clickable { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(p.url))) } }
             .padding(14.dp),
     ) {
@@ -536,7 +958,7 @@ private fun PostCard(c: OpEdPalette, p: SocialPost, followed: Boolean, actions: 
         if (link != null) {
             Spacer(Modifier.height(10.dp))
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).border(1.dp, c.rule, RoundedCornerShape(8.dp))
+                Modifier.fillMaxWidth().border(1.dp, c.rule)
                     .clickable { actions.openLink(link) }.padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -568,7 +990,7 @@ private fun PostCard(c: OpEdPalette, p: SocialPost, followed: Boolean, actions: 
 @Composable
 private fun VoiceRow(c: OpEdPalette, v: Voice, followed: Boolean, onFollow: () -> Unit) {
     Row(
-        Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(vertical = 10.dp),
+        Modifier.widthIn(max = 1100.dp).fillMaxWidth().padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -609,7 +1031,7 @@ private fun columnists(columns: List<OpinionSource.Column>, appLanguage: String,
 
 @Composable
 private fun WriterRow(c: OpEdPalette, w: Writer, followed: Boolean, onFollow: () -> Unit) {
-    Row(Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.widthIn(max = 1100.dp).fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(38.dp).clip(CircleShape).background(c.accent), contentAlignment = Alignment.Center) {
             Text(w.name.trim().firstOrNull()?.uppercase() ?: "•", style = serif(17.sp, FontWeight.Bold), color = c.onAccent)
         }
@@ -635,7 +1057,7 @@ private fun LazyListScope.searchResults(
     val all = columns.orEmpty()
     val keys = authors.map(OpinionCatalog::authorKey).toSet()
     item("s-add") {
-        Row(Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.widthIn(max = 1100.dp).fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 tr(R.string.op_add_as_tab, q), style = sans(13.sp, FontWeight.SemiBold), color = c.onAccent,
                 modifier = Modifier.clip(CircleShape).background(c.accent).clickable { onAddTab(q) }.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -661,7 +1083,7 @@ private fun LazyListScope.searchResults(
             value = source.topicColumns(q, appLanguage)
         }
         val list = (local + searched.orEmpty()).distinctBy { it.title.lowercase() }.take(25)
-        Column(Modifier.widthIn(max = 760.dp).fillMaxWidth()) {
+        Column(Modifier.widthIn(max = 1100.dp).fillMaxWidth()) {
             Rule(c, tr(R.string.op_results_columns))
             if (list.isEmpty()) Status(c, if (searched == null) tr(R.string.op_searching) else tr(R.string.op_nothing))
             list.forEach { ColumnCard(c, it, it.author?.let { a -> OpinionCatalog.authorKey(a) in keys } == true, actions) }

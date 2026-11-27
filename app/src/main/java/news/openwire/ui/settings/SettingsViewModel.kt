@@ -174,6 +174,9 @@ class SettingsViewModel(
 
     // ---- Topics ----
 
+    /** The whole topic order at once (drag to reorder saves once, on release). */
+    fun setTopicOrder(ids: List<String>) = settingsRepo.update { s -> s.copy(topicOrder = ids) }
+
     fun moveTopic(id: String, up: Boolean) = settingsRepo.update { s ->
         s.copy(topicOrder = TopicRegistry.move(topicsFor(s).map { it.id }, id, up))
     }

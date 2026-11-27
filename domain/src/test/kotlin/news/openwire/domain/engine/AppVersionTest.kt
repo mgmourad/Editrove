@@ -62,5 +62,6 @@ class AppVersionTest {
         assertTrue(AppVersion.parse("0.9.3-beta.112426")!! > AppVersion.parse("0.9.2.1")!!)
         assertTrue(AppVersion.parse("0.9.4-beta.112626")!! > AppVersion.parse("0.9.3-beta.112426")!!)
         assertTrue(AppVersion.parse("0.9.4.1")!! > AppVersion.parse("0.9.4-beta.112626")!!)
+        assertTrue(AppVersion.parse("0.9.5")!! > AppVersion.parse("0.9.4.1")!!)
     }
 }

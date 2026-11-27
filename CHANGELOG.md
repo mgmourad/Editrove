@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Next
+### 0.9.5
 
 - Analysis & Opinion is laid out like a newspaper: a masthead with dateline, a section strip, and ruled square boxes (a lead column with a drop cap beside a side column, three columns across, a photo feature, pull-quote boxes), newsprint-toned photos, sharp (the publisher's full-size photo when the feed only has a thumbnail).
 - Audio briefing: a refresh button stops a playing or paused briefing, fetches the latest stories and says what changed; it never starts playing by itself.
@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Topics: dragging to reorder glides; neighbours slide out of the way and the row settles into place. "Edit Sources" no longer cut off.
 - Opinion page: always opens with the lead column; two-across briefs; short columns run on with the article's own text so no box is left half-empty. Page photos skip publisher-branded share cards (The Guardian's banner) for the clean photo.
 - Every reset (topics, sources, paywall rules, everything) asks first in a warning popup.
+- Topics: drag to reorder fixed — the order changes on screen as you drag (one row at a time, neighbours slide aside) and is saved once on release, instead of a save per step that made rows jump, overlap and flicker.
 - Opinion columns never leave a box half-empty: a short column runs on with several paragraphs of the article (read through archives when the site has a paywall), or, until that arrives or when the site can't be read, a "More from …" index of other headlines that fits the space exactly.
 - Settings buttons: the "(!)" text links are proper outlined buttons; Pause Alerts' "Paused until" line lays out on one row; Reset Everything is a red Danger Zone button with a warning popup.
 

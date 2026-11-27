@@ -559,19 +559,49 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
         val rowHeights = remember { androidx.compose.runtime.mutableStateMapOf<String, Int>() }
         val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
         val scope = rememberCoroutineScope()
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val gapPx = with(density) { TopicGap.toPx() }
         // On release the lifted row glides into its slot instead of snapping.
         val settle = remember { androidx.compose.animation.core.Animatable(0f) }
         var settlingId by remember { mutableStateOf<String?>(null) }
+        // The order on screen. While dragging it changes here, in the same frame as the drag (no
+        // round trip through saved settings); it's saved once, on release.
+        val order = remember { androidx.compose.runtime.mutableStateListOf<String>() }
+        var saving by remember { mutableStateOf<List<String>?>(null) }
+        val ids = topics.map { it.id }
+        if (dragging == null && (saving == null || saving == ids)) {
+            if (saving == ids) saving = null
+            if (order.toList() != ids) { order.clear(); order.addAll(ids) }
+        }
+        val byId = topics.associateBy { it.id }
+        // Neighbours that make way slide from where they were to their new slot.
+        val shifts = remember { mutableMapOf<String, androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>>() }
+        fun shiftOf(id: String) = shifts.getOrPut(id) { androidx.compose.animation.core.Animatable(0f) }
+        fun makeWay(id: String, from: Float) {
+            val a = shiftOf(id)
+            scope.launch {
+                a.snapTo(a.value + from)
+                a.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.82f, stiffness = 380f))
+            }
+        }
+        fun endDrag(id: String) {
+            val from = dragOffset
+            settlingId = id; dragging = null; dragOffset = 0f
+            if (order.toList() != ids) { saving = order.toList(); vm.setTopicOrder(order.toList()) }
+            scope.launch {
+                settle.snapTo(from)
+                settle.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.72f, stiffness = 380f))
+                if (settlingId == id) settlingId = null
+            }
+        }
         Section {
-            topics.forEachIndexed { i, t ->
+          Column(verticalArrangement = Arrangement.spacedBy(TopicGap)) {
+            order.toList().mapNotNull { byId[it] }.forEach { t ->
                 androidx.compose.runtime.key(t.id) {
-                    if (i > 0) Divider()
                     val lifted = dragging == t.id
+                    val shift = shiftOf(t.id)
                     val elevation by androidx.compose.animation.core.animateDpAsState(if (lifted) 12.dp else 0.dp, androidx.compose.animation.core.spring(stiffness = 500f), label = "lift")
                     val lift by androidx.compose.animation.core.animateFloatAsState(if (lifted) 1.03f else 1f, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 500f), label = "liftScale")
-                    // A neighbour that swaps places slides to its new slot (from where it was) rather than jumping.
-                    val shift = remember { androidx.compose.animation.core.Animatable(0f) }
-                    var lastY by remember { mutableStateOf<Float?>(null) }
                     // Moved outside the swipe row's clip, so the lifted row can float over its neighbours.
                     Box(Modifier
                         .zIndex(if (lifted || settlingId == t.id) 1f else 0f)
@@ -580,17 +610,7 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
                             scaleX = lift; scaleY = lift
                         }
                         .shadow(elevation, RoundedCornerShape(14.dp))
-                        .onPlaced { c ->
-                        val y = c.positionInParent().y
-                        val before = lastY
-                        lastY = y
-                        if (before != null && before != y && dragging != t.id && settlingId != t.id) {
-                            scope.launch {
-                                shift.snapTo(shift.value + (before - y))
-                                shift.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 420f))
-                            }
-                        }
-                    }) {
+                        .onGloballyPositioned { rowHeights[t.id] = it.size.height }) {
                     // Swipe right: rename / edit (your topics). Swipe left: delete (yours) or hide / show.
                     SwipeActions(
                         // Built-in topics are never renamed or deleted: their sources can be edited.
@@ -603,7 +623,6 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
                     ) {
                     Row(
                         Modifier.fillMaxWidth()
-                            .onGloballyPositioned { rowHeights[t.id] = it.size.height }
                             .background(if (lifted || settlingId == t.id) Glass.deviceBg else Color.Transparent, RoundedCornerShape(14.dp))
                             .semantics {
                                 customActions = listOf(
@@ -620,32 +639,39 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
                             modifier = Modifier.size(28.dp).padding(2.dp).pointerInput(t.id) {
                                 detectDragGestures(
                                     onDragStart = { dragging = t.id; dragOffset = 0f; haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) },
-                                    onDragEnd = {
-                                        val from = dragOffset
-                                        settlingId = t.id; dragging = null; dragOffset = 0f
-                                        scope.launch {
-                                            settle.snapTo(from)
-                                            settle.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.72f, stiffness = 380f))
-                                            if (settlingId == t.id) settlingId = null
-                                        }
-                                    },
-                                    onDragCancel = {
-                                        val from = dragOffset
-                                        settlingId = t.id; dragging = null; dragOffset = 0f
-                                        scope.launch { settle.snapTo(from); settle.animateTo(0f, androidx.compose.animation.core.spring(stiffness = 400f)); if (settlingId == t.id) settlingId = null }
-                                    },
+                                    onDragEnd = { endDrag(t.id) },
+                                    onDragCancel = { endDrag(t.id) },
                                     onDrag = { change, amount ->
                                         change.consume()
                                         dragOffset += amount.y
-                                        val list = vm.allTopics.value
-                                        val idx = list.indexOfFirst { it.id == t.id }
-                                        val h = (rowHeights[t.id] ?: 120).toFloat()
-                                        if (dragOffset > h / 2 && idx < list.lastIndex) {
-                                            vm.moveTopic(t.id, up = false); dragOffset -= (rowHeights[list[idx + 1].id] ?: h.toInt())
-                                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                        } else if (dragOffset < -h / 2 && idx > 0) {
-                                            vm.moveTopic(t.id, up = true); dragOffset += (rowHeights[list[idx - 1].id] ?: h.toInt())
-                                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                        val me = (rowHeights[t.id] ?: 120).toFloat() + gapPx
+                                        // Past the middle of the neighbour: trade places with it, one at a time.
+                                        while (true) {
+                                            val idx = order.indexOf(t.id)
+                                            if (idx < 0) break
+                                            if (idx < order.lastIndex) {
+                                                val next = order[idx + 1]
+                                                val step = (rowHeights[next] ?: 120).toFloat() + gapPx
+                                                if (dragOffset > step / 2) {
+                                                    order.removeAt(idx); order.add(idx + 1, t.id)
+                                                    dragOffset -= step
+                                                    makeWay(next, me) // it moved up by my height: start where it was
+                                                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                                    continue
+                                                }
+                                            }
+                                            if (idx > 0) {
+                                                val prev = order[idx - 1]
+                                                val step = (rowHeights[prev] ?: 120).toFloat() + gapPx
+                                                if (dragOffset < -step / 2) {
+                                                    order.removeAt(idx); order.add(idx - 1, t.id)
+                                                    dragOffset += step
+                                                    makeWay(prev, -me)
+                                                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                                    continue
+                                                }
+                                            }
+                                            break
                                         }
                                     },
                                 )
@@ -676,6 +702,7 @@ private fun LazyListScope.topicsPage(vm: SettingsViewModel, onAdd: () -> Unit, o
                     }
                 }
             }
+          }
         }
     }
     item {
@@ -966,6 +993,9 @@ private fun SwipeActions(start: List<SwipeAction>, end: List<SwipeAction>, conte
         ) { content() }
     }
 }
+
+/** Space between topic rows (each row is its own rounded card). */
+private val TopicGap = 6.dp
 
 /** Wide enough for a two-word label ("Edit Sources") in every language we ship. */
 private val SwipeActionWidth = 100.dp

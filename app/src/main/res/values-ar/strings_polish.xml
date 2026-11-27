@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="briefing_refresh">تحديث الموجز</string>
+    <string name="briefing_refresh_one">تم التحديث: خبر جديد واحد. اضغط تشغيل عندما تكون جاهزًا.</string>
+    <string name="briefing_refresh_n">تم التحديث: %1$d أخبار جديدة. اضغط تشغيل عندما تكون جاهزًا.</string>
+    <string name="briefing_refresh_same">محدّث: لا أخبار جديدة منذ آخر تحديث.</string>
+    <string name="briefing_refresh_failed">تعذّر التحديث. تحقق من اتصالك وحاول مرة أخرى.</string>
+    <string name="danger_zone">منطقة الخطر</string>
+    <string name="reset_everything_title">إعادة ضبط كل شيء؟</string>
+    <string name="reset_everything_undo">لا يمكن التراجع عن ذلك. صدّر إعداداتك أولًا إن كنت قد تحتاجها لاحقًا.</string>
+    <string name="reset_everything_confirm">نعم، أعد ضبط كل شيء</string>
+    <string name="reset_everything_done">عاد Editrove إلى إعداداته الافتراضية</string>
+    <string name="op_edition">صفحات الرأي في Editrove</string>
+    <string name="op_lead">مقال الصدارة</string>
+    <string name="op_by">بقلم %1$s</string>
+</resources>

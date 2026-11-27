@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="briefing_refresh">Actualiser le briefing</string>
+    <string name="briefing_refresh_one">Mis à jour : 1 nouvel article. Appuyez sur Lecture quand vous êtes prêt.</string>
+    <string name="briefing_refresh_n">Mis à jour : %1$d nouveaux articles. Appuyez sur Lecture quand vous êtes prêt.</string>
+    <string name="briefing_refresh_same">À jour : aucun nouvel article depuis la dernière mise à jour.</string>
+    <string name="briefing_refresh_failed">Échec de l\'actualisation. Vérifiez votre connexion et réessayez.</string>
+    <string name="danger_zone">Zone de danger</string>
+    <string name="reset_everything_title">Tout réinitialiser ?</string>
+    <string name="reset_everything_undo">Action irréversible. Exportez d\'abord vos réglages si vous voulez les retrouver.</string>
+    <string name="reset_everything_confirm">Oui, tout réinitialiser</string>
+    <string name="reset_everything_done">Editrove a retrouvé ses réglages par défaut</string>
+    <string name="op_edition">Les pages Débats d\'Editrove</string>
+    <string name="op_lead">La tribune à la une</string>
+    <string name="op_by">Par %1$s</string>
+</resources>

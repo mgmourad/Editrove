@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="briefing_refresh">Actualizar resumen</string>
+    <string name="briefing_refresh_one">Actualizado: 1 noticia nueva. Pulsa Reproducir cuando quieras.</string>
+    <string name="briefing_refresh_n">Actualizado: %1$d noticias nuevas. Pulsa Reproducir cuando quieras.</string>
+    <string name="briefing_refresh_same">Al día: no hay noticias nuevas desde la última actualización.</string>
+    <string name="briefing_refresh_failed">No se pudo actualizar. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="danger_zone">Zona de peligro</string>
+    <string name="reset_everything_title">¿Restablecer todo?</string>
+    <string name="reset_everything_undo">No se puede deshacer. Exporta antes tus ajustes si quieres recuperarlos.</string>
+    <string name="reset_everything_confirm">Sí, restablecer todo</string>
+    <string name="reset_everything_done">Editrove ha vuelto a sus valores predeterminados</string>
+    <string name="op_edition">Las páginas de opinión de Editrove</string>
+    <string name="op_lead">La columna principal</string>
+    <string name="op_by">Por %1$s</string>
+</resources>

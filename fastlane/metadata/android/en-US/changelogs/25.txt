@@ -1,0 +1,9 @@
+Editrove 0.9.5.1 — Following, laid out like the paper
+• Analysis & Opinion is laid out like a real comment page: masthead and dateline, ruled boxes and columns, a lead column with a drop cap, pull-quotes. Short columns run on with the article's own text.
+• Sharper photos, without publishers' banners printed over them.
+• Audio briefing: a refresh button fetches the latest stories and tells you what changed; it never starts playing by itself.
+• Topics: drag to reorder now glides smoothly, one row at a time; "Edit Sources" is no longer cut off.
+• Unfolded: cards beside a wide card are as tall as it, so rows end level.
+• Settings: proper buttons instead of "(!)" links; every reset asks first, Reset Everything with a clear warning.
+• Fix: the Paused banner in Notifications lays out on one line.
+• Following: posts from the accounts you follow are set in the same ruled newspaper boxes, side by side, instead of app cards.

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.9.5.1
+
+- Analysis & Opinion › Following: posts from followed accounts are laid out in ruled newspaper boxes (two or three across, column rules, newsprint photos, squared link boxes) instead of rounded app cards, so the whole page reads as one newspaper.
+
 ### 0.9.5
 
 - Analysis & Opinion is laid out like a newspaper: a masthead with dateline, a section strip, and ruled square boxes (a lead column with a drop cap beside a side column, three columns across, a photo feature, pull-quote boxes), newsprint-toned photos, sharp (the publisher's full-size photo when the feed only has a thumbnail).

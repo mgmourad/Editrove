@@ -300,7 +300,7 @@ private fun LazyListScope.followingTab(
     }
     item("f-discover") {
         Row(
-            Modifier.widthIn(max = 1100.dp).fillMaxWidth().padding(top = 6.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, c.rule, RoundedCornerShape(12.dp))
+            Modifier.widthIn(max = 1100.dp).fillMaxWidth().padding(top = 6.dp).border(1.dp, c.rule)
                 .clickable(onClick = onDiscover).padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -321,7 +321,7 @@ private fun LazyListScope.followingTab(
                 when {
                     posts == null -> Status(c, tr(R.string.op_loading))
                     posts!!.isEmpty() -> Status(c, tr(R.string.op_nothing))
-                    else -> posts!!.take(40).forEach { PostCard(c, it, followed = true, actions) }
+                    else -> PostBoxes(c, posts!!.take(40), { true }, actions)
                 }
             }
         }
@@ -357,7 +357,7 @@ private fun LazyListScope.topicTab(
             when {
                 posts == null -> Status(c, tr(R.string.op_loading))
                 posts!!.isEmpty() -> Status(c, tr(R.string.op_nothing))
-                else -> posts!!.take(25).forEach { PostCard(c, it, followed = it.authorHandle in accounts, actions) }
+                else -> PostBoxes(c, posts!!.take(25), { it.authorHandle in accounts }, actions)
             }
         }
     }
@@ -929,58 +929,86 @@ private fun ColumnCard(c: OpEdPalette, a: Article, followed: Boolean, actions: O
     if (rule) Box(Modifier.fillMaxWidth().height(1.dp).background(c.rule))
 }
 
+/**
+ * Posts laid out like letters on a comment page: ruled square boxes, three across on a wide
+ * screen (two on a narrow one, one on a phone), column rules between, all cells in a row level.
+ */
 @Composable
-private fun PostCard(c: OpEdPalette, p: SocialPost, followed: Boolean, actions: OpinionActions) {
+private fun PostBoxes(c: OpEdPalette, posts: List<SocialPost>, followed: (SocialPost) -> Boolean, actions: OpinionActions) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val per = when { maxWidth >= 840.dp -> 3; maxWidth >= 560.dp -> 2; else -> 1 }
+        Column(Modifier.fillMaxWidth()) {
+            posts.chunked(per).forEach { row ->
+                Column(Modifier.fillMaxWidth().padding(top = 14.dp).border(1.dp, c.rule)) {
+                    Box(Modifier.fillMaxWidth().height(3.dp).background(c.text))
+                    Cells {
+                        row.forEachIndexed { j, p -> Cell(c, j, Modifier.weight(1f)) { PostCell(c, p, followed(p), actions) } }
+                        // A short last row keeps its columns the same width as the rows above.
+                        repeat(per - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One post set as newsprint: who and where in small capitals, the post in the serif, a squared link box. */
+@Composable
+private fun PostCell(c: OpEdPalette, p: SocialPost, followed: Boolean, actions: OpinionActions) {
     val context = LocalContext.current
-    Column(
-        // Letters to the editor: a ruled box, square like a page, not an app card.
-        Modifier.fillMaxWidth().padding(vertical = 8.dp).background(c.surface)
-            .border(1.dp, c.rule)
-            .clickable { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(p.url))) } }
-            .padding(14.dp),
-    ) {
+    Column(Modifier.fillMaxSize().clickable { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(p.url))) } }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            coil.compose.AsyncImage(p.avatar, null, contentScale = ContentScale.Crop, modifier = Modifier.size(36.dp).clip(CircleShape).background(c.rule))
+            coil.compose.AsyncImage(
+                p.avatar, null, contentScale = ContentScale.Crop, colorFilter = Newsprint,
+                modifier = Modifier.size(30.dp).clip(CircleShape).background(c.rule),
+            )
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(p.authorName, style = sans(14.sp, FontWeight.SemiBold), color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(p.authorName, style = serif(16.sp, FontWeight.Bold, lineHeight = 20.sp), color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     // Handle and network kept left-to-right inside right-to-left text.
-                    "\u2066@${p.authorHandle}\u2069  ·  ${p.network}  ·  ${NewsProcessor.formatRelativeTime(p.createdAt)}",
-                    style = sans(11.sp), color = c.dim, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    ("\u2066@${p.authorHandle}\u2069 · ${p.network}").uppercase(),
+                    style = mono(9.sp, FontWeight.Bold, 0.12.em), color = c.accent, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (p.network == "Bluesky") FollowChip(c, followed) { actions.toggleAccount(p.authorHandle) }
         }
         Spacer(Modifier.height(10.dp))
-        Text(p.text, style = sans(14.5.sp, lineHeight = 22.sp), color = c.text, maxLines = 10, overflow = TextOverflow.Ellipsis)
+        Text(p.text, style = serif(15.sp, FontWeight.Normal, lineHeight = 22.sp), color = c.text.copy(alpha = 0.88f), maxLines = 9, overflow = TextOverflow.Ellipsis)
         val link = p.linkUrl
         if (link != null) {
             Spacer(Modifier.height(10.dp))
             Row(
-                Modifier.fillMaxWidth().border(1.dp, c.rule)
-                    .clickable { actions.openLink(link) }.padding(10.dp),
+                Modifier.fillMaxWidth().border(1.dp, c.rule).clickable { actions.openLink(link) }.padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                p.image?.let { coil.compose.AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.size(56.dp).clip(RoundedCornerShape(6.dp))) ; Spacer(Modifier.width(10.dp)) }
+                p.image?.let {
+                    coil.compose.AsyncImage(it, null, contentScale = ContentScale.Crop, colorFilter = Newsprint, modifier = Modifier.size(54.dp).border(1.dp, c.rule))
+                    Spacer(Modifier.width(10.dp))
+                }
                 Column(Modifier.weight(1f)) {
-                    Text(p.linkTitle ?: link, style = serif(15.sp, FontWeight.SemiBold, lineHeight = 20.sp), color = c.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(runCatching { Uri.parse(link).host?.removePrefix("www.") }.getOrNull().orEmpty(), style = mono(10.sp), color = c.dim)
+                    Text(p.linkTitle ?: link, style = serif(14.5.sp, FontWeight.Bold, lineHeight = 19.sp), color = c.text, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    Text(runCatching { Uri.parse(link).host?.removePrefix("www.") }.getOrNull().orEmpty().uppercase(), style = mono(9.sp, tracking = 0.1.em), color = c.dim, maxLines = 1)
                 }
             }
         } else if (p.image != null) {
             Spacer(Modifier.height(10.dp))
-            coil.compose.AsyncImage(p.image, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(8.dp)))
+            coil.compose.AsyncImage(p.image, null, contentScale = ContentScale.Crop, colorFilter = Newsprint, modifier = Modifier.fillMaxWidth().height(170.dp).border(1.dp, c.rule))
         }
+        // The footer sits on the box's bottom line, level across the row.
+        Spacer(Modifier.weight(1f))
         Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.FavoriteBorder, null, tint = c.dim, modifier = Modifier.size(14.dp))
-            Text(" ${p.likes}", style = mono(11.sp), color = c.dim)
-            Spacer(Modifier.width(14.dp))
-            Icon(Icons.Outlined.Repeat, null, tint = c.dim, modifier = Modifier.size(14.dp))
-            Text(" ${p.reposts}", style = mono(11.sp), color = c.dim)
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.rule))
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(NewsProcessor.formatRelativeTime(p.createdAt), style = mono(9.5.sp, tracking = 0.04.em), color = c.dim, maxLines = 1)
+            Spacer(Modifier.width(12.dp))
+            Icon(Icons.Outlined.FavoriteBorder, null, tint = c.dim, modifier = Modifier.size(13.dp))
+            Text(" ${p.likes}", style = mono(10.sp), color = c.dim)
+            Spacer(Modifier.width(10.dp))
+            Icon(Icons.Outlined.Repeat, null, tint = c.dim, modifier = Modifier.size(13.dp))
+            Text(" ${p.reposts}", style = mono(10.sp), color = c.dim)
+            Spacer(Modifier.weight(1f))
             if (p.network == "Bluesky") {
-                Spacer(Modifier.weight(1f))
+                FollowChip(c, followed) { actions.toggleAccount(p.authorHandle) }
                 CardBell(c, accountKey(p.authorHandle), followed, onFollow = { actions.toggleAccount(p.authorHandle) }) { actions.toggleMute(accountKey(p.authorHandle)) }
             }
         }
